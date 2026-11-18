@@ -81,6 +81,36 @@ class EvidenceError(Exception):
     pass
 
 
+# SARIF snippet 에 실린 비밀 값을 가린다(교차 리뷰 X33). prove.py REDACT 와 같아야 한다(tests/test_redact.py).
+# 지문(partialFingerprints)도 가린 글로 만든다: 비밀 값의 해시가 code scanning 으로 나가지 않게
+REDACT = (
+    r"(?i)(-(?:src|dest)?(?:storepass|keypass)\s+)(\"[^\"]*\"|'[^']*'|[^\s\"'`]+)",
+    r"(?i)(\bpass:)(\"[^\"]*\"|'[^']*'|[^\s\"'`]+)",
+    r"(?i)(\b(?:password|passwd|passphrase|pwd|secret|client_secret|api[_-]?key|access[_-]?key|secret[_-]?key|private[_-]?key|token|"
+    r"(?:access|refresh|auth|api|bearer)[_-]?token)\b[\"']?\s*[:=]\s*)(\"[^\"]*\"|'[^']*'|[^\s\"'`,;)]+)",
+    r"(?i)(\bbearer\s+)([A-Za-z0-9._~+/=-]{8,})",
+    r"()(\b(?:ghp_|gho_|ghu_|ghs_|ghr_|github_pat_|glpat-|xox[abprs]-|sk-|AKIA|ASIA|AIza)[A-Za-z0-9_-]{10,})",
+)
+_REDACT = [re.compile(p) for p in REDACT]
+MASK = "***"
+
+
+def redact(text):
+    """text 의 비밀처럼 보이는 값을 *** 로 바꾼다. (바꾼 글, 가린 곳 수). 이미 *** 인 값은 세지 않는다."""
+    n = 0
+
+    def sub(m):
+        nonlocal n
+        if m.group(2) in (MASK, f'"{MASK}"', f"'{MASK}'"):
+            return m.group(0)
+        n += 1
+        return m.group(1) + MASK
+
+    for rx in _REDACT:
+        text = rx.sub(sub, text)
+    return text, n
+
+
 # ---------------------------------------------------------------------------------------------
 # RFC 8785 정규형(이 증적에 나오는 값: 문자열·정수·참거짓·null·배열·객체, 드물게 실수)
 def _es_number(x):
@@ -216,6 +246,7 @@ class Builder:
         self.checks = {c["id"]: c for c in self.r.get("checks", []) if isinstance(c, dict)}
         self.results, self.notes, self.seen = [], [], {}
         self.located = set()
+        self.masked = 0
 
     def t(self, en, ko):
         return ko if self.lang == "ko" else en
@@ -239,6 +270,10 @@ class Builder:
     def add(self, rule, level, text, path, line=None, end=None, snippet=None, key="", props=None):
         if level is None:
             return
+        if snippet:
+            snippet, n = redact(snippet)
+            self.masked += n
+        key = redact(key)[0]
         norm = re.sub(r"[ \t]+", " ", key or snippet or text).strip()
         base = f"{rule}|{path}|{norm}"
         n = self.seen.get(base, 0)
@@ -425,6 +460,7 @@ class Builder:
                 "verdict": self.r.get("verdict"), "receiptId": self.r.get("receipt_id"), "receiptFormat": self.r.get("format"),
                 "checks": self.status, "checkCounts": counts,
                 "notCountedAsPass": sorted(k for k, v in self.status.items() if v in NOT_PASSED),
+                "redactedSnippets": self.masked,
             },
         }
         return {"$schema": SARIF_SCHEMA, "version": "2.1.0", "runs": [run]}

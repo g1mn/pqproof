@@ -158,7 +158,7 @@ Each run writes a new folder (`OUT=...`, default `./proof-out-YYYYMMDD-HHMMSS`, 
 - `tables/summary.csv` (the checks), `tables/java.csv` and `tables/java-usage.csv` (classical lines per rule and per location), `tables/tls.csv` (TLS results).
 - `artifacts/`: raw scanner output, the copies of `residue.sh` and `scan/test-paths.ere` that ran, TLS probe transcripts, the weakening result and the list of changed files.
 
-The output names absolute paths on your machine: the input folders, the tools and the output folder in `receipt.json` and `receipt.html`, and the scanned folder and command line at the top of each CBOM report. Check them before you hand the folder to someone else.
+Before you hand the folder to someone else, check what it carries. It names absolute paths on your machine: the input folders, the tools and the output folder in `receipt.json` and `receipt.html`, and the scanned folder and command line at the top of each CBOM report. For a zip input, `in/` holds the whole unpacked source. The scanner output under `artifacts/` quotes source lines as they are. In the excerpts the tool writes itself (the note column of `tables/cbom-*.csv`, `tables/report.md`) and in SARIF snippets, values that look like secrets are replaced by `***`: the value after `-storepass`, `-keypass` or `pass:`, after `password=`, `secret=`, `token=` and similar names, after `Bearer`, and strings with known token prefixes. The console says how many it masked. Masking inside the scanner output itself comes with the next ruleset, because `cbom-scan.sh` is a rule file.
 
 The evidence hash is the `receipt_id` field. It is the SHA-256 of `receipt.json` without that field, written in RFC 8785 canonical form (JSON Canonicalization Scheme). `bash prove.sh --verify <folder>` recomputes it, checks every file hash and the unpacked input tree, rebuilds the HTML page and `deck.json` to compare, and checks that `evidence-fragment.json` and `tables/report.md` give the same verdict. Anyone can edit the files and write fresh hashes, so the hash only tells you something when you compare it with a value from a place you trust, such as the console output of the run or a submission record.
 
@@ -228,7 +228,7 @@ Before it measures your server, the probe tests itself against two local referen
 
 ## SARIF and the GitHub Action
 
-`pqproof sarif <output folder> [-o file] [--uri-prefix path/] [--anchor file]` (or `bash prove.sh sarif ...` from a clone) turns the evidence into SARIF 2.1.0 for GitHub code scanning. It first recomputes `receipt_id` and the SHA-256 of every file it reads. On a mismatch it writes nothing and exits 2. Fingerprints hash the rule, path, algorithm and snippet without the line number, so an alert survives a line shift.
+`pqproof sarif <output folder> [-o file] [--uri-prefix path/] [--anchor file]` (or `bash prove.sh sarif ...` from a clone) turns the evidence into SARIF 2.1.0 for GitHub code scanning. It first recomputes `receipt_id` and the SHA-256 of every file it reads. On a mismatch it writes nothing and exits 2. Fingerprints hash the rule, path, algorithm and snippet without the line number, so an alert survives a line shift. Snippets go through the same secret masking as the tables, before they are written and before they are hashed, and `run.properties.redactedSnippets` counts the masked values.
 
 | Rule | Source | Level |
 |---|---|---|

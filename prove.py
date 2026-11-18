@@ -776,10 +776,44 @@ def csv_text(head, rows):
     return "﻿" + buf.getvalue()
 
 
+# 발췌에 실린 비밀 값을 가린다(교차 리뷰 X33): keytool·jarsigner 의 -storepass·-keypass 값, OpenSSL pass:값, password=·token= 같은
+# 대입 값, 알려진 토큰 접두사. 원문(artifacts/ 의 스캐너 출력, zip 입력을 푼 in/)은 그대로다. src/pqproof/sarif.py REDACT 와 같아야 한다
+REDACT = (
+    r"(?i)(-(?:src|dest)?(?:storepass|keypass)\s+)(\"[^\"]*\"|'[^']*'|[^\s\"'`]+)",
+    r"(?i)(\bpass:)(\"[^\"]*\"|'[^']*'|[^\s\"'`]+)",
+    r"(?i)(\b(?:password|passwd|passphrase|pwd|secret|client_secret|api[_-]?key|access[_-]?key|secret[_-]?key|private[_-]?key|token|"
+    r"(?:access|refresh|auth|api|bearer)[_-]?token)\b[\"']?\s*[:=]\s*)(\"[^\"]*\"|'[^']*'|[^\s\"'`,;)]+)",
+    r"(?i)(\bbearer\s+)([A-Za-z0-9._~+/=-]{8,})",
+    r"()(\b(?:ghp_|gho_|ghu_|ghs_|ghr_|github_pat_|glpat-|xox[abprs]-|sk-|AKIA|ASIA|AIza)[A-Za-z0-9_-]{10,})",
+)
+_REDACT = [re.compile(p) for p in REDACT]
+MASK = "***"
+
+
+def redact(text):
+    """text 의 비밀처럼 보이는 값을 *** 로 바꾼다. (바꾼 글, 가린 곳 수). 이미 *** 인 값은 세지 않는다."""
+    n = 0
+
+    def sub(m):
+        nonlocal n
+        if m.group(2) in (MASK, f'"{MASK}"', f"'{MASK}'"):
+            return m.group(0)
+        n += 1
+        return m.group(1) + MASK
+
+    for rx in _REDACT:
+        text = rx.sub(sub, text)
+    return text, n
+
+
 def cbom_csv(items):
-    return csv_text(["위치", "출처", "용도·종류", "알고리즘", "양자 위협", "판정", "허용·참고 사유", "비고"],
-                    [[i["loc"], i["source"], i["use"], i["alg"], i["threat"], STATUS_LABEL[i["status"]], i["reason"], i["note"]]
-                     for i in sorted(items, key=lambda x: (-RANK[x["status"]], x["loc"], x["tool"]))])
+    """CBOM 표 CSV 와 비고 칸에서 가린 곳 수. 비고 칸의 발췌는 redact() 를 거친다."""
+    rows, masked = [], 0
+    for i in sorted(items, key=lambda x: (-RANK[x["status"]], x["loc"], x["tool"])):
+        note, n = redact(i["note"])
+        masked += n
+        rows.append([i["loc"], i["source"], i["use"], i["alg"], i["threat"], STATUS_LABEL[i["status"]], i["reason"], note])
+    return csv_text(["위치", "출처", "용도·종류", "알고리즘", "양자 위협", "판정", "허용·참고 사유", "비고"], rows), masked
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1046,7 +1080,7 @@ def report_md(r, fixed_items, ev):
     jf = (r.get("java") or {}).get("fixed") or {}
     res_left = ((jf.get("listed") or {}).get("left") or []) if (r.get("params") or {}).get("scope") != "kex" else []
     if blocks or res_left:
-        rows = [[f"`{loc}`", it["alg"] or it["use"], "a-cbom", it["reason"] or it["note"][:90]] for loc, it in blocks[:20]]
+        rows = [[f"`{loc}`", it["alg"] or it["use"], "a-cbom", it["reason"] or redact(it["note"])[0][:90]] for loc, it in blocks[:20]]
         rows += [[f"`{x.split(' ', 1)[1]}`", x.split(" ", 1)[0], "c-classic", "사유 없이 남은 고전 공개키 코드 줄"] for x in res_left[:20]]
         out += ["막는 위치(실패 원인)", "", md_table(["위치", "알고리즘·규칙", "검사", "까닭"], rows), ""]
         more = []
@@ -1069,7 +1103,7 @@ def report_md(r, fixed_items, ev):
     rows = []
     for loc in sorted(left, key=lambda k: (-RANK[left[k]["status"]], k))[:12]:
         it = left[loc]
-        why = it["reason"] or it["note"][:90]
+        why = it["reason"] or redact(it["note"])[0][:90]
         todo = {"allow": "폐기 조건·시점을 정한다", "review": "쓰기 경로: 고치거나 사유를 사람이 확인"}.get(it["status"],
                                                                                           "사람이 확인: 고전이면 고친다")
         rows.append([f"{it['alg'] or it['use']} ({STATUS_LABEL[it['status']]})", f"`{loc}`", why, todo])
@@ -1240,6 +1274,7 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
     sig_f = tls_signals(root_sf, scan_f)
     cbom = {}
     cbom_items = {}
+    masked = 0  # 표 발췌에서 가린 비밀 값 수(콘솔에만 적는다: 증적 형식 2에는 칸이 없다)
     for side, root, rows, sig, lns, tree in (("orig", root_so, scan_o, sig_o, lines_o, tree_so),
                                              ("fixed", root_sf, scan_f, sig_f, lines_f, tree_sf)):
         d = os.path.join(out, "artifacts", f"cbom-{side}")
@@ -1250,7 +1285,9 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
         art.register_dir(f"artifacts/cbom-{side}")
         items, counts, nloc = merge_cbom(crow, rows, lns, sig[2], params.scope, allow if side == "fixed" else None)
         cbom_items[side] = items
-        p, s = art.add(f"tables/cbom-{side}.csv", cbom_csv(items))
+        table, n_masked = cbom_csv(items)
+        masked += n_masked
+        p, s = art.add(f"tables/cbom-{side}.csv", table)
         cbom[side] = {"rows": len(items), "locations": nloc, "blocking": counts["block"], "allowed": counts["allow"],
                       "review": counts["review"],
                       "comment_or_test": counts["comment"], "tests": counts["tests"], "check": counts["check"], "info": counts["info"],
@@ -1683,6 +1720,9 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
                  + "".join(f" · {STATUS_KO[s]} {tally[s]}" for s in ("review", "na", "undecided", "fail", "check") if tally[s])
                  + " (통과로 세는 것은 '통과'뿐)"
                  + f" · 도구 {r['tool_version']} · 규칙 묶음 {r['ruleset_version']} · 증적 형식 {r['format_version']}")
+    if masked:
+        lines.append(f"비밀번호·토큰처럼 보이는 값 {masked}곳을 표 발췌에서 *** 로 가렸다(원문은 artifacts/ 와 in/ 에 그대로 있다. "
+                     "폴더를 넘기기 전에 확인한다)")
     lines.append(f"검증 증적 다시 확인: {'ok' if not bad else 'FAIL'} ({len(vres)}개 검사)" + ("" if not bad else ": " + "; ".join(bad[:3])))
     lines += next_steps(r, cbom_items["fixed"], out)
     if bad:
