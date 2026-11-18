@@ -231,8 +231,8 @@ jobs:
           shellcheck --version | head -2
           shellcheck -S warning prove.sh build-probe.sh scan/residue.sh scan/cbom-scan.sh
 
-      - name: zizmor (workflows, the action and the example workflow)
-        run: zizmor --offline --min-severity medium .github/workflows/ action.yml examples/github-actions/pqproof-sarif.yml
+      - name: zizmor (workflows, the action and the example workflows)
+        run: zizmor --offline --min-severity medium .github/workflows/ action.yml examples/github-actions/pqproof-sarif.yml examples/github-actions/pqproof-check.yml
 
       - name: Schemas match the code
         run: python3 -I -B tests/make_schemas.py --check

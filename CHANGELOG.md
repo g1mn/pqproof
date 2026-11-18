@@ -12,7 +12,11 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 ## [Unreleased]
 
-Planned as 0.2.0: ruleset 2 (new name and hash), evidence format 3. Bypasses from the November review (X01 to X10) are closed, and the rule gaps X11, X18 to X26, X28 and X59 with them. `--verify` still reads evidence formats 1 and 2 (ruleset 1).
+**Verdict impact (판정 영향): none.**
+
+## [0.2.0] - 2026-11-19
+
+Tool 0.2.0, ruleset 2 (new name and hash, eleven rule files), evidence format 3. Bypasses from the November review (X01 to X10) are closed, and the rule gaps X11, X18 to X28, X30, X31, X47, X56 to X59 and X62 with them. New commands `pqproof check` and `pqproof inventory`, new settings `PROFILE`, `FAIL_ON_REVIEW`, `REQUIRE_RESOLVED`, `EXPECT_FROM`, `REVIEW_MAX_AGE_DAYS` and `MAX_FILE_MIB`, and exit codes 4 (tool error) and 5 (pass that needs review, only with `FAIL_ON_REVIEW=1`). `--verify` still reads evidence formats 1 and 2 (ruleset 1).
 
 **Verdict impact (판정 영향): yes.** The 14 golden tree cases of 0.1.1 give the same verdicts and check statuses. Their counts move in three places: `E-MLKEM768` drops from 3 to 2 in the migrated example because a trailing `#` comment no longer counts as code, lower-case `ecdsa` now counts under `G-EC`, and `m04` gets one more weakening hit (its TLS 1.0 protocol list also leaves out TLS 1.3); the four new `EXPECT` rules appear with 0. Nineteen new golden cases plant one bypass or false positive each, and 0.1.1 gives a different verdict or check status on every one of them. Trees that used one of these bypasses get a different verdict, and a tree hash changes when the tree holds a folder that the skip rules now treat differently.
 
@@ -171,6 +175,7 @@ First public release: tool 0.1.0, ruleset 1, evidence format 2. The comparison p
 - Every TLS target in `receipt.json` now has `openssl_agrees`. Without OpenSSL 3.5 (Ubuntu's 3.0, macOS LibreSSL) it is `null` and `openssl_note` says 교차 확인 불가 (cross-check not possible). Before, the field was missing and code that read it failed.
 - `--verify` checks that the residue script hash in `tools[]` matches the copy in `artifacts/` (`java.script_sha256`). Before, the two could differ and the evidence still verified.
 
-[Unreleased]: https://github.com/g1mn/pqproof/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/g1mn/pqproof/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/g1mn/pqproof/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/g1mn/pqproof/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/g1mn/pqproof/releases/tag/v0.1.0
