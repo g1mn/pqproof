@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 # e2e_orders_edge.py: prove.sh 시험 1(orders-edge). 단위 시험(--unit)에 안 들어가게 이름이 test_로 시작하지 않는다.
+# 손으로 돌리는 시험이다: orders-edge 전체 클론(vendor/ 포함)과 Go 가 있어야 해서 CI·릴리스 워크플로는 돌리지 않는다.
+#   같은 판정 흐름의 오프라인 판은 셀프 시험 S4·S5(tests/fixtures/orders-edge 스냅숏)가 매번 돈다.
 # 정답 수정과 주입 수정은 from g1mn/pq-proof 7b7803f (MIT) e2e/orders-edge-scripted-model.json·orders-edge-injected-model.json
 # (tests/fixtures 사본)이다.
 """orders-edge 사본 세 판(원본·정답 수정·InsecureSkipVerify 주입)을 만들고 Go API를 맥에서 띄워 prove.sh를 TLS 실측과 함께 돌린다.

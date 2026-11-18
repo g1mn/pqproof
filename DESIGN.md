@@ -204,7 +204,7 @@ bash scan/cbom-scan.sh --selftest    # scanner assertions
 | S8f | `examples/classic` plus `tools/old_rsa.py` | `examples/pqc` (that file deleted), with a reviewed entry for `tools/old_rsa.py:1-44` | the entry is invalid in the fixed tree and counts as unused; `REQUIRE_REVIEW=1` fails |
 | S10 | `examples/classic` with its Java moved to `src/main/java/com/example/` | (a) the same with only the Python migrated, (b) a Java-only tree migrated to ML-KEM and ML-DSA | (a) fails `a-cbom` and `c-classic`, with no test lines; (b) passes |
 
-`tests/e2e_orders_edge.py` goes further: it builds the orders-edge Go service from a full clone (with `vendor/`), runs it, and measures the original, the fix and an injected weakening over real TLS.
+`tests/e2e_orders_edge.py` goes further: it builds the orders-edge Go service from a full clone (with `vendor/`), runs it, and measures the original, the fix and an injected weakening over real TLS. It needs that clone and Go, so it is run by hand; CI does not run it, and S4 and S5 cover the same flow offline on every run.
 
 ### Mutation suite
 
