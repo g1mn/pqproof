@@ -1,0 +1,39 @@
+# 주간 코드 변이: 규칙 코드(residue.sh·test-paths.ere·prove.py 허용 규칙·verify.py·sarif.py·deps.py)에 작은 변이를 하나씩 넣은
+# 사본마다 행동·동기 시험을 돌려 살아남은 변이 수를 센다(tests/code_mutants.py). 살아남은 변이가 있으면 실패한다.
+# 판정 고정 기록(golden)과 해시 고정 시험은 규칙이 바뀌면 늘 실패하므로 여기서는 쓰지 않는다. 액션은 커밋 SHA 로 고정한다.
+name: Code mutants
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"  # 월요일 03:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  mutants:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: "3.13"
+      - name: Code mutants (every planted change must fail a behaviour or sync test)
+        run: python3 -I tests/code_mutants.py --baseline --json code-mutants.json
+      - name: Keep the result
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: code-mutants
+          path: code-mutants.json
+          if-no-files-found: ignore
