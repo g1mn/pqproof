@@ -4,6 +4,8 @@
 # OpenSSL 3.5 미만: ubuntu-latest 의 OpenSSL 3.0 이 그 경우다(TLS 교차 확인은 '교차 확인 불가'로 적힌다). macOS 는 Homebrew
 # OpenSSL 3.5 이상으로 돌고, 따로 LibreSSL(맥 기본 /usr/bin/openssl)로 단위 시험을 한 번 더 돈다.
 # 판정 고정 기록: 변이 시험의 트리 항목(예제 대조군 포함)은 tests/golden/verdicts.json 과 판정·검사 칸·숫자가 같아야 한다.
+# 버전 정책: 판정이 바뀌는 변경은 PATCH 로 낼 수 없다. version-policy 작업이 tests/version_policy.py 로 ruleset.json·CHANGELOG 와
+# 마지막 릴리스 태그를 대조한다(버전이 그대로면 다음 릴리스가 MINOR 여야 하는지 알림만).
 # 액션은 모두 커밋 SHA 로 고정한다(주석은 그 SHA 의 태그). Dependabot 이 갱신 PR 을 연다(.github/dependabot.yml).
 name: CI
 
@@ -205,6 +207,25 @@ jobs:
             mutations-result.json
             selfcheck-result.json
           if-no-files-found: ignore
+
+  version-policy:
+    name: version policy (no verdict change in a PATCH release)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0  # 마지막 릴리스 태그와 비교한다
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: "3.13"
+
+      - name: Version policy against the latest release tag
+        run: |
+          base=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)
+          echo "latest release: ${base:-none}"
+          python3 -I tests/version_policy.py ${base:+--base "$base"}
 
   action:
     name: composite action (action.yml)

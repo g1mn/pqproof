@@ -2,10 +2,12 @@
 #   도구 버전(tool_version)   : src/pqproof/__init__.py 의 __version__ 한 곳(pyproject 는 동적으로 읽고, prove.sh --version 도 여기서 읽는다)
 #   규칙 묶음(ruleset)        : 판정을 정하는 규칙 파일 여섯의 해시 묶음. 버전 이름과 해시의 짝은 scan/ruleset.json 에 적는다
 #   증적 형식(format_version) : receipt.json 의 꼴. 이 칸이 없는 옛 증적은 형식 1로 읽는다(pqlite/receipt.py 가 계속 읽는다)
-# 규칙 파일을 고치면 해시가 바뀐다. 그때는 scan/ruleset.json 에 새 버전 이름과 해시를 더하고 current 를 옮기며, CHANGELOG 의
-# '판정 영향' 칸에 적는다(tests/test_versioning.py 가 짝이 안 맞으면 실패한다).
-#   python3 -I -B pqlite/version.py            → "pqproof 0.1.0 (ruleset 1, evidence format 2)"
-#   python3 -I -B pqlite/version.py --ruleset  → 지금 규칙 파일로 계산한 ruleset_sha256
+# 규칙 파일을 고치면 해시가 바뀐다. 그때는 scan/ruleset.json 에 새 버전 이름과 기록(sha256·since·verdict_impact·files)을 더하고
+# current 를 옮기며, CHANGELOG 의 '판정 영향' 칸에 적는다(tests/test_versioning.py 와 tests/version_policy.py 가 짝이 안 맞으면 실패한다).
+# ruleset.json 의 옛 꼴({이름: sha256})도 읽는다.
+#   python3 -I -B pqlite/version.py                 → "pqproof 0.1.0 (ruleset 1, evidence format 2)"
+#   python3 -I -B pqlite/version.py --ruleset       → 지금 규칙 파일로 계산한 ruleset_sha256
+#   python3 -I -B pqlite/version.py --ruleset-json  → 지금 규칙 파일의 sha256·files(ruleset.json 새 기록의 바탕, since·verdict_impact 는 사람이 적는다)
 """Tool version, ruleset version and hash, and evidence format version for PQ-Proof."""
 import hashlib
 import json
@@ -64,19 +66,39 @@ def ruleset_from_tools(tools):
     return ruleset_digest({path: by_name.get(name) for path, name in RULESET_FILES})
 
 
+def current_ruleset_files(root=ROOT):
+    """지금 규칙 파일 여섯의 [{"path", "sha256"}](경로 순, 없는 파일은 sha256 None)."""
+    return [{"path": p, "sha256": (_sha256_file(os.path.join(root, *p.split("/"))) if os.path.isfile(os.path.join(root, *p.split("/")))
+                                   else None)} for p, _ in sorted(RULESET_FILES)]
+
+
 def current_ruleset_sha256(root=ROOT):
-    return ruleset_digest({p: (_sha256_file(os.path.join(root, *p.split("/"))) if os.path.isfile(os.path.join(root, *p.split("/")))
-                              else None) for p, _ in RULESET_FILES})
+    return ruleset_digest({f["path"]: f["sha256"] for f in current_ruleset_files(root)})
 
 
-def ruleset_history(path=RULESET_JSON):
-    """scan/ruleset.json: {"current": 이름, "versions": {이름: sha256}}. 못 읽으면 빈 기록."""
+def ruleset_entries(path=RULESET_JSON):
+    """scan/ruleset.json 의 묶음 기록: (current, {이름: {"sha256", "since", "verdict_impact", "files"}}).
+    새 꼴은 이름마다 객체({"sha256": …, "since": "0.1.0", "verdict_impact": "yes"|"no", "files": [{"path", "sha256"}]}),
+    옛 꼴은 이름마다 sha256 문자열이다(그때 다른 칸은 None). 못 읽으면 (None, {})."""
     try:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
-        return str(data["current"]), {str(k): str(v) for k, v in data["versions"].items()}
+        out = {}
+        for k, v in data["versions"].items():
+            if isinstance(v, str):
+                out[str(k)] = {"sha256": v, "since": None, "verdict_impact": None, "files": None}
+            else:
+                out[str(k)] = {"sha256": str(v["sha256"]), "since": v.get("since"), "verdict_impact": v.get("verdict_impact"),
+                               "files": v.get("files")}
+        return str(data["current"]), out
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
         return None, {}
+
+
+def ruleset_history(path=RULESET_JSON):
+    """scan/ruleset.json 의 (current, {이름: sha256}). 못 읽으면 (None, {})."""
+    current, entries = ruleset_entries(path)
+    return current, {k: v["sha256"] for k, v in entries.items()}
 
 
 def ruleset_label(digest, path=RULESET_JSON):
@@ -96,6 +118,9 @@ def describe():
 def main(argv):
     if argv[:1] == ["--ruleset"]:
         print(current_ruleset_sha256())
+        return 0
+    if argv[:1] == ["--ruleset-json"]:
+        print(json.dumps({"sha256": current_ruleset_sha256(), "files": current_ruleset_files()}, indent=1))
         return 0
     print(describe())
     return 0

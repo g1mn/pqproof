@@ -313,9 +313,9 @@ A different ruleset name alone (`1+modified` while rule files are being edited) 
 
 ## Versioning and maintenance
 
-- Semantic Versioning. A change that can move a verdict (a detection pattern, the test-path list, an allow rule, a check added or removed) bumps MINOR while the version is 0.x, and MAJOR from 1.0. A change that moves no verdict bumps PATCH. Only the latest MINOR release gets fixes.
+- Semantic Versioning. While the version is 0.x, a change that can move a verdict (a detection pattern, the test-path list, an allow rule, a check added or removed) bumps MINOR, and so does a new command or option. From 1.0 a verdict change bumps MAJOR and a new command or option bumps MINOR. Other fixes bump PATCH, so a release that moves a verdict is never a PATCH release. `tests/version_policy.py` checks this in CI and in the release workflow, against the previous release tag. Only the latest MINOR release gets fixes.
 - The version is set once, in `src/pqproof/__init__.py`. `pyproject.toml` reads it, and so do `bash prove.sh --version`, `pqproof --version` and `receipt.json`.
-- A changed rule file needs a new ruleset name and hash in `scan/ruleset.json`, and `tests/test_versioning.py` fails until it is there. If verdicts moved, rewrite `tests/golden/verdicts.json` with `run_mutations.py --write-golden` and describe the change under "Verdict impact" in `CHANGELOG.md`, all in the same commit.
+- A changed rule file needs a new ruleset entry in `scan/ruleset.json`: its hash, `since` (the first version that ships it), `verdict_impact` (`yes`, or `no` when only comments or wording changed) and the hash of each rule file. `python3 pqlite/version.py --ruleset-json` prints the hashes. `tests/test_versioning.py` fails until the entry is there, and it names the rule files that changed. If verdicts moved, rewrite `tests/golden/verdicts.json` with `run_mutations.py --write-golden` and write "Verdict impact: yes" in `CHANGELOG.md`, all in the same commit. The version policy check fails when golden verdicts moved since the last release tag and the matching CHANGELOG entry (`[Unreleased]` before the release) does not say yes. `scan/ruleset.json` written in the old form (a bare hash per name) is still read.
 - A change to the evidence format raises `format_version` and keeps reading the older formats. Before such a release, save evidence from the current version with `tests/golden/make_fixture.py` so that `tests/test_golden.py` keeps checking it.
 - A release starts from a tag `vX.Y.Z` (`.github/workflows/release.yml`). The tag must match the version and a dated `CHANGELOG.md` entry. The workflow builds the wheel and the sdist, the three `tls_probe` binaries with `SHA256SUMS` and `BUILDINFO`, and a CycloneDX SBOM of the package, attaches GitHub build provenance to every asset (`gh attestation verify <file> --repo g1mn/pqproof`), and publishes to PyPI with Trusted Publishing.
 - Workflow actions are pinned to commit SHAs, and Dependabot proposes updates for actions and pip.
@@ -380,7 +380,7 @@ On the eight practice tasks I wrote for rehearsal, the verdicts did not change, 
 |---|---|
 | `prove.sh`, `prove.py` | entry point and the checks |
 | `pqlite/` | code scanner, TLS-weakening rules, probe output parser, evidence writer and verifier, allowlist, versions |
-| `scan/` | `cbom-scan.sh` (CBOM scanner, bash and OpenSSL), `residue.sh` (classical-line counter), `test-paths.ere` (the test-path list both read), `ruleset.json` (ruleset names and hashes) |
+| `scan/` | `cbom-scan.sh` (CBOM scanner, bash and OpenSSL), `residue.sh` (classical-line counter), `test-paths.ere` (the test-path list both read), `ruleset.json` (ruleset names, hashes, first version and verdict impact) |
 | `src/pqproof/` | the `pqproof` command, the SARIF converter and the external-program check |
 | `probe/`, `build-probe.sh` | `tls_probe` source (Go standard library) and its offline build script |
 | `examples/` | the before and after trees used above and by the tests, and a GitHub Actions example |
@@ -404,4 +404,4 @@ Code comments and tool output are in Korean, as they were in the finals. Two wor
 - 한계: 통과는 이 규칙으로 찾은 것이 없다는 뜻일 뿐, 규칙이 옳다는 보장은 아니다. 기능과 성능은 보지 않는다. 허용 목록은 판정을 바꾼다. 사유가 맞는지는 도구가 모르니 사람이 확인해야 하고 실무 검토에서는 `REQUIRE_REVIEW=1`로 돌리기를 권한다. JSON·YAML 설정 값이 고르는 알고리즘은 보지 않는다. 넣은 소스 밖의 설정(호스트의 TLS 설정 등)도 못 보므로 판정이 실행 중인 서비스를 직접 시험한 결과와 다를 수 있다. 작은 서비스에서만 써 봤고 실서비스 규모로는 아직 검증하지 않았다.
 - 공개하면서 대회 문제와 관련된 내용, 개인 경로, 대회용 보고서 표를 뺐다. 참가자가 만든 도구이며 주최·주관기관이 검토하거나 보증하지 않았다.
 - 건너뛴 검사는 통과로 세지 않는다. 돌지 못한 검사는 이름과 함께 '해당 없음'이나 '미판정'으로 남고, 판정 뒤에 상태별 개수를 따로 찍는다. 단위·셀프 시험도 '통과 n · 건너뜀 m'으로 세며 `STRICT=1`이면 건너뛴 것이 있을 때 실패한다.
-- 버전: 도구 버전은 `src/pqproof/__init__.py` 한 곳에서 정한다. 증적에 도구 버전, 규칙 묶음 이름과 해시(스캐너 패턴·시험 경로·허용·약화 규칙 파일 여섯), 증적 형식을 남기고 `--verify`가 규칙 묶음 해시를 다시 계산한다. 이전 공개본이 쓴 옛 증적도 계속 읽는다. 판정이 바뀔 수 있는 규칙 변경은 0.x 동안 MINOR로 올리고 CHANGELOG.md의 '판정 영향' 칸에 적는다.
+- 버전: 도구 버전은 `src/pqproof/__init__.py` 한 곳에서 정한다. 증적에 도구 버전, 규칙 묶음 이름과 해시(스캐너 패턴·시험 경로·허용·약화 규칙 파일 여섯), 증적 형식을 남기고 `--verify`가 규칙 묶음 해시를 다시 계산한다. 이전 공개본이 쓴 옛 증적도 계속 읽는다. 판정이 바뀔 수 있는 변경과 새 명령·옵션은 0.x 동안 MINOR로, 그 밖 고침은 PATCH로 올린다. 판정이 바뀌는 릴리스는 PATCH가 될 수 없고 CI와 릴리스 작업이 앞 릴리스 태그와 대조해 막는다(`tests/version_policy.py`). 바뀐 내용은 CHANGELOG.md의 '판정 영향' 칸에 적는다.

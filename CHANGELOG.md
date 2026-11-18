@@ -4,8 +4,8 @@ All notable changes to PQ-Proof are listed here. The format follows [Keep a Chan
 
 Each release has a **Verdict impact (판정 영향)** line. It says whether the same two trees can get a different verdict, check status or count than they got with the previous release.
 
-- A rule change (detection pattern, test path, allow rule, a check added or removed) bumps MINOR while the version is 0.x, and MAJOR from 1.0 on. It also gets a new ruleset name in `scan/ruleset.json`.
-- A change that leaves every verdict alone bumps PATCH.
+- A change that can move a verdict (detection pattern, test path, allow rule, a check added or removed) bumps MINOR while the version is 0.x, and MAJOR from 1.0 on. A rule change also gets a new ruleset name in `scan/ruleset.json`.
+- A new command or option bumps MINOR. Other fixes bump PATCH, so a release that moves a verdict is never a PATCH release. CI and the release workflow check this against the previous release tag (`tests/version_policy.py`).
 - Only the latest MINOR release gets fixes. See [SECURITY.md](SECURITY.md).
 
 Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `receipt.json`, so a receipt from years ago still names the rules that judged it. `--verify` keeps reading older evidence formats.
@@ -22,6 +22,9 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 ### Changed
 
+- Version policy, as Semantic Versioning has it: a new command or option bumps MINOR too, not only a verdict change. Before, the policy said that any change that moved no verdict was a PATCH.
+- `scan/ruleset.json` records, for each ruleset, the first version that shipped it (`since`), its verdict impact (`yes`, or `no` for a change in comments only) and the hash of each rule file. `--verify` and `pqproof --version` still read the old form. Ruleset 1 is unchanged: same name, same hash.
+- `tests/version_policy.py` enforces the policy in CI (new `version-policy` job) and in the release workflow: a ruleset with verdict impact yes must first ship in a release with PATCH 0, every CHANGELOG entry (and `[Unreleased]`) has a verdict-impact line, an entry that says yes is not a PATCH release, and golden verdicts that moved since the previous release tag need a MINOR release and a "yes" entry.
 - Golden comparison in `run_mutations.py`: a different ruleset name alone no longer fails every tree case. It is reported in one line at the top of the golden summary, and a case fails only when its verdict, a check status or a count moves. `--diff-golden FILE` writes the moved cases and fields as a Markdown table for the verdict-impact entry, and `--write-golden` prints what moved against the file it replaces before writing it.
 
 ### Fixed

@@ -1,5 +1,6 @@
 """버전 관리: 도구 버전 한 곳, 규칙 묶음 해시 고정, 증적 형식 2 칸(tool_version·ruleset_version·ruleset_sha256·format_version),
-판정 고정 기록(golden)이 지금 규칙 묶음과 맞는지, 판정 옆 '검증 호출 제거' 표시가 형식 2에만 붙는지."""
+판정 고정 기록(golden)이 지금 규칙 묶음과 맞는지, 판정 옆 '검증 호출 제거' 표시가 형식 2에만 붙는지,
+버전 정책(tests/version_policy.py: 판정이 바뀌는 릴리스는 PATCH 가 아니다, CHANGELOG 항목마다 판정 영향 줄)."""
 import copy
 import json
 import os
@@ -14,6 +15,7 @@ import unittest
 PROOF = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROOF))
 import prove  # noqa: E402
+import version_policy as VP  # noqa: E402
 from pqlite import receipt as R  # noqa: E402
 from pqlite import version as V  # noqa: E402
 
@@ -222,6 +224,135 @@ class RemovedVerificationNote(unittest.TestCase):
         r = self.base(2)
         r["verdict"] = "fail"
         self.assertEqual(R.verdict_text(r), "실패")
+
+
+RULESET = json.loads((PROOF / "scan" / "ruleset.json").read_text(encoding="utf-8"))
+
+
+def changelog(*sections):
+    """CHANGELOG 흉내: (이름, 판정 영향 또는 None) 마다 '## [이름]' 절."""
+    out = ["# Changelog", ""]
+    for name, impact in sections:
+        out += [f"## [{name}]" + ("" if name == "Unreleased" else " - 2026-12-01"), ""]
+        if impact:
+            out += [f"**Verdict impact (판정 영향): {impact}.**", ""]
+        out += ["### Fixed", "", "- something", ""]
+    return "\n".join(out)
+
+
+def ruleset_with(**changes):
+    doc = copy.deepcopy(RULESET)
+    doc["versions"][doc["current"]].update(changes)
+    return doc
+
+
+class VersionPolicy(unittest.TestCase):
+    def test_this_tree_follows_the_policy(self):
+        log = (PROOF / "CHANGELOG.md").read_text(encoding="utf-8")
+        self.assertEqual(VP.check_tree(V.tool_version(), log, RULESET), [])
+
+    def test_ruleset_record_lists_the_rule_files_that_changed(self):
+        # 해시 고정 시험이 실패할 때 어느 파일이 바뀌었는지 바로 보이게: 기록의 files 와 지금 파일을 하나씩 맞춘다
+        current, entries = V.ruleset_entries()
+        now = {f["path"]: f["sha256"] for f in V.current_ruleset_files()}
+        recorded = {f["path"]: f["sha256"] for f in entries[current]["files"]}
+        self.assertEqual(sorted(p for p in now if now[p] != recorded.get(p)), [], "rule files changed since ruleset " + current)
+
+    def test_old_ruleset_form_is_still_read(self):
+        tmp = tempfile.mkdtemp(prefix="pqproof-rsold-")
+        try:
+            path = os.path.join(tmp, "ruleset.json")
+            sha = RULESET["versions"]["1"]["sha256"]
+            pathlib.Path(path).write_text(json.dumps({"current": "1", "versions": {"1": sha}}), encoding="utf-8")
+            self.assertEqual(V.ruleset_history(path), ("1", {"1": sha}))
+            self.assertEqual(V.ruleset_entries(path)[1]["1"], {"sha256": sha, "since": None, "verdict_impact": None, "files": None})
+            self.assertEqual(V.ruleset_label(sha, path), "1")
+            self.assertEqual(VP.ruleset_doc(json.dumps({"current": "1", "versions": {"1": sha}}))["versions"]["1"], {"sha256": sha})
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)  # 이 시험이 만든 자기 폴더만
+
+    def test_tree_mistakes_are_caught(self):
+        ok_log = changelog(("Unreleased", "none"), ("0.1.0", "yes"))
+        cases = [
+            ("verdict ruleset first ships in a PATCH release", "0.1.1", changelog(("0.1.1", "yes"), ("0.1.0", "yes")),
+             ruleset_with(since="0.1.1"), "a PATCH release"),
+            ("PATCH entry says yes", "0.1.1", changelog(("0.1.1", "yes"), ("0.1.0", "yes")), RULESET, "a PATCH release"),
+            ("entry without a verdict-impact line", "0.1.0", changelog(("0.1.0", None)), RULESET, "no '**Verdict impact"),
+            ("unreleased without a verdict-impact line", "0.1.0", changelog(("Unreleased", None), ("0.1.0", "yes")), RULESET,
+             "[Unreleased] has no"),
+            ("ruleset says yes, entry says none", "0.1.0", changelog(("0.1.0", "none")), RULESET, "does not say yes"),
+            ("old form", "0.1.0", ok_log, dict(RULESET, versions={"1": RULESET["versions"]["1"]["sha256"]}), "old form"),
+            ("files do not give sha256", "0.1.0", ok_log, ruleset_with(sha256="0" * 64), "not sha256"),
+            ("verdict_impact missing", "0.1.0", ok_log, ruleset_with(verdict_impact="maybe"), "verdict_impact must be"),
+            ("from 1.0 a verdict change bumps MAJOR", "1.1.0", changelog(("1.1.0", "yes")), ruleset_with(since="1.1.0"), "a PATCH release"),
+            ("unreleased ruleset, unreleased entry says none", "0.1.0", changelog(("Unreleased", "none"), ("0.1.0", "yes")),
+             ruleset_with(since="0.2.0"), "[Unreleased] does not say yes"),
+        ]
+        for name, version, log, rules, want in cases:
+            with self.subTest(name):
+                self.assertIn(want, "\n".join(VP.check_tree(version, log, rules)))
+
+    def test_allowed_shapes(self):
+        # 주석만 바뀐 묶음(verdict_impact no)은 PATCH 에서 나와도 된다. 아직 안 낸 묶음은 [Unreleased] 가 yes 면 된다
+        self.assertEqual(VP.check_tree("0.1.1", changelog(("0.1.1", "none"), ("0.1.0", "yes")),
+                                       ruleset_with(since="0.1.1", verdict_impact="no")), [])
+        self.assertEqual(VP.check_tree("0.1.0", changelog(("Unreleased", "yes"), ("0.1.0", "yes")), ruleset_with(since="0.2.0")), [])
+        self.assertEqual(VP.check_tree("1.0.0", changelog(("1.0.0", "yes")), ruleset_with(since="1.0.0")), [])
+
+    def test_release_comparison(self):
+        gold = json.loads((PROOF / "tests" / "golden" / "verdicts.json").read_text(encoding="utf-8"))["runs"]
+        moved = copy.deepcopy(gold)
+        moved["m01-trust-all"]["verdict"] = "pass"
+        relabeled = {k: dict(v, ruleset_version="2") for k, v in gold.items()}
+        base = VP.ruleset_doc(json.dumps(RULESET))
+        new_no = copy.deepcopy(base)
+        new_no["versions"]["2"] = dict(base["versions"]["1"], sha256="1" * 64, since="0.1.1", verdict_impact="no")
+        new_no["current"] = "2"
+        new_yes = copy.deepcopy(new_no)
+        new_yes["versions"]["2"]["verdict_impact"] = "yes"
+        rows = [
+            ("0.1.1", "0.1.0", base, gold, [], []),
+            ("0.1.1", "0.1.0", base, moved, ["PATCH release after 0.1.0", "m01-trust-all"], []),
+            ("0.2.0", "0.1.0", base, moved, [], []),
+            ("0.1.1", "0.1.0", new_no, relabeled, [], []),
+            ("0.1.1", "0.1.0", new_yes, gold, ["ruleset 1 -> 2 with verdict impact yes"], []),
+            ("1.1.0", "1.0.0", base, moved, ["from 1.0 a verdict change bumps MAJOR"], []),
+            ("2.0.0", "1.0.0", base, moved, [], []),
+            ("0.0.9", "0.1.0", base, gold, ["older than 0.1.0"], []),
+            ("0.1.0", "0.1.0", base, moved, [], ["the next release must be MINOR"]),
+            ("0.1.0", "0.1.0", base, gold, [], ["a PATCH release is allowed"]),
+        ]
+        for version, base_v, rules_now, gold_now, want_bad, want_notes in rows:
+            with self.subTest(version=version, base=base_v, bad=want_bad, notes=want_notes):
+                yes = changelog(("Unreleased", "yes"), (version, "yes"), (base_v, "yes"))
+                bad, notes = VP.check_release(version, base_v, rules_now, base, gold_now, gold, yes)
+                self.assertEqual(bool(bad), bool(want_bad), bad)
+                for w in want_bad:
+                    self.assertIn(w, "\n".join(bad))
+                for w in want_notes:
+                    self.assertIn(w, "\n".join(notes))
+
+    def test_moved_verdicts_need_yes_in_the_changelog(self):
+        gold = json.loads((PROOF / "tests" / "golden" / "verdicts.json").read_text(encoding="utf-8"))["runs"]
+        moved = copy.deepcopy(gold)
+        moved["m06-d2-test-file-key"]["checks"]["c-classic"] = "fail"
+        base = VP.ruleset_doc(json.dumps(RULESET))
+        bad, _ = VP.check_release("0.2.0", "0.1.0", base, base, moved, gold, changelog(("0.2.0", "none"), ("0.1.0", "yes")))
+        self.assertIn("CHANGELOG.md [0.2.0] does not say verdict impact yes", "\n".join(bad))
+        bad, _ = VP.check_release("0.1.0", "0.1.0", base, base, moved, gold, changelog(("Unreleased", "none"), ("0.1.0", "yes")))
+        self.assertIn("CHANGELOG.md [Unreleased] does not say verdict impact yes", "\n".join(bad))
+        bad, _ = VP.check_release("0.1.0", "0.1.0", base, base, moved, gold, changelog(("Unreleased", "yes"), ("0.1.0", "yes")))
+        self.assertEqual(bad, [])
+
+    def test_workflows_run_the_policy(self):
+        wf = PROOF / ".github" / "workflows"
+        if not wf.is_dir():
+            self.assertEqual(PROOF.name, "_tool")  # 설치본에는 워크플로가 없다
+            return
+        self.assertIn("python3 -I tests/version_policy.py", (wf / "ci.yml").read_text(encoding="utf-8"))
+        rel = (wf / "release.yml").read_text(encoding="utf-8")
+        self.assertIn("python3 -I tests/version_policy.py", rel)
+        self.assertIn("--base", rel)
 
 
 if __name__ == "__main__":
