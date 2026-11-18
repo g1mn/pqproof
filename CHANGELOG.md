@@ -16,6 +16,7 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 ### Added
 
+- CI outside GitHub: a GitLab merge request job (`examples/gitlab/`) that turns the SARIF file into a Code Quality report, a Jenkinsfile that records it with the Warnings Next Generation plugin, and a SonarQube note.
 - JSON Schemas for the evidence and the allowlist (`schemas/receipt-v2.schema.json`, `schemas/unconverted.schema.json`), written from the code by `tests/make_schemas.py` and tested against the golden evidence, a fresh run and the allowlist example. DESIGN lists the fields that stay stable within a `format_version` and the text that is only for people.
 - `examples/allowlist/`: an allowlist with an unreviewed fallback entry and a reviewed boundary entry, and what each field means.
 - Behaviour tests per rule (`tests/test_rules.py`): every pattern alternative in `residue.sh` and every TLS-weakening rule in `pqlite/verify.py` has a line or a change it catches and a near miss it does not, and the allow rules in `prove.py` are tested at their thresholds (hybrid window 12 and 13 lines, write path 3 and 4 lines below, `a-input` at 50% common files). Bypasses found in the November review are pinned as known gaps with their review numbers, so the release that fixes them has to flip those tests. One more gap turned up while writing them: `-Djdk.internal.httpclient.disableHostnameVerification` passed as a JVM option is not flagged (`N1`).
@@ -24,6 +25,7 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 ### Changed
 
+- The GitHub example workflow reads the allowlist from the base commit and warns when a pull request changes it, so the author of a change cannot also approve its allowlist entries. `CODEOWNERS.example` shows how to require a security owner. The Action reference is pinned to the `v0.1.0` commit instead of the movable tag, and permissions are set per job.
 - Release workflow: it runs the whole CI workflow first (`workflow_call`), so a release no longer passes on one Ubuntu job alone. It checks that the tagged commit is on `main`, builds with `build` and `hatchling` pinned by hash, without build isolation, and attests `BUILDINFO` too. The SBOM now lists the wheel and sdist hashes, the `tls_probe` binaries with their Go version and the external programs (bash, OpenSSL, keytool), passes the CycloneDX schema check and gets an SBOM attestation. The release notes say `shasum -a 256 -c --ignore-missing SHA256SUMS`, which works when only one binary was downloaded.
 - CI: a `lint` job (ruff with error rules, shellcheck, zizmor) with hash-pinned tools, and Python 3.15 in the test matrix. A fourth `tls_probe` binary for Intel Macs (`darwin-amd64`).
 - Progress: a run prints the applied settings first, then one line per step with the time taken, to stderr. A large tree no longer looks stuck for minutes.

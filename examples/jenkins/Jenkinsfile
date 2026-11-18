@@ -1,0 +1,42 @@
+// Jenkins declarative pipeline example: judge a change against a base commit, record the SARIF file with the
+// Warnings Next Generation plugin (recordIssues ... sarif), and archive the evidence folder.
+// The agent needs bash, OpenSSL (3.5 or later for the TLS cross-check), git and Python 3.9 or later.
+// BASE_COMMIT is the commit to compare with, for example the target branch of a pull request.
+pipeline {
+  agent any
+  parameters {
+    string(name: 'BASE_COMMIT', defaultValue: 'origin/main', description: 'commit before the migration')
+  }
+  environment {
+    REQUIRE_REVIEW = '1'
+  }
+  stages {
+    stage('PQ-Proof') {
+      steps {
+        sh '''
+          python3 -m venv .pqproof-venv
+          .pqproof-venv/bin/pip install --quiet "pqproof==0.1.1"
+          rm -rf original && mkdir original
+          git archive "$BASE_COMMIT" | tar -x -C original
+          if git cat-file -e "$BASE_COMMIT:notes/unconverted.json" 2>/dev/null; then
+            git show "$BASE_COMMIT:notes/unconverted.json" > base-unconverted.json
+            export ALLOW="$PWD/base-unconverted.json"
+          else
+            export ALLOW=none
+          fi
+          code=0
+          OUT="$PWD/pqproof-evidence-$BUILD_NUMBER" .pqproof-venv/bin/pqproof original . || code=$?
+          .pqproof-venv/bin/pqproof --verify "pqproof-evidence-$BUILD_NUMBER"
+          .pqproof-venv/bin/pqproof sarif "pqproof-evidence-$BUILD_NUMBER" -o pqproof.sarif
+          exit $code
+        '''
+      }
+      post {
+        always {
+          recordIssues(tools: [sarif(pattern: 'pqproof.sarif', id: 'pqproof', name: 'PQ-Proof')])
+          archiveArtifacts artifacts: "pqproof-evidence-${env.BUILD_NUMBER}/**, pqproof.sarif", allowEmptyArchive: true
+        }
+      }
+    }
+  }
+}

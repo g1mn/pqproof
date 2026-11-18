@@ -74,6 +74,25 @@ class SarifTest(unittest.TestCase):
         notes = run["invocations"][0]["toolExecutionNotifications"]
         self.assertTrue(any(n["descriptor"]["id"] == "b-tls" and "not counted as passed" in n["message"]["text"] for n in notes))
 
+    def test_gitlab_code_quality_conversion(self):
+        """GitLab 예시의 SARIF → Code Quality 변환(X43): 결과마다 한 항목, 필수 칸, 수준 대응, 지문은 SARIF 그대로."""
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("sarif_to_codequality",
+                                                      os.path.join(cli.tool_root(), "examples", "gitlab", "sarif_to_codequality.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        doc = sarif.convert(str(self.fail_out), uri_prefix="services/app")
+        issues = mod.convert(doc)
+        results = doc["runs"][0]["results"]
+        self.assertEqual(len(issues), len(results))
+        for issue, res in zip(issues, results):
+            self.assertEqual(set(issue), {"description", "check_name", "fingerprint", "severity", "location"})
+            self.assertTrue(issue["location"]["path"].startswith("services/app/"))
+            self.assertGreaterEqual(issue["location"]["lines"]["begin"], 1)
+            self.assertEqual(issue["fingerprint"], res["partialFingerprints"][sarif.FINGERPRINT])
+            self.assertEqual(issue["severity"], {"error": "critical", "warning": "major"}[res["level"]])
+        self.assertEqual(len({i["fingerprint"] for i in issues}), len(issues))
+
     def test_uri_prefix_and_anchor(self):
         run = sarif.convert(str(self.fail_out), uri_prefix="./services/app", anchor="services/app/pom.xml")["runs"][0]
         uris = {r["locations"][0]["physicalLocation"]["artifactLocation"]["uri"] for r in run["results"]}

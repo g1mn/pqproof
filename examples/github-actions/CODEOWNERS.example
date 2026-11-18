@@ -1,0 +1,5 @@
+# Copy into .github/CODEOWNERS of the repository that runs PQ-Proof, and turn on
+# "Require review from Code Owners" for the default branch. Then an allowlist change,
+# review fields included, needs a security owner's approval before it can count.
+/notes/unconverted.json  @your-org/security-reviewers
+/.github/workflows/      @your-org/security-reviewers

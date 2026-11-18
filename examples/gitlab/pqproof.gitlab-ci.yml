@@ -1,0 +1,40 @@
+# GitLab CI example: judge a merge request against its base commit, show the remaining classical lines in the
+# merge request's Code Quality widget, and keep the evidence folder as a job artifact.
+# Copy the job into .gitlab-ci.yml. It needs bash, OpenSSL (3.5 or later for the TLS cross-check) and git; the image
+# below is Debian 13, whose OpenSSL is 3.5. An offline runner can install the wheel from an internal mirror instead of PyPI.
+# Merge request pipelines only: CI_MERGE_REQUEST_DIFF_BASE_SHA is the base commit.
+pqproof:
+  image: python:3.13-slim-trixie
+  stage: test
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  variables:
+    GIT_DEPTH: "0"
+    PQ_PROOF_VERSION: "0.1.1"
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends git openssl > /dev/null
+    - python3 -m pip install --quiet "pqproof==${PQ_PROOF_VERSION}"
+  script:
+    - mkdir -p original
+    - git archive "$CI_MERGE_REQUEST_DIFF_BASE_SHA" | tar -x -C original
+    # Allowlist from the base commit, so a merge request cannot add entries and review fields to pass itself.
+    - |
+      if git cat-file -e "$CI_MERGE_REQUEST_DIFF_BASE_SHA:notes/unconverted.json" 2>/dev/null; then
+        git show "$CI_MERGE_REQUEST_DIFF_BASE_SHA:notes/unconverted.json" > base-unconverted.json
+        export ALLOW="$PWD/base-unconverted.json"
+      else
+        export ALLOW=none
+      fi
+    - code=0; OUT="$PWD/pqproof-evidence" REQUIRE_REVIEW=1 pqproof original . || code=$?
+    - pqproof --verify pqproof-evidence
+    - pqproof sarif pqproof-evidence -o pqproof.sarif
+    - tool=$(python3 -c 'import os, pqproof; print(os.path.join(os.path.dirname(pqproof.__file__), "_tool"))')
+    - python3 -I "$tool/examples/gitlab/sarif_to_codequality.py" pqproof.sarif gl-code-quality-report.json
+    - exit "$code"   # 0 pass, 1 fail, 2 usage or input error, 3 undecided
+  artifacts:
+    when: always
+    paths:
+      - pqproof-evidence/
+      - pqproof.sarif
+    reports:
+      codequality: gl-code-quality-report.json
