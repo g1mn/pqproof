@@ -8,7 +8,8 @@
 #   bash prove.sh --version            도구 버전, 규칙 묶음 이름, 증적 형식(버전은 src/pqproof/__init__.py 한 곳)
 # 건너뛴 시험은 통과로 세지 않는다. STRICT=1 이면 --unit·--selftest 에서 건너뛴 것이 하나라도 있을 때 실패(종료 1)로 끝난다(CI 가 쓴다)
 # 환경 변수(모두 선택):
-#   OUT=<출력 폴더>        기본: 원본이 <W>/orig 이고 <W>/evidence 가 있으면 <W>/evidence/proof-HHMMSS, 아니면 ./proof-out-HHMMSS. 있으면 멈춘다
+#   OUT=<출력 폴더>        기본: 원본이 <W>/orig 이고 <W>/evidence 가 있으면 <W>/evidence/proof-YYYYMMDD-HHMMSS, 아니면
+#                          ./proof-out-YYYYMMDD-HHMMSS(같은 이름이 있으면 -2, -3). OUT 으로 준 폴더가 이미 있으면 멈춘다
 #   TLS_TARGETS="127.0.0.1:8443@localhost#/abs/ca.pem 127.0.0.1:9443"   띄운 고친 판의 TLS 주소(CA 없으면 -tofu)
 #   TLS_TARGETS_ORIG=...   원본 스택 주소(기준선, 판정에는 안 씀)
 #   TLS_VIA=host | container:<컨테이너 이름>   container면 그 컨테이너 네트워크 이름공간에서 잰다(공개 안 된 내부 포트용)
@@ -20,7 +21,7 @@
 #   OPENSSL=<openssl 3.5+> cbom-scan·교차 확인용. 기본: 찾은 것 중 3.5 이상, 없으면 처음 찾은 것
 #   CBOM_SCAN=<cbom-scan.sh>   기본: scan/cbom-scan.sh
 #   ALLOW=<unconverted.json>|none   허용 목록(where '파일:시작-끝'·why·kind, 선택 reviewed_by·reviewed_at). 그 줄의 고전은 사유와 함께
-#                          '허용'으로 세고, 목록 밖 고전·없는 파일·범위 밖 줄은 허용하지 않는다(DESIGN.md Allow rules). 비우면 원본이 <W>/orig 일 때 <W>/notes/ 에서 찾는다
+#                          '허용'으로 세고, 목록 밖 고전·없는 파일·범위 밖 줄은 허용하지 않는다(guide/allowlist.md, 예시 examples/allowlist/). 비우면 원본이 <W>/orig 일 때 <W>/notes/ 에서 찾는다
 #   EXCLUDE="data/** *.db *.log"|none   검사에서 뺄 실행 데이터 글롭(앱 폴더 기준). 코드·설정·빌드 파일은 걸려도 뺀다고 치지 않는다
 #   RECON=<recon.json>|none   DATA_DIR·앱 루트를 읽어 앱 폴더 안 데이터 폴더를 뺀다. 비우면 <W>/notes/recon.json
 #   EV_NAME=<파일 이름>    deck.json·evidence-fragment.json 의 ev(이 실행의 화면 출력을 남긴 파일 이름). 비우면 <출력 폴더 이름>.txt
@@ -31,6 +32,8 @@
 # 시험·예제 경로는 scan/test-paths.ere 한 곳에 있다(두 스캐너가 같이 쓴다). 그 경로의 고전 줄은 판정에 안 넣고 따로 센다
 #   PROBE_BIN_DIR=<폴더>   tls_probe 바이너리 폴더. 기본 bin/(build-probe.sh가 만든다)
 # 출력 폴더의 deck.json 은 발표 자료·대시보드용 요약이다(receipt.json에서 결정적으로 만든다)
+# 진행: 단계마다 stderr 에 'pqproof: [n/6] ...' 줄과 걸린 시간을 찍는다. 맨 앞 줄은 적용 설정이고, 설정 이름 오타(REQUIRE_REVEIW 등)와
+#   모르는 PQPROOF_ 이름은 경고한다. 설정 설명(영어): guide/configuration.md
 # 종료: 0 통과 · 1 실패 · 2 사용법·입력 오류 · 3 미판정(TLS 신호가 있는데 TLS_TARGETS 없음, 대조 실패 등)
 # 작업 폴더 꼴(선택): <W>/orig(원본) · <W>/repo(고친 판) · <W>/notes/unconverted.json(허용 목록) · <W>/notes/recon.json · <W>/evidence/
 #   W=<작업 폴더>; ALLOW=$W/notes/unconverted.json EXCLUDE='data/** *.db *.sqlite3 *.log' bash prove.sh $W/orig $W/repo

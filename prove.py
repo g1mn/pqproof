@@ -60,6 +60,54 @@ class UsageError(Exception):
     pass
 
 
+# 설정 이름(환경 변수). prove.sh 머리 주석과 같아야 한다. 흔한 오타(REQUIRE_REVEIW 등)는 실행 머리에 경고한다(교차 리뷰 X50)
+SETTINGS = ("OUT", "TLS_TARGETS", "TLS_TARGETS_ORIG", "TLS_VIA", "CLASSIC", "EXPECT", "SCOPE", "RESIDUE", "EXTRA_EV", "OPENSSL",
+            "CBOM_SCAN", "ALLOW", "EXCLUDE", "RECON", "EV_NAME", "REQUIRE_REVIEW", "PROBE_BIN_DIR")
+OTHER_ENV = ("PYTHON", "STRICT", "SELFTEST_DIR", "KEEP", "ORDERS_EDGE", "TEST_PATHS", "SARIF_SCHEMA", "PQPROOF_HOME",
+             "PQPROOF_ENTRY")
+DOCS = "https://github.com/g1mn/pqproof/blob/v{v}/{page}"
+
+
+def _distance(a, b):
+    """두 이름의 편집 거리(이웃 글자 바꿈도 1, optimal string alignment)."""
+    d = [[i + j if i * j == 0 else 0 for j in range(len(b) + 1)] for i in range(len(a) + 1)]
+    for i in range(1, len(a) + 1):
+        for j in range(1, len(b) + 1):
+            d[i][j] = min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] != b[j - 1]))
+            if i > 1 and j > 1 and a[i - 1] == b[j - 2] and a[i - 2] == b[j - 1]:
+                d[i][j] = min(d[i][j], d[i - 2][j - 2] + 1)
+    return d[-1][-1]
+
+
+def env_warnings(env):
+    """설정 이름과 거의 같은데 다른 환경 변수(오타)와 모르는 PQPROOF_ 이름마다 경고 한 줄. 오타면 그 설정은 기본값으로 돈다."""
+    known = set(SETTINGS) | set(OTHER_ENV)
+    out = []
+    for name in sorted(env):
+        if name in known:
+            continue
+        if name.startswith("PQPROOF_"):
+            out.append(f"환경 변수 {name}: PQ-Proof 가 모르는 이름이다(설정 목록: pqproof --env)")
+            continue
+        if len(name) < 5:
+            continue
+        near = [k for k in SETTINGS if len(k) >= 5 and _distance(name, k) <= (2 if len(k) >= 10 else 1)]
+        if near:
+            k = near[0]
+            what = " 엄격 모드(사람 확인 필수)가 꺼진 채로 돈다." if k == "REQUIRE_REVIEW" else f" {k} 는 기본값으로 돈다."
+            out.append(f"환경 변수 {name}: 설정 이름이 아니다. {k} 를 뜻했나?{what}")
+    return out
+
+
+def entry_cmd():
+    """사람에게 보일 진입점: pqproof 명령이 띄웠으면 'pqproof', 아니면 'bash prove.sh'."""
+    return "pqproof" if os.environ.get("PQPROOF_ENTRY") == "pqproof" else "bash prove.sh"
+
+
+def doc_url(page):
+    return DOCS.format(v=ver.tool_version(), page=page)
+
+
 def now():
     return time.time()
 
@@ -930,12 +978,19 @@ def openssl_35(openssl):
 
 
 def default_out(orig):
-    """원본이 <작업 폴더>/orig 이고 <작업 폴더>/evidence 가 있으면 그 아래 proof-HHMMSS, 아니면 ./proof-out-HHMMSS."""
-    stamp = time.strftime("%H%M%S")
+    """원본이 <작업 폴더>/orig 이고 <작업 폴더>/evidence 가 있으면 그 아래 proof-YYYYMMDD-HHMMSS, 아니면 ./proof-out-YYYYMMDD-HHMMSS.
+    같은 이름이 이미 있으면(같은 초에 두 번 돌린 경우) 뒤에 -2, -3 을 붙인다. OUT 으로 준 이름은 그대로 쓰고 있으면 멈춘다."""
+    stamp = time.strftime("%Y%m%d-%H%M%S")
     o = os.path.abspath(orig)
     if os.path.basename(o) == "orig" and os.path.isdir(os.path.join(os.path.dirname(o), "evidence")):
-        return os.path.join(os.path.dirname(o), "evidence", f"proof-{stamp}")
-    return os.path.abspath(f"proof-out-{stamp}")
+        base = os.path.join(os.path.dirname(o), "evidence", f"proof-{stamp}")
+    else:
+        base = os.path.abspath(f"proof-out-{stamp}")
+    path, n = base, 1
+    while os.path.lexists(path):
+        n += 1
+        path = f"{base}-{n}"
+    return path
 
 
 def pqc_names(rows, family):
@@ -974,7 +1029,7 @@ def report_md(r, fixed_items, ev):
     env = ([f"SCOPE={p['scope']}"] if kex else []) + ["EXPECT=" + (",".join(p["expect"]) or "none")] \
         + ([f"CLASSIC={p['classic']}"] if p["classic"] != "allow" else []) + (["TLS_TARGETS=…"] if p["tls_targets"] else []) \
         + (["REQUIRE_REVIEW=1"] if p.get("require_review") else [])
-    cmd = " ".join(env) + f" bash prove.sh {os.path.basename(r['inputs']['orig']['path'])} " \
+    cmd = " ".join(env) + f" {entry_cmd()} {os.path.basename(r['inputs']['orig']['path'])} " \
         f"{os.path.basename(r['inputs']['fixed']['path'])}"
     fx = r["inputs"]["fixed"]
     out = [f"<!-- prove.sh가 만든 표. 고친 판 트리 sha256 {fx['tree_sha256']}"
@@ -987,6 +1042,20 @@ def report_md(r, fixed_items, ev):
     for i, c in enumerate(r["checks"], 1):
         rows.append([f"V{i}", c["title"], f"`{STEP.get(c['id'], c['id'])}`", c["expected"], f"{STATUS_KO[c['status']]}: {c['actual']}"])
     out += ["검사 결과", "", md_table(["#", "검사", "도구", "기대", "실제"], rows), ""]
+    blocks = sorted({it["loc"]: it for it in fixed_items if it["status"] == "block"}.items(), key=lambda kv: al._loc_key(kv[0]))
+    jf = (r.get("java") or {}).get("fixed") or {}
+    res_left = ((jf.get("listed") or {}).get("left") or []) if (r.get("params") or {}).get("scope") != "kex" else []
+    if blocks or res_left:
+        rows = [[f"`{loc}`", it["alg"] or it["use"], "a-cbom", it["reason"] or it["note"][:90]] for loc, it in blocks[:20]]
+        rows += [[f"`{x.split(' ', 1)[1]}`", x.split(" ", 1)[0], "c-classic", "사유 없이 남은 고전 공개키 코드 줄"] for x in res_left[:20]]
+        out += ["막는 위치(실패 원인)", "", md_table(["위치", "알고리즘·규칙", "검사", "까닭"], rows), ""]
+        more = []
+        if len(blocks) > 20:
+            more.append(f"a-cbom 외 {len(blocks) - 20}곳은 tables/cbom-fixed.csv('판정'이 막음인 행).")
+        if len(res_left) > 20 or (jf.get("listed") and len(res_left) >= 60):
+            more.append("c-classic 전체 줄은 artifacts/residue-fixed.txt 의 LEFT 줄.")
+        more.append("꼭 남겨야 하는 줄은 허용 목록에 사유와 함께 적는다: " + doc_url("guide/allowlist.md"))
+        out += [" ".join(more), ""]
     left = {}
     for it in fixed_items:
         if it["status"] in ("review", "allow", "check") and RANK[it["status"]] > RANK.get(left.get(it["loc"], {}).get("status"), 0):
@@ -1005,7 +1074,7 @@ def report_md(r, fixed_items, ev):
                                                                                           "사람이 확인: 고전이면 고친다")
         rows.append([f"{it['alg'] or it['use']} ({STATUS_LABEL[it['status']]})", f"`{loc}`", why, todo])
     if not rows:
-        rows = [["없음(허용·확인 행 0)", "", "", ""]]
+        rows = [["없음(허용·검토 필요·확인 행 0)" + (". 실패 원인은 위 '막는 위치' 표" if blocks or res_left else ""), "", "", ""]]
     more = len(left) - 12
     out += ["전환 뒤 남은 항목(허용·검토 필요·확인)", "", md_table(["남은 고전 항목", "위치", "남은 이유", "할 일"], rows)]
     notes = ([f"외 {more}곳은 tables/cbom-fixed.csv."] if more > 0 else []) \
@@ -1026,7 +1095,7 @@ def report_md(r, fixed_items, ev):
                          f"X25519MLKEM768(TLS 1.3), 옛 클라이언트 {'고전 그룹 허용' if p['classic'] == 'allow' else '거부'}", seen])
         out += ["TLS 대상별 실측", "", md_table(["#", "대상", "기대", "실제 협상(출력 원문)"], rows), ""]
     out += ["이 도구는 기능·성능을 재지 않는다. 앱 기능 시험과 성능 측정은 따로 한다. "
-            "다시 확인: `bash prove.sh --verify <출력 폴더>`(트리·zip sha256과 receipt_id를 다시 계산).", ""]
+            f"다시 확인: `{entry_cmd()} --verify <출력 폴더>`(트리·zip sha256과 receipt_id를 다시 계산).", ""]
     return "\n".join(out)
 
 
@@ -1056,23 +1125,42 @@ def text_lines(root, rel):
     return None if t is None else len(t.split("\n")) - (1 if t.endswith("\n") else 0)
 
 
+def settings_line(params, out):
+    """실행 머리에 찍는 적용 설정 한 줄(오타로 엄격 모드가 꺼졌는지 바로 보이게)."""
+    allow = params.allow or "비움(<W>/notes/unconverted.json 자동)"
+    return (f"설정: EXPECT={','.join(params.expect) or 'none'} · SCOPE={params.scope} · CLASSIC={params.classic} · "
+            f"REQUIRE_REVIEW={1 if params.require_review else 0} · ALLOW={allow} · "
+            f"EXCLUDE={' '.join(params.exclude) or ('none' if params.exclude_off else '없음')} · "
+            f"TLS_TARGETS {len(params.tls_targets)}개 · 출력 {out}")
+
+
 def run(orig, fixed, params, out=None, cache=None, quiet=False):
-    """한 번 돌린다. 반환: (receipt dict, 종료 코드, 출력 줄 목록)."""
+    """한 번 돌린다. 반환: (receipt dict, 종료 코드, 출력 줄 목록). quiet 가 아니면 단계마다 stderr 에 진행 줄을 찍는다."""
     out = os.path.abspath(out or params.out or default_out(orig))
     if os.path.exists(out):
         raise UsageError(f"출력 폴더가 이미 있다(덮어쓰지 않음): {out}")
+    started = now()
+
+    def say(msg):
+        if not quiet:
+            print(f"pqproof: {msg}", file=sys.stderr, flush=True)
+
+    say(settings_line(params, out))
     os.makedirs(out)
     art = rc.Artifacts(out)
-    started = now()
     timeline = []
+    steps = ["준비", "(a) CBOM", "(c) 공개키 집계", "(b) 약화 수정", "(b) TLS 탐침", "(d) 표·증적"]
 
     def phase(name, t0):
         timeline.append({"name": name, "started_at": rc.iso(t0), "ended_at": rc.iso(now())})
+        say(f"[{len(timeline)}/{len(steps)}] {steps[len(timeline) - 1]} 끝 {now() - t0:.1f}초 (누적 {now() - started:.1f}초)")
 
     # 준비
     t0 = now()
+    say(f"[1/{len(steps)}] 준비: 입력 읽기·트리 해시")
     in_o, root_o, files_o = prepare_input(orig, out, "orig")
     in_f, root_f, files_f = prepare_input(fixed, out, "fixed")
+    say(f"  원본 파일 {len(files_o):,} · 고친 판 파일 {len(files_f):,}")
     for side, files in (("원본", files_o), ("고친 판", files_f)):
         if not files:  # 빈 폴더·빈 zip이면 도구가 아무것도 못 찾고 0으로 끝난다(반박 검증에서 찾음)
             raise UsageError(f"{side}에 읽을 파일이 0개다(빈 폴더·빈 zip이거나 build·target 같은 건너뛰는 폴더뿐): "
@@ -1155,7 +1243,10 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
     for side, root, rows, sig, lns, tree in (("orig", root_so, scan_o, sig_o, lines_o, tree_so),
                                              ("fixed", root_sf, scan_f, sig_f, lines_f, tree_sf)):
         d = os.path.join(out, "artifacts", f"cbom-{side}")
+        t1 = now()
+        say(f"[2/{len(steps)}] (a) CBOM: cbom-scan.sh {'원본' if side == 'orig' else '고친 판'} (큰 저장소는 몇 분 걸린다)")
         ok, _, crow = run_cbom_scan(params.cbom_scan, root, d, params.openssl, cache, tree, tp_file)
+        say(f"  cbom-scan.sh {'원본' if side == 'orig' else '고친 판'} {now() - t1:.1f}초")
         art.register_dir(f"artifacts/cbom-{side}")
         items, counts, nloc = merge_cbom(crow, rows, lns, sig[2], params.scope, allow if side == "fixed" else None)
         cbom_items[side] = items
@@ -1168,6 +1259,7 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
 
     # (c) residue
     t0 = now()
+    say(f"[3/{len(steps)}] (c) 공개키 집계: residue.sh 두 판")
     res_ref, res_ref_sha = None, None
     if params.residue:
         res_kind, res_script = "custom", os.path.abspath(params.residue)
@@ -1235,6 +1327,7 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
 
     # (b) 약화 수정
     t0 = now()
+    say(f"[4/{len(steps)}] (b) 약화 수정: 바뀐 파일 {len(added) + len(removed) + len(modified):,}개")
     changed = {}
     for rel in added + removed + modified:
         if excluded(rel):  # 실행 데이터(키·DB·로그)는 약화 수정 검사에서도 뺀다
@@ -1251,6 +1344,8 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
 
     # (b) TLS 대상
     t0 = now()
+    say(f"[5/{len(steps)}] (b) TLS 탐침: " + (f"대상 {len(params.tls_targets) + len(params.tls_targets_orig)}개"
+                                             if params.tls_targets or params.tls_targets_orig else "TLS_TARGETS 없음, 건너뜀"))
     tls_log = []
     controls = problem = None
     t_results, b_results = [], []
@@ -1293,7 +1388,7 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
     elif basis == 0:
         in_st = "undecided"
         in_act += (" · 원본에서 고전 " + ("키 교환을" if kex else "공개키를") + " 하나도 못 찾았고 TLS 실측도 없다: 도구가 이 언어·"
-                   "프레임워크를 못 보는 것일 수 있다(crypto-grep.sh로 사람이 확인하거나 SCOPE·TLS_TARGETS를 맞춘다)")
+                   "프레임워크를 못 보는 것일 수 있다(tables/cbom-orig.csv 와 artifacts/cbom-orig/ 를 사람이 확인하거나 SCOPE·TLS_TARGETS를 맞춘다)")
     elif vanished:
         in_st = "review"
         in_act += (f" · 원본 막는 위치가 있던 파일 중 고친 판에서 사라진 것 {len(vanished)}개: " + ", ".join(vanished[:4])
@@ -1453,7 +1548,7 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
     ev_name = params.ev or out_name + ".txt"
     in_ev = os.path.basename(out_parent) == "evidence"
     deck_meta = {"receipt_file": f"evidence/{out_name}/receipt.json" if in_ev else os.path.join(out, "receipt.json"),
-                 "verify_cmd": f"bash prove.sh --verify {f'evidence/{out_name}' if in_ev else out}", "ev": ev_name}
+                 "verify_cmd": f"{entry_cmd()} --verify {f'evidence/{out_name}' if in_ev else out}", "ev": ev_name}
     fam_sum = {k: sum(v[k] for v in jf["families"].values()) for k in ("code", "allow", "comment")} if jf else None
     if fam_sum:
         lst = jf.get("listed") or {}
@@ -1527,6 +1622,7 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
                      "files_orig": ex_o[:200], "files_fixed": ex_f[:200]}
     r["deck_meta"] = deck_meta
     t0 = now()
+    say(f"[6/{len(steps)}] (d) 표·검증 증적")
     art.add("tables/fragment.html", rc.render_fragment(r))  # 다른 HTML에 붙일 조각(md 문서에는 report.md)
     art.add("tables/report.md", report_md(r, cbom_items["fixed"], ev_name))
     r["artifacts"] = art.manifest()
@@ -1542,7 +1638,7 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
     vres = rc.verify(out)
     bad = [w for ok, w in vres if not ok]
 
-    lines = [f"== pqc-proof prove.sh  ({time.strftime('%Y-%m-%d %H:%M:%S %Z')})  [{platform.machine()}]",
+    lines = [f"== PQ-Proof {ver.tool_version()}  ({time.strftime('%Y-%m-%d %H:%M:%S %Z')})  [{platform.machine()}]",
              f"원본   : {in_o['path']} ({in_o['kind']}, 파일 {in_o['files']}, 트리 {in_o['tree_sha256'][:16]}"
              + (f", zip {in_o['zip_sha256'][:16]}" if in_o["zip_sha256"] else "") + ")",
              f"고친 판: {in_f['path']} ({in_f['kind']}, 파일 {in_f['files']}, 트리 {in_f['tree_sha256'][:16]}"
@@ -1588,13 +1684,40 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
                  + " (통과로 세는 것은 '통과'뿐)"
                  + f" · 도구 {r['tool_version']} · 규칙 묶음 {r['ruleset_version']} · 증적 형식 {r['format_version']}")
     lines.append(f"검증 증적 다시 확인: {'ok' if not bad else 'FAIL'} ({len(vres)}개 검사)" + ("" if not bad else ": " + "; ".join(bad[:3])))
-    lines.append(f"출력: {out}  (receipt.html, deck.json(요약), tables/report.md(문서에 붙일 표), tables/fragment.html, "
-                 "evidence-fragment.json)")
+    lines += next_steps(r, cbom_items["fixed"], out)
     if bad:
         code = 3
     if not quiet:
         print("\n".join(lines))
     return r, code, lines
+
+
+def next_steps(r, fixed_items, out):
+    """콘솔 끝: 먼저 볼 파일과 다시 확인 명령, 실패면 고칠 곳 전체 목록과 허용 목록 안내(교차 리뷰 X49·X67)."""
+    lines = [f"출력: {out}",
+             "  사람이 볼 것: receipt.html · 기계가 읽을 것: receipt.json · 문서에 붙일 표: tables/report.md",
+             f"  다시 확인: {entry_cmd()} --verify {out} (폴더에 파일을 더하거나 고치면 실패한다)"]
+    st = {c["id"]: c["status"] for c in r["checks"]}
+    if r["verdict"] == "fail":
+        lines.append("다음 할 일:")
+        nblock = len({it["loc"] for it in fixed_items if it["status"] == "block"})
+        if st.get("a-cbom") == "fail":
+            lines.append(f"  막는 위치 전체 {nblock}곳: tables/cbom-fixed.csv ('판정'이 막음인 행), 요약은 tables/report.md")
+        if st.get("c-classic") == "fail":
+            lines.append("  남은 고전 줄 전체: artifacts/residue-fixed.txt 의 LEFT 줄(규칙마다)")
+        if st.get("b-weakening") == "fail":
+            lines.append("  약화 수정: artifacts/weakening.json 의 deny. 되돌리거나 같은 강도로 다시 쓴다")
+        if st.get("c-expect") == "fail":
+            lines.append("  c-expect: EXPECT 로 요구한 PQC(ML-KEM-768·ML-DSA-65 등)가 고친 판 코드에 없다")
+        if st.get("r-allow") == "fail":
+            lines.append("  r-allow: 허용 항목마다 사람이 읽고 reviewed_by·reviewed_at 을 적거나, 안 쓰인 항목을 지운다")
+        if st.get("a-cbom") == "fail" or st.get("c-classic") == "fail":
+            lines.append("  꼭 남겨야 하는 줄이면 허용 목록에 사유와 함께 적는다: 예시 "
+                         + os.path.join(HERE, "examples", "allowlist", "unconverted.json") + ", 설명 " + doc_url("guide/allowlist.md"))
+    elif r["verdict"] == "undecided":
+        lines.append("다음 할 일: 미판정 까닭은 위 [검사] 줄에 있다(예: TLS 서버 신호가 있으면 TLS_TARGETS 로 주소를 준다). "
+                     "미판정은 통과로 세지 않는다")
+    return lines
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1904,6 +2027,8 @@ def main(argv):
     if len(argv) != 2:
         print("사용: bash prove.sh <원본 폴더|zip> <고친 폴더|zip>   (환경 변수는 prove.sh 머리 주석)", file=sys.stderr)
         return 2
+    for w in env_warnings(os.environ):
+        print(f"pqproof: 경고: {w}", file=sys.stderr)
     try:
         params = Params()
         _, code, _ = run(argv[0], argv[1], params)

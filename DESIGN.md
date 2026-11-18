@@ -147,7 +147,7 @@ A migration often has to keep a few classical lines, for example to read data wr
 
 ## Outputs
 
-Each run writes a new folder (`OUT=...`, default `./proof-out-HHMMSS`) and refuses to reuse an existing one.
+Each run writes a new folder (`OUT=...`, default `./proof-out-YYYYMMDD-HHMMSS`, with `-2`, `-3` added when two runs start in the same second) and refuses to reuse a folder given in `OUT`. While it runs, it prints the applied settings and one progress line per step, with the time taken, to stderr. It warns about a variable whose name is one letter off a setting (`REQUIRE_REVEIW=1` would otherwise leave strict mode off without a word) and about unknown `PQPROOF_` names. The console ends with the files to open first (`receipt.html` for people, `receipt.json` for programs, `tables/report.md` to paste) and the re-check command for the entry point that ran (`pqproof --verify` or `bash prove.sh --verify`). A failed run then lists where the full lists are (`tables/cbom-fixed.csv`, `artifacts/residue-fixed.txt`, `artifacts/weakening.json`) and points to the allowlist example, and `tables/report.md` gets a table of the blocking locations.
 
 - `receipt.json`: the verification evidence. It records the tool version, the ruleset and the evidence format (see [Versions in the evidence](#versions-in-the-evidence)), the inputs (absolute path, tree SHA-256, zip SHA-256), every tool with its path and SHA-256, the parameters, each check with expected and actual values, the start and end time of each step, and every output file with its size and SHA-256.
 - `receipt.html`: the same evidence as one self-contained page, with no external references.

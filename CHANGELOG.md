@@ -22,6 +22,11 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 ### Changed
 
+- Progress: a run prints the applied settings first, then one line per step with the time taken, to stderr. A large tree no longer looks stuck for minutes.
+- A variable whose name is one letter off a setting (`REQUIRE_REVEIW`, `TLS_TARGET`, `EXPCET`) and an unknown `PQPROOF_` name get a warning at the start. Before, `REQUIRE_REVEIW=1` left strict mode off without a word.
+- The default output folder is `proof-out-YYYYMMDD-HHMMSS` (`proof-YYYYMMDD-HHMMSS` under `<W>/evidence`), with `-2`, `-3` when two runs start in the same second. Before, it had only the time of day and a second run in the same second stopped with exit 2.
+- The console ends with what to open first (`receipt.html`, `receipt.json`, `tables/report.md`) and the re-check command for the entry point that ran (`pqproof --verify` or `bash prove.sh --verify`, also in `deck.json` and `tables/report.md`). After a failure it lists where the full lists are and points to an allowlist example (`examples/allowlist/`). `tables/report.md` gets a "blocking locations" table, and its "left after the migration" table no longer says "none" without pointing to the cause.
+- Leftovers from the contest pipeline are gone: `a-input` no longer points to a `crypto-grep.sh` that is not shipped, and the console header says `PQ-Proof <version>` instead of `pqc-proof prove.sh`.
 - `pqproof --verify` and `pqproof --env` run in Python alone, without bash, so evidence can be re-checked on Windows. A CI job on `windows-latest` re-verifies the golden evidence and converts one to SARIF. On Windows, judging stops with exit 2 and a note to use WSL, even when a Git Bash `bash` is on the PATH. `tests/golden/evidence/` is checked out byte for byte (`.gitattributes`).
 - Version policy, as Semantic Versioning has it: a new command or option bumps MINOR too, not only a verdict change. Before, the policy said that any change that moved no verdict was a PATCH.
 - `scan/ruleset.json` records, for each ruleset, the first version that shipped it (`since`), its verdict impact (`yes`, or `no` for a change in comments only) and the hash of each rule file. `--verify` and `pqproof --version` still read the old form. Ruleset 1 is unchanged: same name, same hash.

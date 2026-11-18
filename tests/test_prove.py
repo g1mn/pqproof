@@ -1,4 +1,6 @@
 """prove.py: 입력 풀기, residue 일반판·출력 읽기, 허용 규칙, 작은 Java 트리 끝에서 끝까지(통과·실패·미판정)."""
+import contextlib
+import io
 import os
 import pathlib
 import sys
@@ -134,6 +136,52 @@ class Inputs(unittest.TestCase):
         self.assertEqual(prove.parse_target("127.0.0.1:8443@api.local"), ("127.0.0.1:8443", "api.local", None))
 
 
+class Settings(unittest.TestCase):
+    def test_typos_and_unknown_pqproof_names_warn(self):
+        env = {"REQUIRE_REVEIW": "1", "TLS_TARGET": "127.0.0.1:8443", "EXPCET": "kem", "PQPROOF_OUT": "x",
+               "REQUIRE_REVIEW": "0", "PQPROOF_HOME": "/x", "PQPROOF_ENTRY": "pqproof"}
+        w = "\n".join(prove.env_warnings(env))
+        self.assertIn("REQUIRE_REVEIW: 설정 이름이 아니다. REQUIRE_REVIEW 를 뜻했나? 엄격 모드", w)
+        self.assertIn("TLS_TARGET: 설정 이름이 아니다. TLS_TARGETS", w)
+        self.assertIn("EXPCET: 설정 이름이 아니다. EXPECT", w)
+        self.assertIn("PQPROOF_OUT: PQ-Proof 가 모르는 이름", w)
+        self.assertEqual(len(prove.env_warnings(env)), 4)
+
+    def test_settings_match_the_help_and_params(self):
+        """SETTINGS(오타 경고의 기준)는 prove.sh 머리 주석의 설정 목록, Params 가 읽는 이름과 같아야 한다."""
+        import re
+        head = pathlib.Path(prove.HERE, "prove.sh").read_text(encoding="utf-8").split("\nset -uo pipefail")[0]
+        documented = set(re.findall(r"(?m)^#   ([A-Z][A-Z_]+)=", head))
+        src = pathlib.Path(prove.HERE, "prove.py").read_text(encoding="utf-8")
+        params_src = src[src.index("class Params:"):src.index("TARGET = re.compile")]
+        read = set(re.findall(r'env\.get\("([A-Z_]+)"', params_src))
+        self.assertEqual(documented, set(prove.SETTINGS))
+        self.assertLessEqual(read, set(prove.SETTINGS))
+        self.assertEqual(set(prove.SETTINGS) - read, {"PROBE_BIN_DIR"})  # prove.sh·cli.py·tlsprobe.py 가 읽는다
+
+    def test_common_environment_is_quiet(self):
+        env = dict.fromkeys(("PATH", "HOME", "SHELL", "LANG", "TERM", "USER", "PWD", "OLDPWD", "TMPDIR", "LOGNAME", "EDITOR",
+                             "PAGER", "PYTHONPATH", "PYTHONHOME", "OPENSSL_CONF", "OPENSSL_DIR", "JAVA_HOME", "CLASSPATH",
+                             "GOPATH", "GITHUB_ACTIONS", "RUNNER_TEMP", "RUNNER_OS", "CI", "SSH_AUTH_SOCK", "EXPECTED",
+                             "OUTPUT", "OUTDIR", "SCOPES_DIR", "ALLOWED_HOSTS", "KEEP", "STRICT"), "x")
+        env.update({k: "x" for k in prove.SETTINGS + prove.OTHER_ENV})
+        self.assertEqual(prove.env_warnings(env), [])
+
+    def test_default_out_has_the_date_and_never_collides(self):
+        with tempfile.TemporaryDirectory() as d:
+            cwd = os.getcwd()
+            os.chdir(d)
+            try:
+                first = prove.default_out(os.path.join(d, "orig-tree"))
+                self.assertRegex(os.path.basename(first), r"^proof-out-[0-9]{8}-[0-9]{6}$")
+                os.makedirs(first)
+                with mock.patch.object(prove.time, "strftime", return_value=os.path.basename(first)[len("proof-out-"):]):
+                    second = prove.default_out(os.path.join(d, "orig-tree"))
+                self.assertEqual(second, first + "-2")
+            finally:
+                os.chdir(cwd)
+
+
 class Residue(unittest.TestCase):
     def test_generic_residue_file(self):
         text = prove.slurp(prove.GENERIC_RESIDUE)
@@ -220,10 +268,22 @@ class EndToEnd(unittest.TestCase):
         self.assertTrue(any("X509TrustManager" in d for d in r["weakening"]["deny"]))
 
     def test_classical_left_fails(self):
-        r, code, _ = self.run_("same", self.orig)
+        r, code, lines = self.run_("same", self.orig)
         self.assertEqual(r["verdict"], "fail")
         st = {c["id"]: c["status"] for c in r["checks"]}
         self.assertEqual((st["a-cbom"], st["c-classic"], st["c-expect"]), ("fail", "fail", "fail"))
+        # 실패면 고칠 곳 전체 목록과 허용 목록 안내가 콘솔 끝에, report.md 에 막는 위치 표가 나온다(X49)
+        text = "\n".join(lines)
+        self.assertIn("다음 할 일:", text)
+        self.assertIn("tables/cbom-fixed.csv", text)
+        self.assertIn("artifacts/residue-fixed.txt", text)
+        self.assertIn(os.path.join("examples", "allowlist", "unconverted.json"), text)
+        self.assertTrue(os.path.isfile(os.path.join(prove.HERE, "examples", "allowlist", "unconverted.json")))
+        md = prove.slurp(os.path.join(self.tmp.name, "out-same", "tables", "report.md"))
+        self.assertIn("막는 위치(실패 원인)", md)
+        self.assertIn("Crypto.java:", md)
+        self.assertIn("실패 원인은 위 '막는 위치' 표", md)
+        self.assertIn("guide/allowlist.md", md)
 
     def test_tls_signal_without_targets_is_undecided(self):
         tls = write(os.path.join(self.tmp.name, "tls"), dict(FIXED_JAVA, **{
@@ -231,6 +291,31 @@ class EndToEnd(unittest.TestCase):
         r, code, _ = self.run_("tls", tls)
         self.assertEqual((r["verdict"], code), ("undecided", 3))
         self.assertTrue(r["tls"]["signals"])
+
+    def test_console_points_to_what_to_open_first(self):
+        r, code, lines = self.run_("first", self.fixed)
+        text = "\n".join(lines)
+        self.assertIn("사람이 볼 것: receipt.html", text)
+        self.assertIn("bash prove.sh --verify " + os.path.join(self.tmp.name, "out-first"), text)
+        self.assertNotIn("다음 할 일", text)
+        self.assertTrue(lines[0].startswith("== PQ-Proof "), lines[0])
+        with mock.patch.dict(os.environ, {"PQPROOF_ENTRY": "pqproof"}):
+            r, code, lines = self.run_("entry", self.fixed)
+        self.assertIn("pqproof --verify " + os.path.join(self.tmp.name, "out-entry"), "\n".join(lines))
+        self.assertTrue(r["deck_meta"]["verify_cmd"].startswith("pqproof --verify "))
+        md = prove.slurp(os.path.join(self.tmp.name, "out-entry", "tables", "report.md"))
+        self.assertIn("`pqproof --verify <출력 폴더>`", md)
+
+    def test_progress_goes_to_stderr_unless_quiet(self):
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+            prove.run(self.orig, self.fixed, params(), os.path.join(self.tmp.name, "out-progress"), self.cache, quiet=False)
+        text = err.getvalue()
+        self.assertIn("pqproof: 설정: EXPECT=kem,sig", text)
+        self.assertIn("REQUIRE_REVIEW=0", text)
+        for step in ("[1/6] 준비", "[2/6] (a) CBOM", "[3/6] (c)", "[4/6] (b)", "[5/6] (b) TLS", "[6/6] (d)"):
+            self.assertIn(step, text)
+        self.assertEqual(text.count(" 끝 "), 6)
 
     def test_output_folder_is_never_reused(self):
         os.makedirs(os.path.join(self.tmp.name, "out-exists"))
