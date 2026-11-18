@@ -1,0 +1,2 @@
+# 증적 고정물은 바이트 그대로 둔다(Windows 체크아웃의 줄 끝 바꿈이 해시를 깨지 않게). --verify 가 SHA-256 으로 맞춰 본다.
+tests/golden/evidence/** -text

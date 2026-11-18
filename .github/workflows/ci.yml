@@ -208,6 +208,34 @@ jobs:
             selfcheck-result.json
           if-no-files-found: ignore
 
+  verify-windows:
+    name: re-verify evidence on Windows (Python only, no bash)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: "3.13"
+
+      - name: Install, re-verify the golden evidence, convert to SARIF, refuse to judge
+        shell: pwsh
+        run: |
+          python -m pip install --quiet .
+          pqproof --version
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          foreach ($d in Get-ChildItem tests/golden/evidence -Directory) {
+            pqproof --verify $d.FullName
+            if ($LASTEXITCODE -ne 0) { Write-Error "verify failed: $($d.Name)"; exit 1 }
+          }
+          pqproof sarif tests/golden/evidence/f2-v0.1.0 -o golden.sarif
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          pqproof examples/classic examples/pqc
+          if ($LASTEXITCODE -ne 2) { Write-Error "judging on Windows must stop with exit 2 and the WSL note"; exit 1 }
+          exit 0
+
   version-policy:
     name: version policy (no verdict change in a PATCH release)
     runs-on: ubuntu-latest

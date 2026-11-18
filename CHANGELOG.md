@@ -22,6 +22,7 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 ### Changed
 
+- `pqproof --verify` and `pqproof --env` run in Python alone, without bash, so evidence can be re-checked on Windows. A CI job on `windows-latest` re-verifies the golden evidence and converts one to SARIF. On Windows, judging stops with exit 2 and a note to use WSL, even when a Git Bash `bash` is on the PATH. `tests/golden/evidence/` is checked out byte for byte (`.gitattributes`).
 - Version policy, as Semantic Versioning has it: a new command or option bumps MINOR too, not only a verdict change. Before, the policy said that any change that moved no verdict was a PATCH.
 - `scan/ruleset.json` records, for each ruleset, the first version that shipped it (`since`), its verdict impact (`yes`, or `no` for a change in comments only) and the hash of each rule file. `--verify` and `pqproof --version` still read the old form. Ruleset 1 is unchanged: same name, same hash.
 - `tests/version_policy.py` enforces the policy in CI (new `version-policy` job) and in the release workflow: a ruleset with verdict impact yes must first ship in a release with PATCH 0, every CHANGELOG entry (and `[Unreleased]`) has a verdict-impact line, an entry that says yes is not a PATCH release, and golden verdicts that moved since the previous release tag need a MINOR release and a "yes" entry.

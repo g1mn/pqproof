@@ -21,6 +21,7 @@ try:
     import pqproof  # noqa: F401  설치본
 except ImportError:
     sys.path.insert(0, str(PROOF / "src"))  # 저장소 체크아웃
+import pqproof  # noqa: E402
 from pqproof import cli, deps, sarif  # noqa: E402
 
 EXAMPLES = PROOF / "examples"
@@ -180,7 +181,7 @@ class CliTest(unittest.TestCase):
             self.assertEqual(cli.main(["--version"]), 0)
             self.assertEqual(cli.main(["--nope"]), 2)
             self.assertEqual(cli.main(["only-one-arg"]), 2)
-        self.assertIn("pqproof 0.1.0", out.getvalue())
+        self.assertIn(f"pqproof {pqproof.__version__}", out.getvalue())
         self.assertIn("never counted as passed", out.getvalue())
 
     def test_tool_root_found(self):
@@ -188,6 +189,48 @@ class CliTest(unittest.TestCase):
         self.assertIsNotNone(root)
         self.assertTrue(os.path.isfile(os.path.join(root, "prove.sh")))
         self.assertTrue(os.path.isfile(os.path.join(root, "scan", "cbom-scan.sh")))
+
+    def test_verify_needs_only_python(self):
+        """--verify 는 bash 를 거치지 않는다(X40): PATH 를 비워도 돌고, bash prove.sh --verify 와 출력·종료 코드가 같다."""
+        gold = str(PROOF / "tests" / "golden" / "evidence" / "f2-v0.1.0")
+        code = ("import sys; sys.path.insert(0, sys.argv[1]); from pqproof import cli; "
+                "sys.exit(cli.main(['--verify', sys.argv[2]]))")
+        src = os.path.dirname(os.path.dirname(os.path.abspath(cli.__file__)))
+        alone = subprocess.run([sys.executable, "-I", "-c", code, src, gold], capture_output=True, text=True,
+                               env={"PATH": "", "PQPROOF_HOME": cli.tool_root()}, timeout=120)
+        self.assertEqual(alone.returncode, 0, alone.stdout + alone.stderr)
+        self.assertIn("all checks pass", alone.stdout)
+        if shutil.which("bash"):
+            via_bash = subprocess.run(["bash", os.path.join(cli.tool_root(), "prove.sh"), "--verify", gold],
+                                      capture_output=True, text=True, env=dict(os.environ, PYTHON=sys.executable), timeout=120)
+            self.assertEqual((via_bash.returncode, via_bash.stdout), (alone.returncode, alone.stdout))
+
+    def test_windows_judges_in_wsl_but_verifies_here(self):
+        gold = str(PROOF / "tests" / "golden" / "evidence" / "f2-v0.1.0")
+        out, err = io.StringIO(), io.StringIO()
+        with mock.patch.object(cli, "is_windows", return_value=True), \
+                mock.patch.object(cli, "run", side_effect=lambda cmd, env: 0 if "bash" not in cmd[0] else 99) as run:
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                self.assertEqual(cli.main(["orig", "fixed"]), 2)
+                self.assertEqual(cli.main(["--unit"]), 2)
+                self.assertEqual(cli.main(["doctor"]), 2)
+                self.assertEqual(cli.main(["--verify", gold]), 0)
+                self.assertEqual(cli.main(["--env"]), 0)
+        self.assertIn("WSL", err.getvalue())
+        self.assertEqual([c.args[0][-2:] for c in run.call_args_list], [["verify", gold]])
+        self.assertIn("REQUIRE_REVIEW", out.getvalue())
+        with mock.patch.object(deps.os, "name", "nt"):
+            rep = deps.check(env={}, bin_dir=None)
+        self.assertTrue(rep.errors and "WSL" in rep.errors[0], rep.errors)
+
+    def test_env_lists_settings_without_bash(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual(cli.main(["--env"]), 0)
+        text = out.getvalue()
+        self.assertTrue(text.startswith("# prove.sh"), text[:80])
+        for name in ("OUT=", "ALLOW=", "REQUIRE_REVIEW=", "TLS_TARGETS="):
+            self.assertIn(name, text)
 
     def test_sarif_subcommand_refuses_missing_folder(self):
         missing = os.path.join(tempfile.gettempdir(), "no-such-pqproof-out-" + hashlib.sha256(b"x").hexdigest()[:8])

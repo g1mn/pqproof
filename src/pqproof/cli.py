@@ -6,7 +6,9 @@
 #   pqproof build-probe     tls_probe 를 사용자 캐시 폴더에 빌드(Go 1.27+, 인터넷 없음)
 #   pqproof mutations [--strict]   심어 둔 결함 시험 묶음
 # 도구 본체는 패키지 데이터 pqproof/_tool(설치본) 또는 저장소 루트(소스에서 실행)에서 찾는다. PQPROOF_HOME 으로 바꿀 수 있다.
-# prove.sh 는 이 파이썬(sys.executable)으로 돌게 PYTHON 을 넘긴다.
+# prove.sh 는 이 파이썬(sys.executable)으로 돌게 PYTHON 을 넘긴다. 판정 출력의 다시 확인 안내가 pqproof 로 나오게 PQPROOF_ENTRY 도 넘긴다.
+# 재검증(--verify)·--version·sarif·--env 는 bash 없이 이 파이썬으로만 돈다(Windows 에서도). 스캔·시험은 bash·grep·awk·OpenSSL 이
+# 있어야 해서 Windows 에서는 WSL 안내 뒤 2로 끝낸다.
 """Console entry point: `pqproof` behaves like `bash prove.sh`, plus sarif, doctor, build-probe and mutations."""
 import os
 import subprocess
@@ -25,7 +27,29 @@ USAGE = """usage:
   pqproof build-probe                              build tls_probe into the user cache (Go 1.27+, offline)
   pqproof mutations [--strict] [--only ids]        planted-defect suite
   pqproof --version | --help | --env               (--env prints the environment variables prove.sh reads)
-exit codes: 0 pass, 1 fail, 2 usage or input error, 3 undecided. A skipped check is never counted as passed."""
+exit codes: 0 pass, 1 fail, 2 usage or input error, 3 undecided. A skipped check is never counted as passed.
+--verify, sarif, --env and --version need only Python; judging needs bash, grep, awk and OpenSSL (on Windows, use WSL)."""
+
+WINDOWS = ("pqproof: judging two trees runs bash, grep, awk and OpenSSL, so on Windows run it inside WSL: `wsl --install`, then "
+           "`pip install pqproof` in the Ubuntu shell. Re-checking evidence works here without WSL: pqproof --verify <folder>, "
+           "pqproof sarif <folder>.")
+
+
+def is_windows():
+    return os.name == "nt"
+
+
+def env_help(root):
+    """prove.sh 머리 주석(둘째 줄부터 첫 비주석 줄 앞까지). bash 없이 읽는다."""
+    lines = []
+    with open(os.path.join(root, "prove.sh"), encoding="utf-8") as f:
+        for i, line in enumerate(f):
+            if i == 0:
+                continue
+            if not line.startswith("#"):
+                break
+            lines.append(line.rstrip("\n"))
+    return "\n".join(lines)
 
 
 def version_line():
@@ -70,6 +94,7 @@ def child_env(root):
     env = dict(os.environ)
     env.setdefault("PYTHON", sys.executable)
     env["PROBE_BIN_DIR"] = probe_dir(root)
+    env["PQPROOF_ENTRY"] = "pqproof"
     return env
 
 
@@ -141,10 +166,18 @@ def main(argv=None):
         print("pqproof: the tool files (prove.sh, prove.py, pqlite/, scan/) are missing from this install. "
               "Reinstall the package or set PQPROOF_HOME to a PQ-Proof checkout.", file=sys.stderr)
         return 2
-    prove = ["bash", os.path.join(root, "prove.sh")]
     if first == "--env":
-        run(prove + ["--help"], child_env(root))  # prove.sh --help 는 머리 주석을 찍고 2로 끝난다
+        print(env_help(root))
         return 0
+    if first == "--verify":
+        if len(argv) != 2:
+            print("usage: pqproof --verify <out dir>", file=sys.stderr)
+            return 2
+        return run([sys.executable, "-I", "-B", os.path.join(root, "pqlite", "receipt.py"), "verify", argv[1]], dict(os.environ))
+    if is_windows():
+        print(WINDOWS, file=sys.stderr)
+        return 2
+    prove = ["bash", os.path.join(root, "prove.sh")]
     if first == "doctor":
         return doctor(root)
     if first == "build-probe":
@@ -159,11 +192,6 @@ def main(argv=None):
         sarif_py = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sarif.py")
         cmd = f'bash "{os.path.join(root, "prove.sh")}"'
         return run([sys.executable, "-I", "-B", runner, "--root", root, "--sarif", sarif_py, "--cmd", cmd] + argv[1:], child_env(root))
-    if first == "--verify":
-        if len(argv) != 2:
-            print("usage: pqproof --verify <out dir>", file=sys.stderr)
-            return 2
-        return run(prove + argv, child_env(root))
     if first in ("--unit", "--selftest"):
         if not preflight(root):
             return 2

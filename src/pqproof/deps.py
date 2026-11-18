@@ -94,8 +94,9 @@ def has_keystores(inputs, limit=20000):
 def check(env=None, inputs=(), bin_dir=None, need_tls=None):
     env = os.environ if env is None else env
     rep = Report()
-    if os.name == "nt" and not shutil.which("bash"):
-        rep.errors.append("Windows without bash: run PQ-Proof inside WSL (Ubuntu) or a Linux container.")
+    if os.name == "nt":  # Git Bash·Cygwin 의 bash 가 PATH 에 있어도 경로·OpenSSL 이 달라 엉뚱하게 실패한다
+        rep.errors.append("Windows: judge inside WSL (Ubuntu) or a Linux container. pqproof --verify and pqproof sarif work "
+                          "here with Python alone.")
         return rep
     if not shutil.which("bash"):
         rep.errors.append("bash not found. PQ-Proof runs its scanners (cbom-scan.sh, residue.sh) with bash 3.2 or later.")

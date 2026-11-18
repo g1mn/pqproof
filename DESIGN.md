@@ -10,7 +10,7 @@ This page describes what one run decides, the rules behind each check, how the v
 
 ## Install and first run
 
-You need Python 3.9 or later (standard library only), bash 3.2 or later and OpenSSL. The TLS cross-check wants OpenSSL 3.5 or later; with an older OpenSSL or LibreSSL the run still works and records the cross-check as not possible. Go 1.27 or later is only needed to build the TLS probe. On Windows, use WSL.
+You need Python 3.9 or later (standard library only), bash 3.2 or later and OpenSSL. The TLS cross-check wants OpenSSL 3.5 or later; with an older OpenSSL or LibreSSL the run still works and records the cross-check as not possible. Go 1.27 or later is only needed to build the TLS probe. Judging needs bash, so on Windows run it in WSL; `pqproof` says so and exits 2 even when a Git Bash `bash` is on the PATH. Re-checking evidence (`pqproof --verify`), `pqproof sarif`, `--env` and `--version` need only Python and run on Windows as well.
 
 ```bash
 pip install pqproof
