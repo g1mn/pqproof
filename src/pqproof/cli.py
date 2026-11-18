@@ -19,6 +19,8 @@ from pqproof import deps
 
 USAGE = """usage:
   pqproof <original dir|zip> <converted dir|zip>   judge both trees, write the evidence folder (env vars as in prove.sh)
+  pqproof check <dir|zip>                          judge one tree as it is now (no original: after the migration, in CI)
+  pqproof inventory <dir|zip>                      no verdict: CBOM rows, classical lines per family, PQC name lines
   pqproof --verify <out dir>                       re-check an evidence folder (schema, receipt_id, file hashes, HTML)
   pqproof --unit [name]                            unit tests (standard library unittest)
   pqproof --selftest                               offline self-test on the bundled examples
@@ -197,6 +199,13 @@ def main(argv=None):
         sarif_py = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sarif.py")
         cmd = f'bash "{os.path.join(root, "prove.sh")}"'
         return run([sys.executable, "-I", "-B", runner, "--root", root, "--sarif", sarif_py, "--cmd", cmd] + argv[1:], child_env(root))
+    if first in ("check", "inventory"):
+        if len(argv) != 2:
+            print(f"usage: pqproof {first} <dir|zip>", file=sys.stderr)
+            return 2
+        if not preflight(root, inputs=argv[1:]):
+            return 2
+        return run(prove + ["--" + first, argv[1]], child_env(root, entry=True))
     if first in ("--unit", "--selftest"):
         if not preflight(root):
             return 2

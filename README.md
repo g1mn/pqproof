@@ -53,7 +53,7 @@ The run writes `proof-out-YYYYMMDD-HHMMSS/`. Open `receipt.html` (for people) or
 
 ## In CI
 
-The GitHub Action judges a pull request against its base commit and uploads SARIF to code scanning; [examples/github-actions/](https://github.com/g1mn/pqproof/blob/main/examples/github-actions/pqproof-sarif.yml) reads the allowlist from the base commit so an author cannot approve their own entries. GitLab, Jenkins and SonarQube examples are in [guide/ci.md](https://github.com/g1mn/pqproof/blob/main/guide/ci.md). Release assets carry build provenance: `gh attestation verify <file> --repo g1mn/pqproof`.
+Three ways to run it in a pipeline: a migration pull request judged against its base commit (`pqproof <original> <converted>`), a regression guard on `main` that judges the tree alone (`pqproof check .`, the Action's `mode: check`), and a first survey with no verdict (`pqproof inventory <tree>`). The GitHub Action judges a pull request against its base commit and uploads SARIF to code scanning; [examples/github-actions/](https://github.com/g1mn/pqproof/blob/main/examples/github-actions/pqproof-sarif.yml) reads the allowlist from the base commit so an author cannot approve their own entries. GitLab, Jenkins and SonarQube examples are in [guide/ci.md](https://github.com/g1mn/pqproof/blob/main/guide/ci.md). Release assets carry build provenance: `gh attestation verify <file> --repo g1mn/pqproof`.
 
 ## Words
 

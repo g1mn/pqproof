@@ -312,6 +312,12 @@
         "max_file_bytes": {
           "type": "integer",
           "minimum": 0
+        },
+        "mode": {
+          "enum": [
+            "pair",
+            "check"
+          ]
         }
       }
     },
@@ -854,6 +860,14 @@
             "null"
           ],
           "pattern": "^[0-9a-f]{64}$"
+        },
+        "probe_build": {
+          "enum": [
+            "release",
+            "local",
+            "unchecked",
+            null
+          ]
         }
       }
     },

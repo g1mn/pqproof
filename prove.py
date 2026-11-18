@@ -154,8 +154,9 @@ def default_openssl():
 # ---------------------------------------------------------------------------------------------
 # 매개변수
 class Params:
-    def __init__(self, env=None):
+    def __init__(self, env=None, mode="pair"):
         env = os.environ if env is None else env
+        self.mode = mode  # pair: 원본과 고친 판, check: 한 트리의 지금 상태만(--check, 교차 리뷰 X13)
         self.out = env.get("OUT") or None
         self.tls_targets = env.get("TLS_TARGETS", "").split()
         self.tls_targets_orig = env.get("TLS_TARGETS_ORIG", "").split()
@@ -558,7 +559,9 @@ def probe_tool():
         return None
     if not (os.path.isfile(path) and os.access(path, os.X_OK)):
         return None
-    return tool("tls_probe", str(path), tlsprobe.PROBE_VERSION)
+    t = tool("tls_probe", str(path), tlsprobe.PROBE_VERSION)
+    t["version"] += f" ({tlsprobe.provenance(path, t['sha256'])})"  # 릴리스 해시와 대조(교차 리뷰 X47): release · local · unchecked
+    return t
 
 
 def openssl_version(openssl):
@@ -966,7 +969,9 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
         tl_path, tl_sha = art.add_json("artifacts/tls-log.json", [dict(x, t=rc.iso(x["t"])) for x in tls_log])
     if os.path.isdir(os.path.join(out, "artifacts", "tls")):
         art.register_dir("artifacts/tls")
+    probe = probe_tool()
     tls = {"signals": sig_f[0], "client_signals": sig_f[1], "applicable": bool(sig_f[0] or params.tls_targets),
+           "probe_build": (probe["version"].rsplit("(", 1)[-1].rstrip(")") if probe and t_results else None),
            "via": params.tls_via, "controls": controls, "control_problem": problem, "targets": t_results,
            "baseline": b_results, "log": tl_path, "log_sha256": tl_sha}
     phase("(b) TLS 탐침", t0)
@@ -1039,7 +1044,6 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
     pyfiles = ["prove.py", "prove.sh", "pqlite/scan.py", "pqlite/verify.py", "pqlite/tlsprobe.py", "pqlite/receipt.py",
                "pqlite/allowlist.py", "pqlite/version.py", "pqlite/rules.py", "pqlite/skipdirs.py"]
     tools += [tool(p, os.path.join(HERE, p)) for p in pyfiles]
-    probe = probe_tool()
     if probe:
         tools.append(probe)
     tools.append({"name": "tls_probe source", "path": str(tlsprobe.PROBE_SRC), "sha256": tlsprobe.source_sha256(),
@@ -1060,7 +1064,7 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
                     "residue": res_script or "", "allow": allow_path or "", "exclude": excl.patterns,
                     "recon": recon_path or "", "require_review": params.require_review, "profile": params.profile,
                     "fail_on_review": params.fail_on_review, "require_resolved": params.require_resolved, "expect_from": params.expect_from,
-                    "review_max_age_days": params.review_max_age_days, "max_file_bytes": params.max_file_bytes},
+                    "review_max_age_days": params.review_max_age_days, "max_file_bytes": params.max_file_bytes, "mode": params.mode},
          "changed": {"added": added, "removed": removed, "modified": modified, "file": ch_path, "file_sha256": ch_sha},
          "cbom": cbom, "java": java_rec, "tls": tls,
          "weakening": {"deny": deny, "review": review, "file": wp, "file_sha256": ws},
@@ -1101,6 +1105,8 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
         f.write(rc.render_html(r))
     with open(os.path.join(out, "deck.json"), "x", encoding="utf-8") as f:
         f.write(rc.render_deck(r))  # 발표 자료·대시보드용 요약. receipt.json에서 결정적으로 나와 verify가 다시 만들어 본다
+    with open(os.path.join(out, "README.txt"), "x", encoding="utf-8") as f:
+        f.write(rc.render_readme(r))  # 결과 폴더 안내(형식 3). 먼저 볼 파일·다시 확인 명령. verify 가 다시 만들어 본다
     vres = rc.verify(out)
     bad = [w for ok, w in vres if not ok]
 
@@ -1161,6 +1167,65 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
     if not quiet:
         print("\n".join(lines))
     return r, code, lines
+
+
+# ---------------------------------------------------------------------------------------------
+# 한 트리 인벤토리(--inventory, 교차 리뷰 X13): 판정 없이 CBOM 과 계열별 고전 줄, PQC 이름 줄을 센다. 정기 감사·첫 현황 조사용
+def inventory(tree, params, out=None, quiet=False):
+    """한 트리를 두 스캐너와 residue.sh 로 훑어 out 에 inventory.json·tables/cbom.csv·artifacts/ 를 쓴다. 반환 (요약 dict, 종료 코드 0)."""
+    out = os.path.abspath(out or params.out or default_out(tree).replace("proof-", "inventory-", 1))
+    if os.path.exists(out):
+        raise UsageError(f"출력 폴더가 이미 있다(덮어쓰지 않음): {out}")
+    started = now()
+    os.makedirs(out)
+    art = rc.Artifacts(out)
+    rules.MAX_TEXT = scanmod.MAX_FILE = params.max_file_bytes
+    info, root, files, extra = prepare_input(tree, out, "tree", skipdirs.load(), params.max_file_bytes)
+    if not files:
+        raise UsageError(f"읽을 파일이 0개다: {info['path']}")
+    tp_art, _ = art.add("artifacts/test-paths.ere", slurp(scanmod.TEST_PATHS_FILE))
+    sd_art, _ = art.add("artifacts/skip-dirs", slurp(skipdirs.SKIP_FILE))
+    tp_file, sd_file = os.path.join(out, *tp_art.split("/")), os.path.join(out, *sd_art.split("/"))
+    rows = scanmod.scan(root)
+    art.add_json("artifacts/scan.json", [x.to_json() for x in rows])
+    sig = tls_signals(root, rows)
+    ok, _, crow = run_cbom_scan(params.cbom_scan, root, os.path.join(out, "artifacts", "cbom"), params.openssl, None, None, tp_file, sd_file)
+    art.register_dir("artifacts/cbom")
+    items, counts, nloc = merge_cbom(crow, rows, Lines(root), sig[2], params.scope, None)
+    table, _ = cbom_csv(items)
+    art.add("tables/cbom.csv", table)
+    code, text = run_residue(params.residue or GENERIC_RESIDUE, root, tp_file, sd_file)
+    art.add("artifacts/residue.txt", text)
+    parsed = parse_residue(text)
+    fams = parsed["families"] if parsed else None
+    rs_sha = ver.ruleset_from_tools([tool(n, os.path.join(HERE, p)) for p, n in ver.RULESET_FILES])
+    summary = {
+        "format": "pqproof inventory 1", "tool_version": ver.tool_version(), "ruleset_version": ver.ruleset_label(rs_sha),
+        "ruleset_sha256": rs_sha, "started_at": rc.iso(started), "input": info, "profile": params.profile, "scope": params.scope,
+        "cbom": {"rows": len(items), "locations": nloc, "blocking": counts["block"], "review": counts["review"], "allowed": counts["allow"],
+                 "comment_or_test": counts["comment"], "tests": counts["tests"], "check": counts["check"], "unresolved": counts["unresolved"],
+                 "cbom_scan_ok": ok},
+        "blocking": sorted({it["loc"] for it in items if it["status"] == "block"}, key=al._loc_key)[:400],
+        "families": fams, "classic_code_lines": sum(v["code"] for v in fams.values()) if fams else None,
+        "weak_pqc": parsed["weak_pqc"] if parsed else None, "expect": parsed["expect"] if parsed else None,
+        "tls": {"server_signals": sig[0], "client_signals": sig[1]},
+        "note": "판정이 아니다. 한 트리의 지금 상태(인벤토리)이고 같은 규칙 묶음으로 센 수다. 전환 판정은 두 트리를 넣어 돌린다.",
+        "artifacts": None}
+    summary["artifacts"] = art.manifest()
+    with open(os.path.join(out, "inventory.json"), "x", encoding="utf-8") as f:
+        f.write(json.dumps(summary, ensure_ascii=False, indent=1, sort_keys=True) + "\n")
+    if not quiet:
+        c = summary["cbom"]
+        print(f"== PQ-Proof {ver.tool_version()} 인벤토리(판정 아님)  {info['path']} (파일 {info['files']}, 트리 {info['tree_sha256'][:16]})")
+        print(f"CBOM 위치 {c['locations']} · 막는 위치 {c['blocking']} · 검토 필요 {c['review']} · 확인 {c['check']}"
+              + ("" if ok else " · cbom-scan 실패"))
+        if fams:
+            print("공개키 9계열 code: " + " · ".join(f"{k} {v['code']}" for k, v in fams.items() if v["code"])
+                  + f" (합 {summary['classic_code_lines']}) · 보안레벨 3 미만 PQC {summary['weak_pqc']}")
+            print("PQC 이름 줄: " + " · ".join(f"{k} {v}" for k, v in (summary["expect"] or {}).items()))
+        print(f"TLS 서버 신호 {len(sig[0])} · 클라이언트 신호 {len(sig[1])} · 규칙 묶음 {summary['ruleset_version']}")
+        print(f"출력: {out} (inventory.json, tables/cbom.csv)")
+    return summary, 0
 
 
 def next_steps(r, fixed_items, out):
@@ -1495,12 +1560,22 @@ def selftest(base=None, keep=False):
 def main(argv):
     if argv[:1] == ["--selftest"]:
         return selftest(base=os.environ.get("SELFTEST_DIR") or None, keep=os.environ.get("KEEP") == "1")
-    if len(argv) != 2:
+    if argv[:1] in (["--check"], ["--inventory"]):  # 한 트리(교차 리뷰 X13)
+        if len(argv) != 2:
+            print(f"사용: bash prove.sh {argv[0]} <폴더|zip>", file=sys.stderr)
+            return 2
+        argv = [argv[0], argv[1], argv[1]] if argv[0] == "--check" else argv
+    if len(argv) not in (2, 3) or (len(argv) == 3 and argv[0] != "--check"):
         print("사용: bash prove.sh <원본 폴더|zip> <고친 폴더|zip>   (환경 변수는 prove.sh 머리 주석)", file=sys.stderr)
         return 2
     for w in env_warnings(os.environ):
         print(f"pqproof: 경고: {w}", file=sys.stderr)
     try:
+        if argv[0] == "--inventory":
+            return inventory(argv[1], Params())[1]
+        if argv[0] == "--check":
+            _, code, _ = run(argv[1], argv[2], Params(mode="check"))
+            return code
         params = Params()
         _, code, _ = run(argv[0], argv[1], params)
         return code

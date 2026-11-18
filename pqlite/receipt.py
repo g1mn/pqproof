@@ -157,15 +157,16 @@ SCHEMA = obj(_TOP_REQ,
                classic={"enum": ["allow", "deny"]}, expect=STRS, scope={"enum": ["all", "kex"]}, tls_via=STR, tls_targets=STRS,
                tls_targets_orig=STRS, residue=STR, allow=STR, exclude=STRS, recon=STR, require_review=BOOL, profile=STR,
                fail_on_review=BOOL, require_resolved=BOOL, expect_from={"enum": ["names", "api"]}, review_max_age_days=INT_OR_NULL,
-               max_file_bytes=INT),
+               max_file_bytes=INT, mode={"enum": ["pair", "check"]}),
     changed=strict(added=STRS, removed=STRS, modified=STRS, file=PATH, file_sha256=SHA),
     cbom=strict(orig=CBOM_SIDE, fixed=CBOM_SIDE),
     java=strict(residue_kind={"enum": ["custom", "generic", "none"]}, script=PATH_OR_NULL, script_sha256=SHA_OR_NULL,
                 ref=STR_OR_NULL, ref_digest=SHA_OR_NULL, orig=JAVA_SIDE, fixed=JAVA_SIDE, usage=PATH, usage_sha256=SHA),
-    tls=strict(signals=STRS, client_signals=STRS, applicable=BOOL, via=STR,
+    tls=obj(["signals", "client_signals", "applicable", "via", "controls", "control_problem", "targets", "baseline", "log", "log_sha256"],
+            signals=STRS, client_signals=STRS, applicable=BOOL, via=STR,
                controls={"type": ["object", "null"]}, control_problem=STR_OR_NULL,
                targets={"type": "array", "items": ANY_OBJ}, baseline={"type": "array", "items": ANY_OBJ},
-               log=PATH_OR_NULL, log_sha256=SHA_OR_NULL),
+               log=PATH_OR_NULL, log_sha256=SHA_OR_NULL, probe_build={"enum": ["release", "local", "unchecked", None]}),
     weakening=strict(deny=STRS, review={"type": "array", "items": strict(path=STR, rule=STR, before=INT, after=INT,
                                                                            detail=STR, reason=STR)},
                      file=PATH, file_sha256=SHA),
@@ -179,7 +180,7 @@ SCHEMA = obj(_TOP_REQ,
 # 형식마다 꼭 있어야 하는 칸과 있으면 안 되는 칸(스키마는 모든 형식을 한 번에 읽는다). skip_dirs 는 형식 3에서 보탰다
 FORMAT_ONLY = {"skip_dirs": 3}
 # 형식 3에서 보탠 안쪽 칸(선택). 형식 2 스키마(schemas/receipt-v2.schema.json)에는 없다: tests/make_schemas.py 가 뺀다
-FORMAT_ONLY_NESTED = {("params", "profile"): 3, ("params", "fail_on_review"): 3, ("params", "require_resolved"): 3,
+FORMAT_ONLY_NESTED = {("tls", "probe_build"): 3, ("params", "profile"): 3, ("params", "mode"): 3, ("params", "fail_on_review"): 3, ("params", "require_resolved"): 3,
                       ("params", "expect_from"): 3, ("params", "review_max_age_days"): 3, ("params", "max_file_bytes"): 3,
                       ("allowlist", "composite"): 3, ("allowlist", "expired"): 3, ("allowlist", "entries[]", "expires_at"): 3,
                       ("allowlist", "entries[]", "approval_ref"): 3, ("allowlist", "entries[]", "expired"): 3,
@@ -505,7 +506,7 @@ def _listed_files(root):
             full = os.path.join(dirpath, name)
             if os.path.islink(full) or not os.path.isdir(full):
                 out.append(os.path.relpath(full, root).replace(os.sep, "/"))
-    return sorted(p for p in out if p not in ("receipt.json", "receipt.html", "deck.json"))
+    return sorted(p for p in out if p not in ("receipt.json", "receipt.html", "deck.json", "README.txt"))
 
 
 def derive_verdict(checks):
@@ -537,7 +538,10 @@ def consistency(r):
             out.append("a-cbom is review, but cbom.fixed.review is 0")
     if format_version(r) >= 2 and "r-review" in by and (by["r-review"] == "review") != bool(r["weakening"]["review"]):
         out.append(f"r-review is {by['r-review']}, but weakening.review has {len(r['weakening']['review'])} items")
-    if "b-weakening" in by and (by["b-weakening"] == "pass") != (not r["weakening"]["deny"]):
+    single = r["params"].get("mode") == "check"  # 형식 3 한 트리 점검: 두 트리 대조 검사는 해당 없음
+    if single and (by.get("b-weakening"), by.get("r-review")) != ("na", "na"):
+        out.append("params.mode is check, but b-weakening or r-review is not na")
+    if not single and "b-weakening" in by and (by["b-weakening"] == "pass") != (not r["weakening"]["deny"]):
         out.append(f"b-weakening is {by['b-weakening']}, but weakening.deny has {len(r['weakening']['deny'])} items")
     if "b-tls" in by:
         # review: 서버 신호 0인데 클라이언트 TLS 신호가 있다(prove.py, 반박 검증에서 찾음)
@@ -888,7 +892,43 @@ def verify(root):
             out.append((False, f"deck.json cannot be read: {e}"))
     elif os.path.lexists(os.path.join(root, "deck.json")):
         out.append((False, "deck.json is there, but the receipt has no deck_meta"))
+    if format_version(receipt) >= 3:  # 형식 3: 결과 폴더 안내 파일도 receipt 에서 결정적으로 나온다
+        try:
+            same = _read_nofollow(root, "README.txt").decode("utf-8") == render_readme(receipt)
+            out.append((same, "README.txt is this receipt" if same else "README.txt differs from this receipt"))
+        except (OSError, ValueError) as e:
+            out.append((False, f"README.txt cannot be read: {e}"))
+    elif os.path.lexists(os.path.join(root, "README.txt")):
+        out.append((False, "README.txt is there, but formats before 3 do not write one"))
     return out
+
+
+def render_readme(r):
+    """결과 폴더 안내(README.txt, 형식 3). 먼저 볼 파일, 다시 확인하는 법, 폴더를 넘기기 전에 볼 것. receipt.json 에서만 만든다."""
+    meta = r.get("deck_meta") or {}
+    verify_cmd = meta.get("verify_cmd") or "pqproof --verify <this folder>"
+    lines = [
+        f"PQ-Proof {r.get('tool_version', '')} result folder. Verdict: {verdict_text(r, en=True)}",
+        f"판정: {verdict_text(r)} · 증적 해시(receipt_id): {r['receipt_id']}",
+        "",
+        "Open first / 먼저 볼 것",
+        "  receipt.html          the verification evidence as one page (사람이 볼 것)",
+        "  receipt.json          the verification evidence for programs (기계가 읽을 것, schemas/receipt-v3.schema.json)",
+        "  tables/report.md      a summary to paste into a document (문서에 붙일 표)",
+        "  tables/cbom-fixed.csv every cryptographic location in the fixed tree with its status",
+        "",
+        "Check again / 다시 확인",
+        f"  {verify_cmd}",
+        "  Adding, removing or editing any file in this folder makes the check fail (README.txt included).",
+        "  폴더 안 파일을 더하거나 지우거나 고치면 다시 확인이 실패한다.",
+        "",
+        "Before sharing / 넘기기 전에",
+        "  artifacts/ holds the raw scanner output with source lines, and in/ holds unpacked zip inputs.",
+        "  Paths on this machine are recorded in receipt.json. Read guide/outputs.md before handing the folder over.",
+        "  artifacts/ 에는 소스 줄이 든 스캐너 원문이, in/ 에는 푼 zip 입력이 있다. 넘기기 전에 확인한다.",
+        "",
+    ]
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------------------------

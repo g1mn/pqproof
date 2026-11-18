@@ -13,6 +13,7 @@ import stat
 
 from . import allowlist as al
 from . import scan as scanmod
+from . import tlsprobe
 from . import verify
 from .receipt import STATUS_KO
 
@@ -757,7 +758,11 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
     vanished = sorted({split_loc(it["loc"])[0] for it in cbom_items["orig"] if it["status"] == "block"} & (o_paths - f_paths))
     in_act = (f"공통 파일 {common}/{len(o_paths)} · 원본 막는 위치 {co['blocking']}"
               + ("" if kex else f" · 원본 공개키 code {orig_code}") + f" · TLS 실측 대상 {len(t_results)}")
-    if common < MIN_COMMON * len(o_paths):
+    single = getattr(params, "mode", "pair") == "check"  # 한 트리 점검(--check, 교차 리뷰 X13): 두 트리 대조는 해당 없음
+    if single:
+        in_st = "na"
+        in_act = "단일 트리 점검: 공통 파일·원본 근거·사라진 파일은 보지 않음"
+    elif common < MIN_COMMON * len(o_paths):
         in_st = "undecided"
         in_act += " · 공통 파일이 절반 미만: 다른 서비스이거나 폴더 깊이가 다르다(zip 최상위 한 겹, repo 안 하위 폴더 등)"
     elif basis == 0:
@@ -793,7 +798,7 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
             in_st = "fail"
         elif in_st in ("pass", "review"):
             in_st = "undecided"
-    elif (out_links or skip_code or oversize) and in_st == "pass":
+    elif (out_links or skip_code or oversize) and in_st in ("pass", "na"):
         in_st = "review"
     check("a-input", "입력 확인(같은 서비스의 전·후, 원본에서 전환 대상을 찾음)", in_st,
           f"공통 파일 {int(MIN_COMMON * 100)}% 이상, 원본 막는 위치·공개키 code·TLS 실측 중 하나 이상, "
@@ -809,9 +814,12 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
           + (f" · 검토 필요 {cf['review']}(" + review_kinds(cbom_items["fixed"]) + ")" if cf["review"] else "")
           + (f" · 범위 밖 {cf['out_of_scope']}" if kex else "") + ("" if cf["cbom_scan_ok"] else " · cbom-scan 실패")
           + (" · REQUIRE_RESOLVED=1" if cf.get("unresolved") and getattr(params, "require_resolved", False) else ""))
-    check("b-weakening", "TLS 약화 수정 없음", "fail" if deny else "pass", "deny 0",
-          f"deny {len(deny)}" + (": " + "; ".join(deny[:3]) if deny else "") + f" · 본 파일 {len(changed)}")
-    if not tls["applicable"] and sig_o[0]:  # TLS를 걷어 내고 평문으로 바꾼 판이 '해당 없음'으로 통과하지 않게(반박 검증에서 찾음)
+    if single:
+        check("b-weakening", "TLS 약화 수정 없음", "na", "deny 0", "단일 트리 점검: 바뀐 파일이 없어 보지 않음")
+    else:
+        check("b-weakening", "TLS 약화 수정 없음", "fail" if deny else "pass", "deny 0",
+              f"deny {len(deny)}" + (": " + "; ".join(deny[:3]) if deny else "") + f" · 본 파일 {len(changed)}")
+    if not tls["applicable"] and sig_o[0] and not single:  # TLS를 걷어 내고 평문으로 바꾼 판이 '해당 없음'으로 통과하지 않게(반박 검증에서 찾음)
         check("b-tls", "TLS 하이브리드 협상·옛 클라이언트", "undecided", "TLS 서버 신호 없음",
               f"원본 TLS 서버 신호 {len(sig_o[0])}곳({', '.join(sig_o[0][:3])})이 고친 판에서 0: TLS를 걷어 냈는지 사람이 확인"
               "(TLS 제거는 약화다. 일부러 앞단으로 옮겼으면 그 앞단 주소를 TLS_TARGETS로)")
@@ -842,6 +850,8 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
                 act += f" · 클라이언트 TLS 신호 {len(sig_f[1])}곳은 재지 않음"
             if any(t.get("openssl_note") for t in t_results):
                 act += " · OpenSSL 교차 확인 불가(3.5 미만이거나 컨테이너 모드, tls_probe 결과만)"
+        if tls.get("probe_build"):  # 탐침 바이너리 출처(교차 리뷰 X47)
+            act += f" · tls_probe {tlsprobe.PROVENANCE_KO.get(tls['probe_build'], tls['probe_build'])}"
         check("b-tls", "TLS 하이브리드 협상·옛 클라이언트", st,
               f"대조 성립, 하이브리드 전용 제시 → {prof['tls_group']}(TLS 1.3), 옛 클라이언트 {'접속' if params.classic == 'allow' else '거부'}",
               act)
@@ -906,8 +916,11 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
               + f", 프로필 {getattr(params, 'profile', DEFAULT_PROFILE)}"
               + (", EXPECT_FROM=api(이름만 있는 상수는 세지 않음)" if getattr(params, "expect_from", "names") == "api" else ""),
               " · ".join(parts))
-    check("r-review", "검증 생략 흔적(검토 등급, 실패 아님)", "review" if review else "pass", "0 또는 줄마다 사유",
-          f"{len(review)}건" + (": " + "; ".join(f"{x['path']} {x['rule']}" for x in review[:3]) if review else ""))
+    if single:
+        check("r-review", "검증 생략 흔적(검토 등급, 실패 아님)", "na", "0 또는 줄마다 사유", "단일 트리 점검: 바뀐 파일이 없어 보지 않음")
+    else:
+        check("r-review", "검증 생략 흔적(검토 등급, 실패 아님)", "review" if review else "pass", "0 또는 줄마다 사유",
+              f"{len(review)}건" + (": " + "; ".join(f"{x['path']} {x['rule']}" for x in review[:3]) if review else ""))
     # r-allow: 허용 목록이 판정에서 뺀 줄을 사람이 확인했다는 기록(reviewed_by·reviewed_at)이 있는가. 도구는 사유가 맞는지
     # 모르므로 확인 전 허용은 검토 등급으로 남기고(판정 그대로), REQUIRE_REVIEW=1 이면 실패로 막는다. 목록 맨 위 칸은
     # reviewed_digest 가 지금 목록과 맞을 때만 센다(확인 뒤 더하거나 고친 항목이 예전 확인을 물려받지 않게, allowlist.resolve_reviews)

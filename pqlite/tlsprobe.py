@@ -122,6 +122,37 @@ def source_sha256(src=PROBE_SRC):
     return h.hexdigest()
 
 
+# 릴리스 빌드의 tls_probe 해시(교차 리뷰 X47). 릴리스 작업이 같은 실행에서 만든 SHA256SUMS 를 휠·sdist 에 이 이름으로 넣는다. 소스 저장소에는
+# 없다(그때 탐침은 '릴리스 해시 없음'). 실행할 때 바이너리 해시가 이 목록과 맞으면 '릴리스 빌드', 다르면 '릴리스 빌드 아님'으로 증적과 b-tls 에 적는다
+RELEASE_SUMS = pathlib.Path(__file__).with_name("tls_probe-release.sha256")
+
+
+def release_sums(path=RELEASE_SUMS):
+    """{바이너리 이름: sha256}. 'sha256  이름' 줄(shasum 꼴). 파일이 없으면 {}."""
+    try:
+        text = pathlib.Path(path).read_text(encoding="utf-8")
+    except OSError:
+        return {}
+    out = {}
+    for line in text.splitlines():
+        m = re.fullmatch(r"([0-9a-f]{64})\s+\*?(\S+)", line.strip())
+        if m:
+            out[m[2].rsplit("/", 1)[-1]] = m[1]
+    return out
+
+
+def provenance(binary, sha, sums=None):
+    """탐침 바이너리의 출처 표시: release(릴리스 해시와 같음) · local(다름, 직접 빌드했거나 바뀐 파일) · unchecked(릴리스 해시 목록 없음)."""
+    sums = release_sums() if sums is None else sums
+    if not sums:
+        return "unchecked"
+    return "release" if sums.get(pathlib.Path(binary).name) == sha else "local"
+
+
+PROVENANCE_KO = {"release": "릴리스 빌드(해시 일치)", "local": "릴리스 빌드 아님(직접 빌드했거나 바뀐 바이너리, 사람이 확인)",
+                 "unchecked": "릴리스 해시 목록 없음(소스에서 실행)"}
+
+
 def host_binary():
     """이 맥(또는 리눅스)에서 돌 tls_probe 바이너리 경로."""
     system = {"Darwin": "darwin", "Linux": "linux"}.get(platform.system())

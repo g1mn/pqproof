@@ -1,6 +1,7 @@
 """tls_probe 출력 읽기, 대조 판정, 대상 판정, 컨테이너 명령 꼴, 그리고 맥에서 참조 서버를 띄운 실측."""
 import os
 import pathlib
+import shutil
 import sys
 import tempfile
 import unittest
@@ -112,6 +113,28 @@ class Live(unittest.TestCase):
                 self.assertEqual((got.group, got.cert_key, got.cert_sig), ("X25519MLKEM768", "ML-DSA-65", "ML-DSA-65"))
             finally:
                 r.stop()
+
+
+class ReleaseHashes(unittest.TestCase):
+    """교차 리뷰 X47: 탐침 바이너리를 릴리스 해시(휠에 든 tls_probe-release.sha256)와 대조한다."""
+
+    def test_provenance(self):
+        sums = {"tls_probe-linux-amd64": "a" * 64}
+        self.assertEqual(T.provenance("/x/tls_probe-linux-amd64", "a" * 64, sums), "release")
+        self.assertEqual(T.provenance("/x/tls_probe-linux-amd64", "b" * 64, sums), "local")
+        self.assertEqual(T.provenance("/x/tls_probe-linux-amd64", "a" * 64, {}), "unchecked")
+
+    def test_release_sums_reads_shasum_lines(self):
+        d = tempfile.mkdtemp(prefix="pqproof-sums-")
+        try:
+            p = os.path.join(d, "s")
+            with open(p, "w", encoding="utf-8") as f:
+                f.write(f"{'c' * 64}  tls_probe-darwin-arm64\n{'d' * 64} *bin/tls_probe-linux-arm64\nnot a line\n")
+            self.assertEqual(T.release_sums(p), {"tls_probe-darwin-arm64": "c" * 64, "tls_probe-linux-arm64": "d" * 64})
+            self.assertEqual(T.release_sums(os.path.join(d, "none")), {})
+        finally:
+            shutil.rmtree(d, ignore_errors=True)  # 이 시험이 만든 자기 폴더만
+        self.assertFalse(T.RELEASE_SUMS.exists(), "the source tree must not carry release hashes; the release job adds them")
 
 
 if __name__ == "__main__":

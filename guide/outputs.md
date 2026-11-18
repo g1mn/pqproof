@@ -9,6 +9,7 @@ Each run writes a new folder: `OUT=...`, or `./proof-out-YYYYMMDD-HHMMSS` (with 
 | `receipt.html` | people: the whole evidence on one self-contained page, dark and light theme |
 | `receipt.json` | programs: the verification evidence ([schema](../schemas/receipt-v3.schema.json), format 3) |
 | `tables/report.md` | a document: the check table, the blocking locations after a failure, and what is left after the migration |
+| `README.txt` | the folder itself: the verdict, what to open first, the re-check command and what to look at before sharing (from 0.2.0) |
 
 ## Everything else
 
@@ -18,13 +19,13 @@ Each run writes a new folder: `OUT=...`, or `./proof-out-YYYYMMDD-HHMMSS` (with 
 - `artifacts/`: raw scanner output, the copies of `residue.sh` and `scan/test-paths.ere` that ran, TLS probe transcripts, the weakening result, the list of changed files and a copy of the allowlist.
 - `in/`: zip inputs, unpacked.
 
-Re-check with `pqproof --verify <folder>`. It fails on any file that is not listed, so keep notes outside the folder.
+Re-check with `pqproof --verify <folder>`. It fails on any file that is not listed, and on a changed `README.txt`, so keep notes outside the folder.
 
 ## Before you share it
 
 - Absolute paths on your machine: the input folders, the tools and the output folder in `receipt.json` and `receipt.html`, and the scanned folder and command line at the top of each CBOM report.
 - For a zip input, `in/` holds the whole unpacked source.
-- The scanner output under `artifacts/` quotes source lines as they are. The excerpts the tool writes itself (`tables/cbom-*.csv` notes, `tables/report.md`, SARIF snippets) replace values that look like secrets with `***`: after `-storepass`, `-keypass`, `pass:`, `password=`, `token=` and similar names, after `Bearer`, and strings with known token prefixes. The console says how many.
+- The scanner output under `artifacts/` quotes source lines as they are. The excerpts the tool writes itself (`tables/cbom-*.csv` notes, `tables/report.md`, SARIF snippets) and, from 0.2.0, the excerpts in the CBOM reports under `artifacts/cbom-*/` replace values that look like secrets with `***`: after `-storepass`, `-keypass`, `pass:`, `password=`, `token=` and similar names, after `Bearer`, and strings with known token prefixes. The console says how many.
 
 ## Evidence hash
 

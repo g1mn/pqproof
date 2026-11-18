@@ -34,7 +34,7 @@
    ]
   },
   "2": {
-   "sha256": "80d2cceed30c230cf809da4515f87032cdbe8a1c389965dc00acd77cdadc1883",
+   "sha256": "238fbded98101c99522495bd079e683ab1694cc8e1a588902cf14c25c35ccc33",
    "since": "0.2.0",
    "verdict_impact": "yes",
    "files": [
@@ -44,7 +44,7 @@
     },
     {
      "path": "pqlite/rules.py",
-     "sha256": "91fefbf98f647820c673a0be6960ed3c9dd9ab1cb8750b786b6377ed55679ce6"
+     "sha256": "d288ef63faf501ef5be0df663946a55f6ae8545f5dc912faf48224b8c7482326"
     },
     {
      "path": "pqlite/scan.py",
@@ -56,7 +56,7 @@
     },
     {
      "path": "pqlite/tlsprobe.py",
-     "sha256": "038ae4a7f105845983c9bb17dc75baad485a7e0f94970466c9dba699cdeee6c8"
+     "sha256": "8c85b99d1148ebb570d497ec2b91eab82d7b74d40cb690f0cd02c7b81fb1c443"
     },
     {
      "path": "pqlite/verify.py",

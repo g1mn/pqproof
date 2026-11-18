@@ -643,6 +643,7 @@ class HumanReview(unittest.TestCase):
         pathlib.Path(bad, "receipt.json").write_text(json.dumps(rec, indent=2, sort_keys=True, ensure_ascii=False) + "\n")
         pathlib.Path(bad, "receipt.html").write_text(rc.render_html(rec))
         pathlib.Path(bad, "deck.json").write_text(rc.render_deck(rec))
+        pathlib.Path(bad, "README.txt").write_text(rc.render_readme(rec))  # 형식 3 결과 폴더 안내도 다시 쓴다
         fails = [w for ok, w in rc.verify(bad) if not ok]
         self.assertEqual(len(fails), 1, fails)
         self.assertTrue(fails[0].startswith("allowlist review fields disagree with the copied allow list"), fails)

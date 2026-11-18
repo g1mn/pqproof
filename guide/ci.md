@@ -1,12 +1,20 @@
 # CI
 
-PQ-Proof fits a pipeline as one step: judge the change against its base commit, keep the evidence folder, and show the remaining classical lines where reviewers look. Exit codes: 0 pass, 1 fail, 2 usage or input error, 3 undecided.
+PQ-Proof fits a pipeline as one step: judge the change against its base commit, keep the evidence folder, and show the remaining classical lines where reviewers look. Exit codes: 0 pass, 1 fail, 2 usage or input error, 3 undecided, 4 tool error, and 5 for a pass that needs review under `FAIL_ON_REVIEW=1`.
+
+| Scenario | Command | Example |
+|---|---|---|
+| A migration pull request | `pqproof <base tree> <pull request tree>`, or the Action with `original` and `converted` | `examples/github-actions/pqproof-sarif.yml` |
+| After the migration: stop classical code from coming back, catch expired allowlist entries | `pqproof check .`, or the Action with `mode: check` | `examples/github-actions/pqproof-check.yml` |
+| A first survey or an audit, no verdict | `pqproof inventory <tree>` writes `inventory.json` and `tables/cbom.csv` | |
+
+`check` judges one tree with the same rules. The checks that compare two trees (`a-input`'s common files, `b-weakening`, `r-review`) are "not applicable" and never count as passed; `receipt.json` records `params.mode: check`. Before 0.2.0 the only way was to pass the same tree twice, which ended undecided because the original showed nothing to migrate.
 
 ## GitHub Action
 
 `action.yml` is a composite Action.
 
-- Inputs: `original`, `converted`, `allow-list`, `require-review`, `expect`, `scope`, `classic`, `exclude`, `tls-targets`, `probe-bin-dir`, `output-dir`, `sarif-file`, `sarif-anchor`, `fail-on` (`not-pass`, `review`, `fail` or `never`; `review` also stops a pass that has a check needing review) and `python`.
+- Inputs: `original` (not used with `mode: check`), `converted`, `mode` (`pair` or `check`), `profile`, `allow-list`, `require-review`, `expect`, `scope`, `classic`, `exclude`, `tls-targets`, `probe-bin-dir`, `output-dir`, `sarif-file`, `sarif-anchor`, `fail-on` (`not-pass`, `review`, `fail` or `never`; `review` also stops a pass that has a check needing review) and `python`.
 - Outputs: `verdict` (`pass`, `fail`, `undecided`, or `error` when no evidence was written), `evidence-hash`, `exit-code`, `output-dir`, `sarif-file` and `review-checks` (the ids of the checks that need review).
 
 Inputs reach the scripts only through environment variables. The Action runs `--verify` on the evidence it wrote and reports `error` if that fails. Its job summary lists the checks and the ones not counted as passed.

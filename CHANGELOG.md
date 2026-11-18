@@ -63,6 +63,9 @@ Planned as 0.2.0: ruleset 2 (new name and hash), evidence format 3. Bypasses fro
 - Settings `FAIL_ON_REVIEW` (exit 5 for a pass that needs review), `REQUIRE_RESOLVED`, `EXPECT_FROM=api` (X30), `REVIEW_MAX_AGE_DAYS` (X31) and `MAX_FILE_MIB` (X56), recorded under `params`. The Action takes `fail-on: review` and gives `review-checks`.
 - Allowlist fields `expires_at` and `approval_ref`, the `kind` words, and warnings for fields the tool does not read (X31).
 - Exit code 4 for an unexpected exception in a run or in `--verify` (X62).
+- `README.txt` in every result folder (format 3): the verdict, what to open first, the re-check command and what to check before sharing. `--verify` renders it again and compares.
+- The release workflow ships the `SHA256SUMS` of its `tls_probe` builds in the package; a TLS run records whether the probe binary is the release build (`tls.probe_build`: `release`, `local` or `unchecked`) and says so on the `b-tls` line (X47).
+- `pqproof check <tree>` (`prove.sh --check`): judge one tree with no original, for a regression guard after the migration; the two-tree checks are not applicable and `receipt.json` records `params.mode`. `pqproof inventory <tree>` (`prove.sh --inventory`): no verdict, `inventory.json` with the CBOM and the counts (X13). The Action takes `mode: check` and `profile`, and `examples/github-actions/pqproof-check.yml` shows a weekly check.
 - Ten more code mutants (40 in all) for the rule changes of this release; every one fails a behaviour or sync test.
 - `tests/test_options.py`: the new settings, exit codes 4 and 5, expiry, review age, the size limit and unresolved key material, each with a re-verified evidence folder.
 

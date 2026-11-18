@@ -84,6 +84,49 @@ class Runs(unittest.TestCase):
         r, _, _ = self.run_("pqc-api", PQC, EXPECT_FROM="api")
         self.assertEqual(st(r)["c-expect"], "pass", next(c for c in r["checks"] if c["id"] == "c-expect"))
 
+    # X13 -------------------------------------------------------------------------------------
+    def test_check_mode_judges_one_tree(self):
+        out = os.path.join(self.tmp, "out-check-pqc")
+        r, code, lines = prove.run(PQC, PQC, prove.Params({"ALLOW": "none", "RECON": "none"}, mode="check"), out, self.cache, quiet=True)
+        self.assertEqual((r["verdict"], code, r["params"]["mode"]), ("pass", 0, "check"))
+        self.assertEqual((st(r)["a-input"], st(r)["b-weakening"], st(r)["r-review"]), ("na", "na", "na"))
+        self.assertEqual([w for ok, w in rc.verify(out) if not ok], [])
+        out = os.path.join(self.tmp, "out-check-classic")
+        r, code, _ = prove.run(CLASSIC, CLASSIC, prove.Params({"ALLOW": "none", "RECON": "none"}, mode="check"), out, self.cache,
+                               quiet=True)
+        self.assertEqual((r["verdict"], code, st(r)["a-cbom"], st(r)["c-classic"]), ("fail", 1, "fail", "fail"))
+        # 같은 트리를 두 번 넣는 옛 방법은 a-input 미판정이었다(원본에서 고칠 것을 못 찾음)
+        r, code, _ = self.run_("pair-same", PQC, orig=PQC)
+        self.assertEqual((r["verdict"], st(r)["a-input"]), ("undecided", "undecided"))
+
+    def test_inventory_has_no_verdict(self):
+        out = os.path.join(self.tmp, "out-inv")
+        s, code = prove.inventory(CLASSIC, prove.Params({}), out, quiet=True)
+        self.assertEqual(code, 0)
+        self.assertNotIn("verdict", s)
+        doc = json.loads(pathlib.Path(out, "inventory.json").read_text(encoding="utf-8"))
+        self.assertEqual(doc["format"], "pqproof inventory 1")
+        self.assertGreater(doc["cbom"]["blocking"], 0)
+        self.assertGreater(doc["classic_code_lines"], 0)
+        self.assertEqual(doc["ruleset_version"], prove.ver.ruleset_history()[0])
+        self.assertTrue(pathlib.Path(out, "tables", "cbom.csv").is_file())
+        with mock.patch("sys.stderr"):
+            self.assertEqual(prove.main(["--inventory"]), 2)
+            self.assertEqual(prove.main(["--check", PQC, PQC]), 2)
+
+    # 결과 폴더 안내 파일(README.txt, 형식 3) -------------------------------------------------
+    def test_readme_in_the_result_folder_is_checked(self):
+        out = os.path.join(self.tmp, "out-readme")
+        r, _, _ = prove.run(CLASSIC, PQC, prove.Params({"ALLOW": "none", "RECON": "none"}), out, self.cache, quiet=True)
+        text = pathlib.Path(out, "README.txt").read_text(encoding="utf-8")
+        self.assertIn(r["receipt_id"], text)
+        self.assertIn("--verify " + out, text)
+        self.assertTrue(all(ok for ok, _ in rc.verify(out)))
+        pathlib.Path(out, "README.txt").write_text(text + "note\n", encoding="utf-8")
+        self.assertIn((False, "README.txt differs from this receipt"), rc.verify(out))
+        os.remove(os.path.join(out, "README.txt"))
+        self.assertTrue(any(not ok and w.startswith("README.txt cannot be read") for ok, w in rc.verify(out)))
+
     # X62 -------------------------------------------------------------------------------------
     def test_unexpected_exception_is_exit_4(self):
         with mock.patch.object(prove, "run", side_effect=RuntimeError("boom")), mock.patch("sys.stderr"):

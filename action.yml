@@ -10,8 +10,17 @@ branding:
 
 inputs:
   original:
-    description: "Original tree (folder or zip), before the PQC migration"
-    required: true
+    description: "Original tree (folder or zip), before the PQC migration. Not used with mode: check"
+    required: false
+    default: ""
+  mode:
+    description: "pair (default): judge original against converted. check: judge the converted tree alone, as it is now (regression guard after the migration)"
+    required: false
+    default: "pair"
+  profile:
+    description: "Algorithm profile: nist-cat3 (default), cnsa2 or kpqc (PROFILE)"
+    required: false
+    default: ""
   converted:
     description: "Converted tree (folder or zip), after the PQC migration"
     required: true
@@ -95,6 +104,8 @@ runs:
       shell: bash
       env:
         IN_ORIGINAL: ${{ inputs.original }}
+        IN_MODE: ${{ inputs.mode }}
+        IN_PROFILE: ${{ inputs.profile }}
         IN_CONVERTED: ${{ inputs.converted }}
         IN_ALLOW: ${{ inputs.allow-list }}
         IN_REQUIRE_REVIEW: ${{ inputs.require-review }}
@@ -115,8 +126,14 @@ runs:
         [ -n "$IN_EXCLUDE" ] && export EXCLUDE="$IN_EXCLUDE"
         [ -n "$IN_TLS" ] && export TLS_TARGETS="$IN_TLS"
         [ -n "$IN_PROBE" ] && export PROBE_BIN_DIR="$IN_PROBE"
+        [ -n "$IN_PROFILE" ] && export PROFILE="$IN_PROFILE"
         code=0
-        bash "$GITHUB_ACTION_PATH/prove.sh" "$IN_ORIGINAL" "$IN_CONVERTED" || code=$?
+        case "$IN_MODE" in
+          check) bash "$GITHUB_ACTION_PATH/prove.sh" --check "$IN_CONVERTED" || code=$?;;
+          pair) if [ -z "$IN_ORIGINAL" ]; then echo "::error::original is required unless mode is check"; code=2
+                else bash "$GITHUB_ACTION_PATH/prove.sh" "$IN_ORIGINAL" "$IN_CONVERTED" || code=$?; fi;;
+          *) echo "::error::mode must be pair or check (got $IN_MODE)"; code=2;;
+        esac
         verdict=error rid="" review=""
         if [ -f "$out/receipt.json" ]; then
           read -r verdict rid < <("$PYTHON" -I -c 'import json,sys; r=json.load(open(sys.argv[1], encoding="utf-8")); print(r.get("verdict") or "error", r.get("receipt_id") or "")' "$out/receipt.json")
