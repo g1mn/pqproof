@@ -1,0 +1,30 @@
+$ bash /tmp/work/proof-out/artifacts/residue-generic.sh /opt/pqproof/examples/pqc
+== residue /opt/pqproof/examples/pqc  (2026-11-19 05:25:13 KST)
+INFO 검사 파일 5개 · 건너뛴 키·DB·비밀 모양 파일 0개(내용 미열람)
+INFO 레거시 호출처 없음
+
+[1] 서비스별 전환 대상 자리(SITE 규칙이 있을 때만). 전환 뒤 전부 GONE 또는 ALLOW 여야 한다
+
+[2] 일반 고전 패턴: 폴더 전체(주석·문서 줄은 comment, 시험 경로 코드 줄은 test 로 따로)
+GEN  G-RSA              GONE   code=0 allow=0 comment=0 test=0  - RSA 전반(Cipher·KeyFactory·라벨·변수)
+GEN  G-EC               GONE   code=0 allow=0 comment=0 test=0  - EC/ECDSA/ECDH 전반
+GEN  G-CURVE            GONE   code=0 allow=0 comment=0 test=0  - 고전 곡선 이름·OID
+GEN  G-OAEP-PKCS1       GONE   code=0 allow=0 comment=0 test=0  - RSA 패딩
+GEN  G-CLASSIC-SIG      GONE   code=0 allow=0 comment=0 test=0  - 고전 서명 알고리즘 이름(SHA256withRSA·SHA256withECDSA 등)
+GEN  G-JWT-ALG          GONE   code=0 allow=0 comment=0 test=0  - JWT/JOSE 고전 alg(RS256·ES256·PS256)
+GEN  G-EDDSA            GONE   code=0 allow=0 comment=0 test=0  - EdDSA 서명
+GEN  G-X25519           GONE   code=0 allow=0 comment=0 test=0  - X25519/ECDH 단독(같은 줄 ML-KEM 이면 하이브리드 허용)
+GEN  G-DH-DSA           GONE   code=0 allow=0 comment=0 test=0  - DH·DSA·ElGamal
+GEN  G-AES128           GONE   code=0 allow=0 comment=0 test=0  - AES-128(보안레벨 1)
+GEN  G-WEAK-PQC         GONE   code=0 allow=0 comment=0 test=0  - 보안레벨 3 미만 PQC
+
+[3] 레거시 파일(Legacy*.java) 쓰기 경로
+LWRITE LW-legacy-write  OK     code=0  - Legacy*.java 는 읽기·검증 전용이어야 함
+
+[4] PQC 실사용 흔적(시험 경로 밖 코드 줄)
+EXPECT E-MLKEM768       PRESENT  n=3  L17,9,15  - ML-KEM-768 사용
+EXPECT E-MLDSA65        PRESENT  n=2  L18,14  - ML-DSA-65 사용
+
+SUMMARY files=5 sites=0 LEFT=0 ALLOW=0 GONE=0 | gen_rules=11 LEFT=0 (code=0 allow=0 comment=0 test=0) | legacy_write=0 | pqc_expect MISSING=0/2 | VERDICT=CLEAN
+
+# exit=0

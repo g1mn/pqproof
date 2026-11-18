@@ -103,6 +103,32 @@
     "/opt/pqproof"
    ],
    "report_section_removed": null
+  },
+  {
+   "name": "f2-v0.1.1",
+   "label": "0.1.1 (evidence format 2, ruleset 1), examples/classic against examples/pqc with the example allowlist, whose two entries name files that are not in this tree (invalid): pass",
+   "format_version": 2,
+   "verdict": "pass",
+   "checks": {
+    "a-input": "pass",
+    "a-cbom": "pass",
+    "b-weakening": "pass",
+    "b-tls": "na",
+    "c-classic": "pass",
+    "c-expect": "pass",
+    "r-review": "pass",
+    "r-allow": "na"
+   },
+   "receipt_id": "553ac8f6a0def1ae5a81029027287a29a4a485ff008f6bcc6c0d633877791cd1",
+   "source_receipt_id": "09b7952df5112825d9d6c000f57560705453c8bfc4906c0656125784aa461193",
+   "source_receipt_html_sha256": "84d5ffc3867b3f29f14472b5c1ff88d218ab06b776c7d0cdb49fffdd3f1d9967",
+   "source_verified_by_this_tool": true,
+   "paths_replaced": [
+    "/tmp/work/proof-out",
+    "/tmp/work",
+    "/opt/pqproof"
+   ],
+   "report_section_removed": null
   }
  ]
 }

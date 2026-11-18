@@ -1,0 +1,89 @@
+{
+ "verdict": "pass",
+ "verdict_text": "통과",
+ "verdict_text_en": "pass",
+ "allow_unreviewed": 0,
+ "receipt": "553ac8f6a0de",
+ "receipt_file": "/tmp/work/proof-out/receipt.json",
+ "cbom": {
+  "before": 13,
+  "after": 0,
+  "blocking_before": 13,
+  "blocking_after": 0,
+  "allowed_after": 0,
+  "review_after": 0
+ },
+ "classic_lines": {
+  "before": 17,
+  "after": 0,
+  "allowed": 0,
+  "hybrid": 0,
+  "review": 0,
+  "left": 0,
+  "legacy_rule": 0
+ },
+ "pqc_lines": {
+  "mlkem": 3,
+  "mldsa": 2
+ },
+ "allowed": [],
+ "allow_invalid": 2,
+ "allow_unused": 0,
+ "allow_unused_orig_lines": 0,
+ "allow_write_review": 0,
+ "checks": [
+  {
+   "id": "a-input",
+   "status": "pass",
+   "label": "입력 대조"
+  },
+  {
+   "id": "a-cbom",
+   "status": "pass",
+   "label": "막는 고전 위치 0"
+  },
+  {
+   "id": "b-weakening",
+   "status": "pass",
+   "label": "TLS 약화 없음"
+  },
+  {
+   "id": "b-tls",
+   "status": "skip",
+   "label": "TLS 하이브리드 협상"
+  },
+  {
+   "id": "c-classic",
+   "status": "pass",
+   "label": "사유 없는 고전 줄 0"
+  },
+  {
+   "id": "c-expect",
+   "status": "pass",
+   "label": "ML-KEM·ML-DSA 사용"
+  },
+  {
+   "id": "r-review",
+   "status": "pass",
+   "label": "검증 호출 유지"
+  },
+  {
+   "id": "r-allow",
+   "status": "skip",
+   "label": "허용 항목 사람 확인"
+  }
+ ],
+ "excluded": [],
+ "excluded_files": {
+  "orig": 0,
+  "fixed": 0
+ },
+ "tls": null,
+ "verify_cmd": "bash prove.sh --verify /tmp/work/proof-out",
+ "ev": [
+  "f2run.txt"
+ ],
+ "tool_version": "0.1.1",
+ "ruleset_version": "1",
+ "format_version": 2
+}

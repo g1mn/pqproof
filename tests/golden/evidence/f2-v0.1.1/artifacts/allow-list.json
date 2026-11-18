@@ -1,0 +1,18 @@
+{
+  "unconverted": [
+    {
+      "where": "src/main/java/com/acme/vault/OldKeyReader.java:18-41",
+      "what": "RSA-OAEP unwrap of data keys sealed before the migration",
+      "why": "Records written before the switch still carry RSA-wrapped keys. This reads them once and re-seals them with ML-KEM-768. Delete after the re-seal job reports zero old records.",
+      "kind": "fallback"
+    },
+    {
+      "where": "src/main/java/com/acme/partner/PartnerClient.java:52",
+      "what": "ECDSA P-256 signature check on the partner's webhook",
+      "why": "The partner signs with ECDSA until its own ML-DSA rollout. Verify only, never sign. Review again when the partner announces ML-DSA keys.",
+      "kind": "boundary",
+      "reviewed_by": "j.kim",
+      "reviewed_at": "2026-11-18"
+    }
+  ]
+}
