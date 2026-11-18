@@ -135,7 +135,7 @@ def check(env=None, inputs=(), bin_dir=None, need_tls=None):
     elif need_tls:
         rep.errors.append(f"TLS_TARGETS is set but no tls_probe binary for this machine in {bin_dir}. Either run `pqproof build-probe` "
                           "(needs Go 1.27 or later, no network), or download tls_probe-<os>-<arch> and SHA256SUMS from the GitHub release, "
-                          "check them with `shasum -a 256 -c SHA256SUMS`, and set PROBE_BIN_DIR to that folder.")
+                          "check them with `shasum -a 256 -c --ignore-missing SHA256SUMS`, and set PROBE_BIN_DIR to that folder.")
     else:
         rep.optional.append("tls_probe: not found (optional, only for TLS_TARGETS live checks; pqproof build-probe)")
     return rep

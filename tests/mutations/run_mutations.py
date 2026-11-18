@@ -415,7 +415,7 @@ class Runner:
                         a["sha256"], a["bytes"] = sha, size
                         hit += 1
 
-                def walk(o):
+                def walk(o, rel=rel, sha=sha):
                     nonlocal hit
                     if isinstance(o, dict):
                         for k in list(o):

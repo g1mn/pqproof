@@ -1,14 +1,17 @@
 # 릴리스: 태그 vX.Y.Z 를 밀면
-#   (1) 태그와 버전(src/pqproof/__init__.py 한 곳)·CHANGELOG 항목을 맞추고, 버전 정책을 앞 태그와 대조하고(판정이 바뀌면 PATCH 금지,
-#       tests/version_policy.py), 시험을 다시 돈다(STRICT, 판정 고정 기록 포함)
-#   (2) tls_probe 3종(darwin-arm64, linux-amd64, linux-arm64)과 SHA256SUMS·BUILDINFO 를 만든다
-#   (3) 휠·sdist 를 깨끗한 체크아웃에서 만들고, 그 휠만 깐 환경으로 CycloneDX SBOM(도구 자신의 구성 목록)을 만든다
-#   (4) 모든 릴리스 자산에 GitHub 출처 증명(actions/attest-build-provenance)을 붙이고 GitHub 릴리스로 올린다
-#   (5) PyPI 에 Trusted Publishing(OIDC)으로 낸다. 토큰·비밀번호를 저장하지 않는다. PyPI 쪽 출처 증명(PEP 740)은 이 액션이 붙인다
+#   (0) CI 전체(ci.yml: ubuntu·macOS x Python 3.9~3.15, LibreSSL, 스캐너 셀프 시험, 패키지 설치, Windows 재검증, 린트, 버전 정책)를
+#       workflow_call 로 그대로 돈다. 릴리스만 좁은 시험으로 나가는 일이 없다
+#   (1) 태그와 버전(src/pqproof/__init__.py 한 곳)·CHANGELOG 항목을 맞추고, 태그 커밋이 main 에 있는지, 버전 정책을 앞 태그와 대조한다
+#       (판정이 바뀌면 PATCH 금지, tests/version_policy.py)
+#   (2) tls_probe 4종(darwin-arm64·amd64, linux-amd64·arm64)과 SHA256SUMS·BUILDINFO 를 만든다
+#   (3) 휠·sdist 를 깨끗한 체크아웃에서 해시로 고정한 빌드 도구(.github/requirements/build.txt, 격리 없이)로 만든다
+#   (4) 그 휠만 깐 환경으로 CycloneDX SBOM 을 만들고 파일 해시·tls_probe·바깥 실행 의존(bash, openssl, keytool)을 더해 검사한다
+#   (5) 모든 릴리스 자산에 GitHub 출처 증명(BUILDINFO 포함), 휠에 SBOM 증명을 붙이고 GitHub 릴리스로 올린다
+#   (6) PyPI 에 Trusted Publishing(OIDC)으로 낸다. 토큰·비밀번호를 저장하지 않는다. PyPI 쪽 출처 증명(PEP 740)은 이 액션이 붙인다
 # 처음 한 번(사용자 몫, 승인 뒤): PyPI 계정 > Publishing > pending publisher 추가
 #   PyPI project: pqproof · Owner: g1mn · Repository: pqproof · Workflow: release.yml · Environment: pypi
 # 그리고 저장소 Settings > Environments 에 pypi 환경을 만든다(보호 규칙으로 사람 승인을 걸 수 있다).
-# 액션은 모두 커밋 SHA 로 고정한다(주석은 태그). 직접 까는 파이썬 도구(jsonschema, build, cyclonedx-bom)도 버전을 고정한다(그 의존성은 고정하지 않는다).
+# 액션은 모두 커밋 SHA 로 고정한다(주석은 태그). 파이썬 도구는 .github/requirements/*.txt 에 하위 의존까지 해시로 고정한다.
 name: Release
 
 on:
@@ -24,23 +27,25 @@ defaults:
 
 env:
   PYTHONDONTWRITEBYTECODE: "1"
-  CYCLONEDX_BOM_VERSION: "7.6.0"
 
 jobs:
+  ci:
+    name: full CI
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
   verify:
+    needs: ci
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 0  # 버전 정책이 앞 릴리스 태그와 비교한다
+          fetch-depth: 0  # 버전 정책이 앞 릴리스 태그와, 태그 확인이 main 과 비교한다
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
           python-version: "3.13"
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
-        with:
-          go-version-file: probe/go.mod
-          cache: false
       - name: Tag matches the version and the changelog
         env:
           TAG: ${{ github.ref_name }}
@@ -57,6 +62,10 @@ jobs:
           print("version", init)
           EOF
           bash prove.sh --version
+      - name: Tag commit is on main
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "::error::$GITHUB_SHA is not on main"; exit 1; }
+          echo "tag commit $GITHUB_SHA is on main"
       - name: Version policy (a release that moves a verdict is never a PATCH release)
         env:
           TAG: ${{ github.ref_name }}
@@ -64,18 +73,6 @@ jobs:
           base=$(git describe --tags --abbrev=0 --match 'v[0-9]*' "$TAG^" 2>/dev/null || true)
           echo "previous release: ${base:-none}"
           python3 -I tests/version_policy.py ${base:+--base "$base"}
-      - name: SARIF schema and jsonschema
-        run: |
-          python3 -m pip install --quiet "jsonschema==4.25.1"
-          curl -sSfL -o "$RUNNER_TEMP/sarif-schema.json" https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json
-          echo "c3b4bb2d6093897483348925aaa73af03b3e3f4bd4ca38cef26dcb4212a2682e  $RUNNER_TEMP/sarif-schema.json" | shasum -a 256 -c -
-          echo "SARIF_SCHEMA=$RUNNER_TEMP/sarif-schema.json" >> "$GITHUB_ENV"
-      - name: Tests (unit, self-test, mutations with golden verdicts)
-        run: |
-          bash build-probe.sh
-          STRICT=1 bash prove.sh --unit
-          STRICT=1 bash prove.sh --selftest
-          python3 -I tests/mutations/run_mutations.py --strict --golden tests/golden/verdicts.json
 
   probe:
     needs: verify
@@ -88,7 +85,7 @@ jobs:
         with:
           go-version-file: probe/go.mod
           cache: false
-      - name: Build tls_probe (three targets, offline, reproducible flags)
+      - name: Build tls_probe (four targets, offline, reproducible flags)
         run: |
           bash build-probe.sh
           ls -l bin
@@ -111,10 +108,11 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
           python-version: "3.13"
-      - name: Build wheel and sdist from a clean checkout
+      - name: Build wheel and sdist from a clean checkout with hash-pinned build tools
         run: |
-          python3 -m pip install --quiet "build==1.3.0"
-          python3 -m build
+          python3 -m venv "$RUNNER_TEMP/build-env"
+          "$RUNNER_TEMP/build-env/bin/pip" install --quiet --require-hashes -r .github/requirements/build.txt
+          "$RUNNER_TEMP/build-env/bin/python" -m build --no-isolation
           python3 - <<'EOF'
           import pathlib, zipfile
           whl = next(pathlib.Path("dist").glob("pqproof-*.whl"))
@@ -134,28 +132,63 @@ jobs:
           "$RUNNER_TEMP/v/bin/pip" install --quiet dist/pqproof-*.whl
           "$RUNNER_TEMP/v/bin/pqproof" --version
           "$RUNNER_TEMP/v/bin/pqproof" --selftest
-      - name: SBOM (CycloneDX) of the wheel alone
-        run: |
-          ver=$(python3 -c 'import re,pathlib; print(re.search(r"^__version__ = \"([^\"]+)\"", pathlib.Path("src/pqproof/__init__.py").read_text(), re.M)[1])')
-          python3 -m venv --without-pip "$RUNNER_TEMP/sbom-env"
-          python3 -m pip --python "$RUNNER_TEMP/sbom-env/bin/python" install --quiet --no-deps dist/pqproof-*.whl
-          python3 -m pip install --quiet "cyclonedx-bom==${CYCLONEDX_BOM_VERSION}"
-          cyclonedx-py environment --output-format JSON --output-file "dist/pqproof-${ver}.cdx.json" "$RUNNER_TEMP/sbom-env/bin/python"
-          python3 - "dist/pqproof-${ver}.cdx.json" "$ver" <<'EOF'
-          import json, sys
-          bom = json.load(open(sys.argv[1]))
-          names = {(c.get("name"), c.get("version")) for c in bom.get("components", [])}
-          assert ("pqproof", sys.argv[2]) in names, names
-          print("SBOM", bom.get("specVersion"), sorted(names))
-          EOF
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: dist
           path: dist/
           if-no-files-found: error
 
-  github-release:
+  sbom:
     needs: [probe, dist]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: "3.13"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: dist
+          path: dist
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: tls_probe
+          path: probe-bin
+      - name: SBOM (CycloneDX) of the wheel, plus file hashes, tls_probe and the external programs
+        run: |
+          ver=$(python3 -c 'import re,pathlib; print(re.search(r"^__version__ = \"([^\"]+)\"", pathlib.Path("src/pqproof/__init__.py").read_text(), re.M)[1])')
+          probe_ver=$(python3 -c 'import re,pathlib; print(re.search(r"^PROBE_VERSION = \"([^\"]+)\"", pathlib.Path("pqlite/tlsprobe.py").read_text(), re.M)[1])')
+          python3 -m venv "$RUNNER_TEMP/sbom-tools"
+          "$RUNNER_TEMP/sbom-tools/bin/pip" install --quiet --require-hashes -r .github/requirements/sbom.txt
+          python3 -m venv --without-pip "$RUNNER_TEMP/sbom-env"
+          "$RUNNER_TEMP/sbom-tools/bin/pip" --python "$RUNNER_TEMP/sbom-env/bin/python" install --quiet --no-deps dist/pqproof-*.whl
+          mkdir -p sbom
+          "$RUNNER_TEMP/sbom-tools/bin/cyclonedx-py" environment --output-format JSON --output-file "sbom/pqproof-${ver}.cdx.json" "$RUNNER_TEMP/sbom-env/bin/python"
+          python3 -I .github/scripts/sbom_extend.py --bom "sbom/pqproof-${ver}.cdx.json" --dist dist --probe-dir probe-bin --probe-version "$probe_ver"
+          "$RUNNER_TEMP/sbom-tools/bin/python" - "sbom/pqproof-${ver}.cdx.json" "$ver" <<'EOF'
+          import json, sys
+          from cyclonedx.schema import SchemaVersion
+          from cyclonedx.validation.json import JsonStrictValidator
+          text = open(sys.argv[1], encoding="utf-8").read()
+          bom = json.loads(text)
+          err = JsonStrictValidator(SchemaVersion.from_version(bom["specVersion"])).validate_str(text)
+          assert err is None, err
+          names = {(c.get("name"), c.get("version")) for c in bom.get("components", [])}
+          assert ("pqproof", sys.argv[2]) in names, names
+          assert {"bash", "openssl", "keytool"} <= {n for n, _ in names}, names
+          assert sum(1 for n, _ in names if n.startswith("tls_probe-")) == 4, names
+          print("SBOM", bom["specVersion"], sorted(n for n, _ in names))
+          EOF
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: sbom
+          path: sbom/
+          if-no-files-found: error
+
+  github-release:
+    needs: [probe, dist, sbom]
     runs-on: ubuntu-latest
     permissions:
       contents: write      # 릴리스 만들기
@@ -175,7 +208,18 @@ jobs:
           subject-path: |
             assets/tls_probe-*
             assets/SHA256SUMS
+            assets/BUILDINFO
             assets/pqproof-*
+      - name: Find the SBOM
+        id: sbom
+        run: |
+          f=$(ls assets/pqproof-*.cdx.json)
+          echo "path=$f" >> "$GITHUB_OUTPUT"
+      - name: SBOM attestation for the wheel
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e  # v4.1.0
+        with:
+          subject-path: assets/pqproof-*.whl
+          sbom-path: ${{ steps.sbom.outputs.path }}
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -186,9 +230,9 @@ jobs:
           See CHANGELOG.md for what changed and whether verdicts can move ("Verdict impact").
 
           - Python package: \`pip install pqproof\` (console command \`pqproof\`)
-          - tls_probe binaries for TLS live checks: download the one for your machine and SHA256SUMS, run \`shasum -a 256 -c SHA256SUMS\`, then set \`PROBE_BIN_DIR\` to that folder.
-          - BUILDINFO records the Go version, build flags and source hashes. pqproof-*.cdx.json is the CycloneDX SBOM of the package.
-          - Check where an asset came from: \`gh attestation verify <file> --repo ${GITHUB_REPOSITORY}\`
+          - tls_probe binaries for TLS live checks: download the one for your machine and SHA256SUMS into one folder, run \`shasum -a 256 -c --ignore-missing SHA256SUMS\`, then set \`PROBE_BIN_DIR\` to that folder.
+          - BUILDINFO records the Go version, build flags and source hashes. pqproof-*.cdx.json is the CycloneDX SBOM of the package, with the tls_probe binaries and the external programs PQ-Proof runs (bash, OpenSSL, keytool).
+          - Check where an asset came from: \`gh attestation verify <file> --repo ${GITHUB_REPOSITORY}\`. The wheel also has an SBOM attestation (\`--predicate-type https://cyclonedx.org/bom\`).
           EOF
           gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "PQ-Proof $TAG" --notes-file notes.md \
             assets/tls_probe-* assets/SHA256SUMS assets/BUILDINFO assets/pqproof-*

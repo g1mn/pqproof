@@ -140,7 +140,7 @@ def build_probe(root):
     ok, line = deps.go_ok()
     if not ok:
         print(f"pqproof: build-probe needs Go 1.27 or later (crypto/mldsa). Found: {line}", file=sys.stderr)
-        print("  Or download tls_probe-<os>-<arch> and SHA256SUMS from the GitHub release, run `shasum -a 256 -c SHA256SUMS`, "
+        print("  Or download tls_probe-<os>-<arch> and SHA256SUMS from the GitHub release, run `shasum -a 256 -c --ignore-missing SHA256SUMS` in that folder, "
               "and set PROBE_BIN_DIR to that folder.", file=sys.stderr)
         return 2
     env = dict(os.environ)

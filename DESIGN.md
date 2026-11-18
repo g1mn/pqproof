@@ -222,7 +222,7 @@ From evidence format 2 (0.1.0), `receipt.json` also records:
 `b-tls` needs a running server. Build the probe once (static Go binaries, nothing downloaded), start the fixed service, and pass its address:
 
 ```bash
-bash build-probe.sh      # bin/tls_probe-{darwin-arm64,linux-amd64,linux-arm64}
+bash build-probe.sh      # bin/tls_probe-{darwin-arm64,darwin-amd64,linux-amd64,linux-arm64}
 EXPECT=kem,sig,tls TLS_TARGETS="127.0.0.1:8443@localhost#/abs/path/ca.pem" bash prove.sh orig/ fixed/
 ```
 
@@ -323,8 +323,8 @@ A different ruleset name alone (`1+modified` while rule files are being edited) 
 - The version is set once, in `src/pqproof/__init__.py`. `pyproject.toml` reads it, and so do `bash prove.sh --version`, `pqproof --version` and `receipt.json`.
 - A changed rule file needs a new ruleset entry in `scan/ruleset.json`: its hash, `since` (the first version that ships it), `verdict_impact` (`yes`, or `no` when only comments or wording changed) and the hash of each rule file. `python3 pqlite/version.py --ruleset-json` prints the hashes. `tests/test_versioning.py` fails until the entry is there, and it names the rule files that changed. If verdicts moved, rewrite `tests/golden/verdicts.json` with `run_mutations.py --write-golden` and write "Verdict impact: yes" in `CHANGELOG.md`, all in the same commit. The version policy check fails when golden verdicts moved since the last release tag and the matching CHANGELOG entry (`[Unreleased]` before the release) does not say yes. `scan/ruleset.json` written in the old form (a bare hash per name) is still read.
 - A change to the evidence format raises `format_version` and keeps reading the older formats. Before such a release, save evidence from the current version with `tests/golden/make_fixture.py` so that `tests/test_golden.py` keeps checking it.
-- A release starts from a tag `vX.Y.Z` (`.github/workflows/release.yml`). The tag must match the version and a dated `CHANGELOG.md` entry. The workflow builds the wheel and the sdist, the three `tls_probe` binaries with `SHA256SUMS` and `BUILDINFO`, and a CycloneDX SBOM of the package, attaches GitHub build provenance to every asset (`gh attestation verify <file> --repo g1mn/pqproof`), and publishes to PyPI with Trusted Publishing.
-- Workflow actions are pinned to commit SHAs, and Dependabot proposes updates for actions and pip.
+- A release starts from a tag `vX.Y.Z` (`.github/workflows/release.yml`). It first runs the whole CI workflow (`ci.yml` through `workflow_call`), so a release passes every job a push does. The tag must match the version and a dated `CHANGELOG.md` entry, and the tagged commit must be on `main`. The workflow builds the four `tls_probe` binaries with `SHA256SUMS` and `BUILDINFO`, and the wheel and the sdist with build tools pinned by hash (`.github/requirements/build.txt`, no build isolation). It writes a CycloneDX SBOM of the wheel and adds the file hashes, the `tls_probe` binaries with their Go version, and the external programs the tool runs (bash, OpenSSL, keytool) to it (`.github/scripts/sbom_extend.py`), then checks it against the CycloneDX schema. Every asset, `BUILDINFO` included, gets GitHub build provenance (`gh attestation verify <file> --repo g1mn/pqproof`), and the wheel gets an SBOM attestation. Then it publishes to PyPI with Trusted Publishing.
+- Workflow actions are pinned to commit SHAs, release and lint tools to versions with hashes, and Dependabot proposes updates for both. A `lint` job runs ruff (error rules only), shellcheck on the shell scripts (`scan/cbom-scan.sh` waits for the next ruleset, because fixing its warnings changes the ruleset hash) and zizmor on the workflows and the Action.
 
 ## Use in the finals
 

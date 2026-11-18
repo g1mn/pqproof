@@ -72,7 +72,7 @@ class StrictReceipt(Copies):
     def test_nan_and_infinity_fail(self):
         for const in (b"NaN", b"Infinity", b"-Infinity"):
             with self.subTest(const=const):
-                d = self.edit(lambda b: b.replace(b'"unused": 0', b'"unused": ' + const, 1))
+                d = self.edit(lambda b, c=const: b.replace(b'"unused": 0', b'"unused": ' + c, 1))
                 self.assertIn("is not a JSON number", self.fails(d))
                 shutil.rmtree(d)
 

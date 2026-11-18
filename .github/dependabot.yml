@@ -1,4 +1,5 @@
-# Dependabot: 워크플로가 쓰는 액션(커밋 SHA 고정)과 파이썬 빌드 의존(pyproject 의 build-system)을 매주 본다.
+# Dependabot: 워크플로가 쓰는 액션(커밋 SHA 고정), 파이썬 빌드 의존(pyproject 의 build-system), 릴리스·린트 도구
+# (.github/requirements/*.txt, 해시 고정)를 매주 본다.
 # 액션 PR 은 SHA 와 버전 주석을 같이 바꾼다. 런타임 파이썬 의존은 없다.
 version: 2
 updates:
@@ -13,6 +14,12 @@ updates:
       prefix: "ci"
   - package-ecosystem: pip
     directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "build"
+  - package-ecosystem: pip
+    directory: "/.github/requirements"  # 릴리스·린트 도구(해시 고정). 갱신 PR 은 해시도 같이 바꾼다
     schedule:
       interval: weekly
     commit-message:

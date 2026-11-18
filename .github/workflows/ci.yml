@@ -6,6 +6,9 @@
 # 판정 고정 기록: 변이 시험의 트리 항목(예제 대조군 포함)은 tests/golden/verdicts.json 과 판정·검사 칸·숫자가 같아야 한다.
 # 버전 정책: 판정이 바뀌는 변경은 PATCH 로 낼 수 없다. version-policy 작업이 tests/version_policy.py 로 ruleset.json·CHANGELOG 와
 # 마지막 릴리스 태그를 대조한다(버전이 그대로면 다음 릴리스가 MINOR 여야 하는지 알림만).
+# 린트: ruff(오류 계열 F·E9·B), shellcheck(규칙 파일 cbom-scan.sh 는 ruleset 2 에서), zizmor(워크플로·액션 보안 점검). 도구는
+# .github/requirements/lint.txt 에 해시로 고정한다. Windows 칸은 bash 없이 증적 재검증만 돈다.
+# 릴리스 워크플로(release.yml)가 이 파일을 workflow_call 로 그대로 부른다: 릴리스도 이 칸 전부를 통과해야 나간다.
 # 액션은 모두 커밋 SHA 로 고정한다(주석은 그 SHA 의 태그). Dependabot 이 갱신 PR 을 연다(.github/dependabot.yml).
 name: CI
 
@@ -18,6 +21,7 @@ on:
     branches: [main]
     paths-ignore: ['docs/**', '.github/workflows/pages.yml']
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -46,7 +50,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]
         # ubuntu-latest(26.04)에는 setup-python 의 3.9 빌드가 없어 3.9 만 24.04 에서 돈다
         exclude:
           - os: ubuntu-latest
@@ -207,6 +211,35 @@ jobs:
             mutations-result.json
             selfcheck-result.json
           if-no-files-found: ignore
+
+  lint:
+    name: lint (ruff, shellcheck, zizmor)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: "3.13"
+
+      - name: Lint tools (hash-pinned)
+        run: python3 -m pip install --quiet --require-hashes -r .github/requirements/lint.txt
+
+      - name: ruff (F, E9, B; settings in pyproject.toml)
+        run: ruff check --no-cache .
+
+      - name: shellcheck (scan/cbom-scan.sh waits for ruleset 2, see CONTRIBUTING.md)
+        run: |
+          shellcheck --version | head -2
+          shellcheck -S warning prove.sh build-probe.sh scan/residue.sh
+
+      - name: zizmor (workflows, the action and the example workflow)
+        run: zizmor --offline --min-severity medium .github/workflows/ action.yml examples/github-actions/pqproof-sarif.yml
+
+      - name: Schemas match the code
+        run: python3 -I -B tests/make_schemas.py --check
 
   verify-windows:
     name: re-verify evidence on Windows (Python only, no bash)

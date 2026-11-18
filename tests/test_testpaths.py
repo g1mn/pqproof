@@ -7,7 +7,6 @@ src/test·test·tests·*Test 와 Go _test.go, residue.sh 는 src/test·test·tes
 처음 고친 판은 폴더 이름을 경로 어디서든 맞춰 src/main/java/com/example/… 이 통째로 시험이 됐다(독립 검토에서 찾음). 그래서 목록 둘째 줄에
 본 소스 표시(/src/main/)를 두고 그 앞부분만 맞춰 보며, examples·samples·spec·fixtures·mock(s) 는 트리 맨 위 폴더만 본다.
 """
-import json
 import os
 import pathlib
 import shutil

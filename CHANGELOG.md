@@ -24,6 +24,8 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 ### Changed
 
+- Release workflow: it runs the whole CI workflow first (`workflow_call`), so a release no longer passes on one Ubuntu job alone. It checks that the tagged commit is on `main`, builds with `build` and `hatchling` pinned by hash, without build isolation, and attests `BUILDINFO` too. The SBOM now lists the wheel and sdist hashes, the `tls_probe` binaries with their Go version and the external programs (bash, OpenSSL, keytool), passes the CycloneDX schema check and gets an SBOM attestation. The release notes say `shasum -a 256 -c --ignore-missing SHA256SUMS`, which works when only one binary was downloaded.
+- CI: a `lint` job (ruff with error rules, shellcheck, zizmor) with hash-pinned tools, and Python 3.15 in the test matrix. A fourth `tls_probe` binary for Intel Macs (`darwin-amd64`).
 - Progress: a run prints the applied settings first, then one line per step with the time taken, to stderr. A large tree no longer looks stuck for minutes.
 - A variable whose name is one letter off a setting (`REQUIRE_REVEIW`, `TLS_TARGET`, `EXPCET`) and an unknown `PQPROOF_` name get a warning at the start. Before, `REQUIRE_REVEIW=1` left strict mode off without a word.
 - The default output folder is `proof-out-YYYYMMDD-HHMMSS` (`proof-YYYYMMDD-HHMMSS` under `<W>/evidence`), with `-2`, `-3` when two runs start in the same second. Before, it had only the time of day and a second run in the same second stopped with exit 2.

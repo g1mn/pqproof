@@ -33,6 +33,7 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
   "Programming Language :: Unix Shell",
   "Topic :: Security :: Cryptography",
   "Topic :: Software Development :: Quality Assurance",
@@ -90,3 +91,15 @@ include = [
   "/pyproject.toml",
 ]
 exclude = ["**/__pycache__", "/bin", "/proof-out-*", "/scan/evidence", "/scan/fixtures/gen"]
+
+# 린트(CI lint 작업): 오류 계열만 본다(F 이름·가져오기, E9 구문, B 흔한 버그). 고정물(일부러 틀린 코드)은 빼고,
+# 규칙 파일 여섯(규칙 묶음 해시에 든다)의 지적은 다음 묶음 올림(ruleset 2)에서 함께 고친다.
+[tool.ruff]
+target-version = "py39"
+extend-exclude = ["scan/fixtures", "tests/fixtures", "tests/golden/evidence", "docs"]
+
+[tool.ruff.lint]
+select = ["F", "E9", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+"pqlite/allowlist.py" = ["F401"]

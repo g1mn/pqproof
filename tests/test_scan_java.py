@@ -174,7 +174,7 @@ class JavaTracing(unittest.TestCase):
     def test_locals_maps_branches_and_other_files(self):
         got = brief(r for r in rows_of({"src/main/java/x/T.java": TRACE, "src/main/java/x/Algs.java": ALGS}) if r.path.endswith("T.java"))
         by_line = {}
-        for line, kind, alg, threat in got:
+        for line, _kind, alg, threat in got:
             by_line.setdefault(line, set()).add((alg, threat))
         self.assertEqual(by_line[6], {("SHA256withECDSA", "shor")})  # 다른 메서드의 alg = "ML-DSA-65"에 가리지 않는다
         self.assertEqual(by_line[7], {("ML-DSA-65", "pqc")})

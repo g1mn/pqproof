@@ -285,7 +285,7 @@ def unwrap(dest):
 
 def skipped_dirs(root):
     found = set()
-    for dirpath, dirnames, _ in os.walk(root, followlinks=False):
+    for _, dirnames, _ in os.walk(root, followlinks=False):
         for d in list(dirnames):
             if d in rc.TREE_SKIP_DIRS:
                 found.add(d)
