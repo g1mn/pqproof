@@ -20,7 +20,7 @@
 ---
 
 ### [Overview, verification results and the KISA mapping: g1mn.github.io/pqproof](https://g1mn.github.io/pqproof/)
-> 소개, 공개 예제로 한 검증 결과, KISA AI 보안 매뉴얼 대응표는 사이트에 있습니다. 참가자가 만든 도구이며 과학기술정보통신부·KISA가 검토하거나 보증하지 않았습니다.
+> 소개, 공개 예제로 돌린 검증 결과, KISA AI 보안 매뉴얼 대응표는 사이트에 있습니다. 참가자가 만든 도구이며 과학기술정보통신부·KISA가 검토하거나 보증하지 않았습니다.
 
 ---
 
@@ -42,4 +42,4 @@ Rules, outputs and limits: [DESIGN.md](https://github.com/g1mn/pqproof/blob/main
 
 MIT © 2026 [g1mn](https://github.com/g1mn)
 
-Quotes from the AI Security Threat Mitigation Manual (Ministry of Science and ICT and KISA) in the site and its data are not covered by MIT; they follow KOGL Type 4 (attribution, non-commercial, no derivatives). Fonts embedded in docs/index.html are under the SIL Open Font License 1.1, whose text is in the page.
+Quotes from the AI Security Threat Mitigation Manual (Ministry of Science and ICT and KISA) on the site and in its data are not covered by MIT; they follow KOGL Type 4 (attribution, non-commercial, no derivatives). Fonts embedded in docs/index.html are under the SIL Open Font License 1.1, and the page includes the license text.

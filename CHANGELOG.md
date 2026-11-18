@@ -22,7 +22,7 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 First public release: tool 0.1.0, ruleset 1, evidence format 2. The comparison point is the version that ran in the finals of the 2026 PQC Transition Hackathon on 2026-11-16 ("the finals version" below).
 
-**Verdict impact (판정 영향): yes, compared with the finals version.** A tree whose only classical public-key lines sit in test paths used to fail `c-classic` and now passes (D2 below). The new `r-allow` check adds a row, and it fails a run only under `REQUIRE_REVIEW=1`. On 16 runs over the eight practice tasks, every verdict matched the finals version. The one intended difference is a reproduction of the test-path case. Those runs used the rules of this release (ruleset 1); the rule files have changed since only in comments.
+**Verdict impact (판정 영향): yes, compared with the finals version.** A tree whose only classical public-key lines sit in test paths used to fail `c-classic` and now passes (D2 below). The new `r-allow` check adds a row, and it fails a run only under `REQUIRE_REVIEW=1`. On 16 runs over the eight practice tasks, with the rules of this release (ruleset 1), every verdict matched the finals version; the rule files have changed since then only in comments. The one intended difference is a separate reproduction of the test-path case.
 
 | Change | Verdict impact (판정 영향) |
 |---|---|
@@ -47,7 +47,7 @@ First public release: tool 0.1.0, ruleset 1, evidence format 2. The comparison p
 
 ### Changed
 
-- `--verify` reads evidence format 1 (no `format_version`): the earlier public copies. It accepts their notes and rebuilds their `receipt.html` with the words they used.
+- `--verify` reads evidence format 1 (no `format_version`), which the earlier public copies wrote. It accepts their notes and rebuilds their `receipt.html` with the words they used.
 - Self-test and unit tests count skipped cases apart (`n 통과 · m 건너뜀 · k 실패`). With `STRICT=1` a skipped case fails the run. CI runs with `STRICT=1`.
 - After the verdict, the console prints how many checks ended in each state. Only pass counts as passed.
 - An explicit `OPENSSL` is used as given, even below 3.5. Before, a newer OpenSSL found elsewhere took its place.
