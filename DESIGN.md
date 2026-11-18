@@ -2,7 +2,7 @@
 
 PQ-Proof takes a codebase before and after a post-quantum migration and checks whether the migration is finished. It looks for classical public-key code left without a recorded reason, checks that ML-KEM-768 and ML-DSA-65 are in use, and checks that no TLS setting got weaker along the way. It runs offline and calls no AI model. It reads the code it inspects and never runs it. Each run leaves verification evidence: the raw tool output, a CBOM for both versions, and an evidence hash that anyone can recompute.
 
-I built it for the finals of 2026년 양자내성암호 전환 해커톤 (2026 Post-Quantum Cryptography Transition Hackathon), organized by the Ministry of Science and ICT and hosted by KISA. I won 대상 (Grand Prize), given as the 과학기술정보통신부 장관상 (Minister of Science and ICT Award). The English names are my translations. An AI coding agent made the code changes, and PQ-Proof (then just `prove.sh`) was the completion check in its pipeline. This repository is based on the version that ran in the finals, minus contest material, local paths and contest-only report tables. I fixed two flaws found in testing after the finals and closed two gaps that a review of those fixes turned up; [Changes since the finals](#changes-since-the-finals) lists what moved. This is a participant's own tool; the organizers have not reviewed or endorsed it.
+I built it for the finals of 2026년 양자내성암호 전환 해커톤 (2026 Post-Quantum Cryptography Transition Hackathon), organized by the Ministry of Science and ICT and hosted by KISA. I won 대상 (Grand Prize), given as the 부총리상 (Deputy Prime Minister's Award). The English names are my translations. An AI coding agent made the code changes, and PQ-Proof (then just `prove.sh`) was the completion check in its pipeline. This repository is based on the version that ran in the finals, minus contest material, local paths and contest-only report tables. I fixed two flaws found in testing after the finals and closed two gaps that a review of those fixes turned up; [Changes since the finals](#changes-since-the-finals) lists what moved. This is a participant's own tool; the organizers have not reviewed or endorsed it.
 
 Some parts come from an earlier hackathon version of PQ-Proof (`g1mn/pq-proof` at commit `7b7803f`, MIT). Those files say so in their first line.
 
@@ -382,7 +382,7 @@ Code comments and tool output are in Korean, as they were in the finals. Two wor
 
 ## 한국어 요약
 
-2026년 양자내성암호 전환 해커톤 본선에서 실제로 쓴 검증 도구다. 이 대회에서 대상(과학기술정보통신부 장관상)을 받았다. 전환 전과 후의 소스를 넣으면 사유 없이 남은 기존 공개키 암호 코드가 없는지, ML-KEM-768과 ML-DSA-65를 쓰는지, TLS 설정을 약하게 바꾸지 않았는지 보고 전환이 끝났는지 판정한다. 판정에 AI 모델을 쓰지 않으므로 입력이 같으면 판정도 같다.
+2026년 양자내성암호 전환 해커톤 본선에서 실제로 쓴 검증 도구다. 이 대회에서 대상(부총리상)을 받았다. 전환 전과 후의 소스를 넣으면 사유 없이 남은 기존 공개키 암호 코드가 없는지, ML-KEM-768과 ML-DSA-65를 쓰는지, TLS 설정을 약하게 바꾸지 않았는지 보고 전환이 끝났는지 판정한다. 판정에 AI 모델을 쓰지 않으므로 입력이 같으면 판정도 같다.
 
 - 실행: `pip install pqproof` 뒤 `pqproof <전환 전 폴더|zip> <전환 후 폴더|zip>`, 저장소에서는 `bash prove.sh <전환 전> <전환 후>`. 예제로 돌려 보려면 `bash prove.sh examples/classic examples/pqc`.
 - 출력: 판정(종료 코드 0 통과, 1 실패, 3 미판정), 전후 CBOM 표, 검증 증적(`receipt.json`, `receipt.html`), 증적 해시. 증적 해시는 증적 JSON을 RFC 8785 방식으로 정규화해 SHA-256으로 계산한 값이다. `bash prove.sh --verify <출력 폴더>`로 누구든 다시 계산해 볼 수 있다. 증적에 실행 시각과 입력 폴더의 절대 경로가 들어가서, 입력이 같아도 증적 해시는 실행할 때마다 달라진다.
