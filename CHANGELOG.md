@@ -14,6 +14,10 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 **Verdict impact (판정 영향): none.**
 
+### Added
+
+- Sync tests (`tests/test_rule_sync.py`) for rule values that live in more than one file: the residue rule IDs against the nine families in `prove.py` and the rules SARIF reports, the write operations, the `legacy` word, the `Legacy*.java` name rule, and the order in which `prove.py` and `pqproof doctor` pick OpenSSL. The four skip-folder lists differ today; the test pins them as a known gap.
+
 ### Fixed
 
 - SARIF rule help links (`helpUri`) pointed to `#checks`, an anchor the site does not have, so they opened the top of the page. They now point to `#sec-checks`, the checks section.

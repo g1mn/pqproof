@@ -301,6 +301,10 @@ bash scan/cbom-scan.sh --selftest    # scanner assertions
 
 `tests/golden/verdicts.json` keeps the verdict, the check statuses and the main counts (blocking locations, classical lines per family, ML-KEM and ML-DSA lines, weakening hits, allowlist counts) of every tree case above, including the two plain example runs. `run_mutations.py --golden tests/golden/verdicts.json` fails when any of them moves. After an intended rule change, rewrite the file with `--write-golden` and record the change under "Verdict impact" in `CHANGELOG.md`.
 
+### Rule tests
+
+`tests/test_rule_sync.py` checks rule values that are copied between files: the residue rule IDs against `FAMILIES` in `prove.py` and the rules SARIF reports, the write operations, the `legacy` word and the `Legacy*.java` name rule, and that `prove.py` and `pqproof doctor` pick the same OpenSSL. A test that pins a known gap (current behaviour that a later release fixes) lists the review item in `KNOWN_GAPS`, and `--unit` prints those numbers after the counts. Fixing the gap fails that test on purpose, so the fix also flips the expectation.
+
 ## Versioning and maintenance
 
 - Semantic Versioning. A change that can move a verdict (a detection pattern, the test-path list, an allow rule, a check added or removed) bumps MINOR while the version is 0.x, and MAJOR from 1.0. A change that moves no verdict bumps PATCH. Only the latest MINOR release gets fixes.

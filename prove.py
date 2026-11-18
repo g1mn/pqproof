@@ -82,6 +82,11 @@ def spit(path, data):
         f.write(data if isinstance(data, bytes) else data.encode("utf-8"))
 
 
+# OPENSSL 을 안 줬을 때 찾는 곳(이 순서, 그다음 PATH). src/pqproof/deps.py 의 OPENSSL_CANDIDATES 와 같아야 한다(tests/test_rule_sync.py)
+OPENSSL_CANDIDATES = ("/opt/homebrew/opt/openssl@3.5/bin/openssl", "/opt/homebrew/opt/openssl@3/bin/openssl", "/opt/homebrew/bin/openssl",
+                      "/usr/local/opt/openssl@3/bin/openssl", "/usr/local/bin/openssl")
+
+
 def default_openssl():
     """OPENSSL 을 주면 그것(3.5 미만이어도, Params 와 같은 규칙). 아니면 3.5 이상을 먼저 고른다(교차 확인·ML-DSA 인증서 읽기).
     없으면 처음 찾은 것(cbom-scan은 옛 OpenSSL로도 돈다)."""
@@ -89,8 +94,7 @@ def default_openssl():
     if given and os.path.isfile(given) and os.access(given, os.X_OK):
         return given
     found = []
-    for c in ("/opt/homebrew/opt/openssl@3.5/bin/openssl", "/opt/homebrew/opt/openssl@3/bin/openssl",
-              "/opt/homebrew/bin/openssl", "/usr/local/opt/openssl@3/bin/openssl", "/usr/local/bin/openssl", shutil.which("openssl")):
+    for c in OPENSSL_CANDIDATES + (shutil.which("openssl"),):
         if c and c not in found and os.path.isfile(c) and os.access(c, os.X_OK):
             found.append(c)
     return next((c for c in found if openssl_35(c)), found[0] if found else None)

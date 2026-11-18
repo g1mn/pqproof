@@ -11,6 +11,7 @@ import zipfile
 
 SHELL_TOOLS = ("grep", "awk", "sed", "find", "sort", "head", "tail", "tr", "cut", "uniq", "wc", "mktemp", "date")
 KEYSTORE = re.compile(r"\.(?:jks|jceks|p12|pfx|keystore|bks)$", re.I)
+# prove.py OPENSSL_CANDIDATES 와 같아야 한다(tests/test_rule_sync.py)
 OPENSSL_CANDIDATES = ("/opt/homebrew/opt/openssl@3.5/bin/openssl", "/opt/homebrew/opt/openssl@3/bin/openssl", "/opt/homebrew/bin/openssl",
                       "/usr/local/opt/openssl@3/bin/openssl", "/usr/local/bin/openssl")
 
