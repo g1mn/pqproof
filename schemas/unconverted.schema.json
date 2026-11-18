@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/g1mn/pqproof/blob/main/schemas/unconverted.schema.json",
+  "title": "PQ-Proof allowlist (notes/unconverted.json)",
+  "description": "The allowlist that ALLOW= points to: a bare array of entries, or an object with the entries under unconverted and one review pair at the top for the entries without their own. The top pair counts only with a matching reviewed_digest. Fields not listed here are ignored today. Rules: guide/allowlist.md.",
+  "anyOf": [
+    {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "where",
+          "why"
+        ],
+        "properties": {
+          "where": {
+            "type": "string",
+            "minLength": 1,
+            "description": "file:line, file:start-end, file:15,24-40, a path or a glob, relative to the fixed tree"
+          },
+          "why": {
+            "type": "string",
+            "minLength": 1,
+            "description": "the reason a person can check, with when the entry goes away"
+          },
+          "what": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "description": "free word such as fallback, boundary or kept"
+          },
+          "reviewed_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "who read the entry (with reviewed_at)"
+          },
+          "reviewed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}",
+            "description": "ISO 8601 date or date and time"
+          },
+          "reviewed_digest": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{16}$",
+            "description": "first 16 hex digits printed by the run; optional on an entry"
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "unconverted"
+      ],
+      "properties": {
+        "unconverted": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "where",
+              "why"
+            ],
+            "properties": {
+              "where": {
+                "type": "string",
+                "minLength": 1,
+                "description": "file:line, file:start-end, file:15,24-40, a path or a glob, relative to the fixed tree"
+              },
+              "why": {
+                "type": "string",
+                "minLength": 1,
+                "description": "the reason a person can check, with when the entry goes away"
+              },
+              "what": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "description": "free word such as fallback, boundary or kept"
+              },
+              "reviewed_by": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "who read the entry (with reviewed_at)"
+              },
+              "reviewed_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}",
+                "description": "ISO 8601 date or date and time"
+              },
+              "reviewed_digest": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[0-9a-f]{16}$",
+                "description": "first 16 hex digits printed by the run; optional on an entry"
+              }
+            }
+          }
+        },
+        "reviewed_by": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "who read the entry (with reviewed_at)"
+        },
+        "reviewed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}",
+          "description": "ISO 8601 date or date and time"
+        },
+        "reviewed_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{16}$",
+          "description": "first 16 hex digits printed by the run; optional on an entry"
+        }
+      }
+    }
+  ]
+}

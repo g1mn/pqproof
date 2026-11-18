@@ -123,7 +123,7 @@ jobs:
                  or "/scan/evidence/" in n or "/scan/fixtures/gen/" in n]
           assert not bad, bad
           for need in ("pqproof/cli.py", "pqproof/sarif.py", "pqproof/_tool/prove.sh", "pqproof/_tool/scan/cbom-scan.sh",
-                       "pqproof/_tool/scan/ruleset.json", "pqproof/_tool/pqlite/version.py",
+                       "pqproof/_tool/scan/ruleset.json", "pqproof/_tool/pqlite/version.py", "pqproof/_tool/schemas/receipt-v2.schema.json",
                        "pqproof/_tool/examples/pqc/README.md", "pqproof/_tool/tests/mutations/run_mutations.py"):
               assert need in names, need
           print(whl.name, len(names), "files")

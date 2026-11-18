@@ -209,6 +209,10 @@ From evidence format 2 (0.1.0), `receipt.json` also records:
 
 `--verify` refuses a format it does not know (`format_version` above 2) and says to use a newer pqproof.
 
+`format` is the fixed string `pqc-proof receipt 1` that the first public copy wrote. It has not changed since and does not track the format; read `format_version`.
+
+**Machine-readable contract.** `schemas/receipt-v2.schema.json` is the JSON Schema (draft 2020-12) of format 2, and `schemas/unconverted.schema.json` that of the allowlist. `tests/make_schemas.py` writes both from the code that reads these files, and a test fails when they drift. Within one `format_version` these fields keep their name, type and meaning: `format_version`, `tool_version`, `ruleset_version`, `ruleset_sha256`, `receipt_id`, `verdict`, `checks[].id`, `checks[].status`, `inputs.*.tree_sha256`, `inputs.*.zip_sha256`, `artifacts[].path`, `artifacts[].sha256`, the counts under `cbom`, `java` and `allowlist`, and the exit codes and Action outputs. Text meant for people (`checks[].title`, `expected`, `actual`, `note`, `warnings`, the Korean words in tables) can change in any release; do not parse it. The schema is closed (`additionalProperties: false`), so adding, removing or renaming a field, or changing its type or meaning, raises `format_version`.
+
 ### Older evidence
 
 `--verify` keeps reading format 1. It accepts the note the first public copy wrote (it said 영수증, receipt). It rebuilds that copy's `receipt.html` and `deck.json` with the copy's own words, so the byte-for-byte page check still applies and its verdict line keeps its old text. `tests/golden/evidence/` holds one evidence folder from each of three earlier public copies and one from 0.1.0. `tests/golden/make_fixture.py` replaced local paths in them and recomputed the hashes. The verdicts, checks and counts are as those versions wrote them. Development builds between those versions are not supported.

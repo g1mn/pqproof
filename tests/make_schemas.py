@@ -1,0 +1,100 @@
+# make_schemas.py: schemas/*.schema.json 을 코드에서 다시 만든다(손으로 고치지 않는다). receipt 스키마는 pqlite/receipt.py SCHEMA
+# (--verify 가 쓰는 것)에 형식 2의 필수 칸을 더한 것이고, 허용 목록 스키마는 pqlite/allowlist.py 가 읽는 꼴을 적은 것이다.
+#   python3 -I -B tests/make_schemas.py           schemas/ 에 쓴다
+#   python3 -I -B tests/make_schemas.py --check   지금 파일이 코드와 같은지만 본다(다르면 1)
+"""Write the JSON Schemas under schemas/ from the code that reads the same files."""
+import copy
+import json
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+sys.path.insert(0, ROOT)
+from pqlite import receipt as R  # noqa: E402
+from pqlite import version as V  # noqa: E402
+
+BASE = "https://github.com/g1mn/pqproof/blob/main/schemas/"
+DRAFT = "https://json-schema.org/draft/2020-12/schema"
+# 형식 2(0.1.0~)를 쓰는 도구가 늘 적는 맨 위 칸. --verify 의 SCHEMA 는 형식 1도 읽으려고 이 칸들을 필수로 두지 않는다
+V2_REQUIRED = ("format_version", "tool_version", "ruleset_version", "ruleset_sha256", "allowlist", "excluded", "deck_meta",
+               "test_paths")
+
+
+def receipt_v2():
+    body = copy.deepcopy(R.SCHEMA)
+    body["required"] = sorted(set(body["required"]) | set(V2_REQUIRED))
+    body["properties"]["format_version"] = {"const": V.FORMAT_VERSION}
+    body["properties"]["note"] = {"const": R.NOTE}
+    return dict({"$schema": DRAFT, "$id": BASE + "receipt-v2.schema.json",
+                 "title": "PQ-Proof receipt.json, evidence format 2",
+                 "description": ("Shape of receipt.json written by pqproof 0.1.0 and later (format_version 2). Generated from "
+                                 "pqlite/receipt.py SCHEMA by tests/make_schemas.py. Fields named in guide/outputs.md as stable keep "
+                                 "their meaning within a format_version. Text fields (checks[].title, expected, actual, note, "
+                                 "warnings) are for people and can change in any release. pqproof --verify checks more than this "
+                                 "schema: the receipt_id, every file hash and the consistency of the numbers.")}, **body)
+
+
+ENTRY = {
+    "type": "object",
+    "required": ["where", "why"],
+    "properties": {
+        "where": {"type": "string", "minLength": 1,
+                  "description": "file:line, file:start-end, file:15,24-40, a path or a glob, relative to the fixed tree"},
+        "why": {"type": "string", "minLength": 1, "description": "the reason a person can check, with when the entry goes away"},
+        "what": {"type": "string"},
+        "kind": {"type": "string", "description": "free word such as fallback, boundary or kept"},
+        "reviewed_by": {"type": ["string", "null"], "description": "who read the entry (with reviewed_at)"},
+        "reviewed_at": {"type": ["string", "null"], "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}",
+                        "description": "ISO 8601 date or date and time"},
+        "reviewed_digest": {"type": ["string", "null"], "pattern": "^[0-9a-f]{16}$",
+                            "description": "first 16 hex digits printed by the run; optional on an entry"},
+    },
+}
+
+
+def unconverted():
+    entries = {"type": "array", "items": ENTRY}
+    return {"$schema": DRAFT, "$id": BASE + "unconverted.schema.json",
+            "title": "PQ-Proof allowlist (notes/unconverted.json)",
+            "description": ("The allowlist that ALLOW= points to: a bare array of entries, or an object with the entries under "
+                            "unconverted and one review pair at the top for the entries without their own. The top pair counts "
+                            "only with a matching reviewed_digest. Fields not listed here are ignored today. Rules: "
+                            "guide/allowlist.md."),
+            "anyOf": [entries, {"type": "object", "required": ["unconverted"],
+                                "properties": {"unconverted": entries,
+                                               "reviewed_by": ENTRY["properties"]["reviewed_by"],
+                                               "reviewed_at": ENTRY["properties"]["reviewed_at"],
+                                               "reviewed_digest": ENTRY["properties"]["reviewed_digest"]}}]}
+
+
+FILES = {"receipt-v2.schema.json": receipt_v2, "unconverted.schema.json": unconverted}
+
+
+def text(make):
+    return json.dumps(make(), indent=2, ensure_ascii=False) + "\n"
+
+
+def main(argv):
+    check = argv[:1] == ["--check"]
+    bad = []
+    for name, make in FILES.items():
+        path = os.path.join(ROOT, "schemas", name)
+        want = text(make)
+        have = open(path, encoding="utf-8").read() if os.path.isfile(path) else None
+        if check:
+            if have != want:
+                bad.append(name)
+        elif have != want:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(want)
+            print("wrote", path)
+    if bad:
+        print("schemas out of date (run python3 -I -B tests/make_schemas.py):", ", ".join(bad))
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
