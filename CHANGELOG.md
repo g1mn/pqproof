@@ -34,6 +34,9 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 - The RFC 8785 form sorts object keys by UTF-16 code units, as the RFC says, and refuses integers beyond 2^53. Every key so far is ASCII, so no existing `receipt_id` changes. A test recomputes the golden receipts with a second implementation and, when Node.js is there, in JavaScript.
 - `--verify` on a folder that does not exist, or one without `receipt.json`, exits 2 (input error) instead of 1.
 - A zip input that would unpack differently on another machine is an input error (exit 2) with a one-line reason: a name that appears twice, names that differ only in case or Unicode normalization, control characters, a file and a folder with the same name, or more than 500,000 entries. Before, a repeated name stopped the run with a Python traceback and exit 1, and a case-only pair unpacked as one file on macOS. Well-formed zips and folders get the same verdicts as before.
+- A `tls_probe` binary that is not on the machine is no longer listed in `receipt.json` `tools` with version 0.4.0 and no hash, which read as if it had run. The source entry stays.
+- The warning for OpenSSL below 3.5 or LibreSSL says what is really lost: the OpenSSL TLS cross-check and some key details in the CBOM notes. It used to say ML-DSA certificates could not be read, but the scanner reads them by OID.
+- The five evidence tamper tests ran only with a `tls_probe` binary, so an installed copy without Go skipped them. They now use a run without TLS; only the TLS case still needs the binary, and `--unit` says how to build it.
 - SARIF rule help links (`helpUri`) pointed to `#checks`, an anchor the site does not have, so they opened the top of the page. They now point to `#sec-checks`, the checks section.
 
 ## [0.1.0] - 2026-11-18

@@ -16,6 +16,12 @@ OPENSSL_CANDIDATES = ("/opt/homebrew/opt/openssl@3.5/bin/openssl", "/opt/homebre
                       "/usr/local/opt/openssl@3/bin/openssl", "/usr/local/bin/openssl")
 
 
+# OpenSSL 3.5 미만·LibreSSL 의 실제 영향(교차 리뷰 X68: 예전 문구는 ML-DSA 인증서를 못 읽는다고 했지만 cbom-scan.sh 는 OID 표로 읽는다)
+OLD_OPENSSL_EFFECT = ("the scan still runs and names ML-KEM and ML-DSA keys and certificates from their OIDs. Two things are lost: the "
+                      "OpenSSL TLS cross-check (recorded as not possible) and some key details in the CBOM notes. Set OPENSSL to "
+                      "3.5 or later only if you need those.")
+
+
 class Report:
     def __init__(self):
         self.errors, self.warnings, self.info, self.optional = [], [], [], []
@@ -108,11 +114,9 @@ def check(env=None, inputs=(), bin_dir=None, need_tls=None):
         rep.errors.append("openssl not found. Install OpenSSL (3.5 or later recommended) or set OPENSSL=/path/to/openssl. "
                           "macOS: brew install openssl@3. Debian/Ubuntu: apt install openssl.")
     elif not ver:
-        rep.warnings.append(f"{path} is not OpenSSL ({line}). Certificates with ML-DSA keys cannot be read and the TLS cross-check is off. "
-                            "Set OPENSSL to OpenSSL 3.5 or later.")
+        rep.warnings.append(f"{path} is not OpenSSL ({line}), which works like OpenSSL below 3.5: " + OLD_OPENSSL_EFFECT)
     elif ver < (3, 5, 0):
-        rep.warnings.append(f"OpenSSL {'.'.join(map(str, ver))} at {path}: below 3.5, so ML-KEM/ML-DSA certificates are not read and the "
-                            "OpenSSL TLS cross-check is off. The scan still runs.")
+        rep.warnings.append(f"OpenSSL {'.'.join(map(str, ver))} at {path}: below 3.5. " + OLD_OPENSSL_EFFECT)
     else:
         rep.info.append(f"openssl: {path} ({line})")
     kt = shutil.which("keytool") or (os.path.join(env["JAVA_HOME"], "bin", "keytool") if env.get("JAVA_HOME") else None)

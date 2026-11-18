@@ -35,6 +35,8 @@ def main(argv):
     print(f"unit: {passed} 통과 · {skipped} 건너뜀 · {failed} 실패 (건너뛴 시험은 통과로 세지 않는다)")
     for test, why in res.skipped:
         print(f"  SKIP {test.id()}: {why}")
+    if any("tls_probe" in why for _, why in res.skipped):
+        print("  건너뛴 TLS 시험을 돌리려면 tls_probe 를 만든다: bash build-probe.sh 또는 pqproof build-probe(Go 1.27 이상, 인터넷 없음)")
     gaps = known_gaps(here)
     if gaps:
         print(f"알려진 실패 {len(gaps)}건은 지금 동작대로 고정했다(고치면 그 시험이 실패하니 기대값을 뒤집는다): {' '.join(sorted(gaps))}")

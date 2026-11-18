@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 import zipfile
+from unittest import mock
 
 PROOF = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROOF))
@@ -55,37 +56,50 @@ def small_tree(root, files):
     return root
 
 
-@unittest.skipUnless(os.access(str(T.host_binary()), os.X_OK), "tls_probe 바이너리 없음")
+def zip_tree(src, dest, top):
+    with zipfile.ZipFile(dest, "w") as z:
+        for p in sorted(pathlib.Path(src).rglob("*")):
+            if p.is_file():
+                z.write(p, f"{top}/{p.relative_to(src).as_posix()}")
+    return dest
+
+
 class Tamper(unittest.TestCase):
-    """zip 입력 + TLS 대상·기준선 + EXTRA_EV로 검증 증적 하나를 만들고, 한 곳씩 바꿔 verify가 잡는지 본다."""
+    """examples/classic(폴더) → examples/pqc(zip) + EXTRA_EV 로 검증 증적 하나를 만들고, 한 곳씩 바꿔 verify 가 잡는지 본다.
+    TLS 가 없는 예제라 tls_probe 없이 돈다(설치본 pqproof --unit 에서도 증적 무결성 시험이 빠지지 않게, X64)."""
 
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory()
         t = cls.tmp.name
-        orig = small_tree(os.path.join(t, "o"), {"app/README.md": "x\n", "app/run.sh": "echo hi\n"})
-        z = os.path.join(t, "fixed.zip")
-        with zipfile.ZipFile(z, "w") as f:
-            f.writestr("app/README.md", "x\n")
-            f.writestr("app/run.sh", "echo hi\n")
-            f.writestr("app/server.py", "import ssl\nctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)\n")
+        z = zip_tree(PROOF / "examples" / "pqc", os.path.join(t, "fixed.zip"), "pqc")
         extra = os.path.join(t, "extra-test-log.txt")
         pathlib.Path(extra).write_text("app tests: ok\n")
-        cls.runner = T.HostRunner(os.path.join(t, "srv"))
-        os.makedirs(cls.runner.tls_dir)
-        cls.runner.run(["cert", "-hosts=localhost,127.0.0.1", cls.runner.tls_dir])
-        a, b = cls.runner.ref_addr(), cls.runner.ref_addr()
-        cls.runner.start(T.serve_args(a, T.REFERENCE_POSITIVE, cls.runner.path("cert.pem"), cls.runner.path("key.pem")))
-        cls.runner.start(T.serve_args(b, "X25519", cls.runner.path("cert.pem"), cls.runner.path("key.pem")))
-        env = {"EXPECT": "tls", "TLS_TARGETS": f"{a}@localhost#{cls.runner.path('ca.pem')}", "TLS_TARGETS_ORIG": b,
-               "EXTRA_EV": extra}
         cls.out = os.path.join(t, "out")
-        cls.r, cls.code, _ = prove.run(os.path.join(orig, "app"), z, prove.Params(env), cls.out, quiet=True)
+        env = {"EXPECT": "kem,sig", "ALLOW": "none", "RECON": "none", "EXTRA_EV": extra}
+        cls.r, cls.code, _ = prove.run(str(PROOF / "examples" / "classic"), z, prove.Params(env), cls.out, quiet=True)
 
     @classmethod
     def tearDownClass(cls):
-        cls.runner.stop()
         cls.tmp.cleanup()
+
+    def test_run_passes_and_records_everything(self):
+        self.assertEqual((self.r["verdict"], self.code), ("pass", 0), self.r["checks"])
+        self.assertEqual(self.fails(self.out), [])
+        self.assertEqual(self.r["inputs"]["fixed"]["kind"], "zip")
+        self.assertEqual(self.r["inputs"]["fixed"]["root"], "in/fixed/pqc")
+        self.assertEqual(len(self.r["extra"]), 1)
+        probe = [t for t in self.r["tools"] if t["name"] == "tls_probe"]
+        self.assertEqual(bool(probe), os.access(str(T.host_binary()), os.X_OK))  # 없는 바이너리는 적지 않는다(X68)
+        self.assertTrue(all(t["sha256"] for t in probe))
+        self.assertTrue(any(t["name"] == "tls_probe source" and t["sha256"] for t in self.r["tools"]))
+
+    def test_absent_probe_is_not_recorded(self):
+        with tempfile.TemporaryDirectory() as empty, \
+                mock.patch.object(T, "host_binary", return_value=pathlib.Path(empty, "tls_probe-x-y")):
+            self.assertIsNone(prove.probe_tool())
+        with mock.patch.object(T, "host_binary", side_effect=RuntimeError("no build for this platform")):
+            self.assertIsNone(prove.probe_tool())
 
     def copy(self, name):
         d = os.path.join(self.tmp.name, name)
@@ -94,23 +108,6 @@ class Tamper(unittest.TestCase):
 
     def fails(self, d):
         return [w for ok, w in R.verify(d) if not ok]
-
-    def test_run_passes_and_records_everything(self):
-        self.assertEqual((self.r["verdict"], self.code), ("pass", 0), self.r["checks"])
-        self.assertEqual(self.fails(self.out), [])
-        self.assertEqual(self.r["inputs"]["fixed"]["kind"], "zip")
-        self.assertEqual(self.r["inputs"]["fixed"]["root"], "in/fixed/app")
-        self.assertEqual(self.r["tls"]["baseline"][0]["hybrid"]["kind"], "failed")  # 기준선(X25519 전용)은 기록만
-        # 교차 확인 칸은 늘 있다. OpenSSL 3.5 이상이면 맞았는지(True), 아니면(우분투 러너의 3.0, 맥 LibreSSL) null 과 '교차 확인 불가'
-        t0 = self.r["tls"]["targets"][0]
-        self.assertIn("openssl_agrees", t0)
-        if prove.openssl_35(prove.Params({}).openssl):
-            self.assertTrue(t0["openssl_agrees"])
-        else:
-            self.assertIsNone(t0["openssl_agrees"])
-            self.assertIn("교차 확인 불가", t0.get("openssl_note", ""))
-        self.assertEqual(len(self.r["extra"]), 1)
-        self.assertTrue(any("server.py" in s for s in self.r["tls"]["signals"]))
 
     def test_changed_verdict_breaks_the_id(self):
         d = self.copy("verdict")
@@ -138,8 +135,8 @@ class Tamper(unittest.TestCase):
         with open(os.path.join(d, "artifacts", "weakening.json"), "a") as f:
             f.write(" ")
         pathlib.Path(d, "artifacts", "note.txt").write_text("added later\n")
-        with open(os.path.join(d, "in", "fixed", "app", "run.sh"), "a") as f:
-            f.write("rm x\n")
+        with open(os.path.join(d, "in", "fixed", "pqc", "README.md"), "a") as f:
+            f.write("changed later\n")
         with open(os.path.join(d, "receipt.html"), "a") as f:
             f.write("<!-- -->")
         bad = "\n".join(self.fails(d))
@@ -156,6 +153,52 @@ class Tamper(unittest.TestCase):
         frag = pathlib.Path(self.out, "tables", "fragment.html").read_text()
         self.assertTrue(frag.startswith('<section class="pqcproof">'))
         self.assertNotIn("<script", frag)
+
+
+@unittest.skipUnless(os.access(str(T.host_binary()), os.X_OK), "tls_probe 바이너리 없음(bash build-probe.sh 또는 pqproof build-probe)")
+class TamperTls(unittest.TestCase):
+    """zip 입력 + TLS 대상·기준선으로 증적을 만들어 TLS 칸이 다 적히고 verify 가 통과하는지 본다(tls_probe 가 있을 때만)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        t = cls.tmp.name
+        orig = small_tree(os.path.join(t, "o"), {"app/README.md": "x\n", "app/run.sh": "echo hi\n"})
+        z = os.path.join(t, "fixed.zip")
+        with zipfile.ZipFile(z, "w") as f:
+            f.writestr("app/README.md", "x\n")
+            f.writestr("app/run.sh", "echo hi\n")
+            f.writestr("app/server.py", "import ssl\nctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)\n")
+        cls.runner = T.HostRunner(os.path.join(t, "srv"))
+        os.makedirs(cls.runner.tls_dir)
+        cls.runner.run(["cert", "-hosts=localhost,127.0.0.1", cls.runner.tls_dir])
+        a, b = cls.runner.ref_addr(), cls.runner.ref_addr()
+        cls.runner.start(T.serve_args(a, T.REFERENCE_POSITIVE, cls.runner.path("cert.pem"), cls.runner.path("key.pem")))
+        cls.runner.start(T.serve_args(b, "X25519", cls.runner.path("cert.pem"), cls.runner.path("key.pem")))
+        env = {"EXPECT": "tls", "TLS_TARGETS": f"{a}@localhost#{cls.runner.path('ca.pem')}", "TLS_TARGETS_ORIG": b}
+        cls.out = os.path.join(t, "out")
+        cls.r, cls.code, _ = prove.run(os.path.join(orig, "app"), z, prove.Params(env), cls.out, quiet=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.runner.stop()
+        cls.tmp.cleanup()
+
+    def test_tls_run_passes_and_records_everything(self):
+        self.assertEqual((self.r["verdict"], self.code), ("pass", 0), self.r["checks"])
+        self.assertEqual([w for ok, w in R.verify(self.out) if not ok], [])
+        self.assertEqual(self.r["inputs"]["fixed"]["root"], "in/fixed/app")
+        self.assertEqual(self.r["tls"]["baseline"][0]["hybrid"]["kind"], "failed")  # 기준선(X25519 전용)은 기록만
+        # 교차 확인 칸은 늘 있다. OpenSSL 3.5 이상이면 맞았는지(True), 아니면(우분투 러너의 3.0, 맥 LibreSSL) null 과 '교차 확인 불가'
+        t0 = self.r["tls"]["targets"][0]
+        self.assertIn("openssl_agrees", t0)
+        if prove.openssl_35(prove.Params({}).openssl):
+            self.assertTrue(t0["openssl_agrees"])
+        else:
+            self.assertIsNone(t0["openssl_agrees"])
+            self.assertIn("교차 확인 불가", t0.get("openssl_note", ""))
+        self.assertTrue(any("server.py" in s for s in self.r["tls"]["signals"]))
+        self.assertTrue(any(t["name"] == "tls_probe" and t["sha256"] for t in self.r["tools"]))
 
 
 if __name__ == "__main__":

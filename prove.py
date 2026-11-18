@@ -903,6 +903,18 @@ def tool(name, path, version=""):
     return {"name": name, "path": str(path or ""), "sha256": sha, "version": version or ""}
 
 
+def probe_tool():
+    """증적 tools[] 의 tls_probe 칸. 이 기계에 바이너리가 없으면 None(없는 바이너리를 버전과 함께 적어 쓴 것처럼 보이지 않게).
+    소스 해시 칸('tls_probe source')은 늘 따로 남는다."""
+    try:
+        path = tlsprobe.host_binary()
+    except RuntimeError:
+        return None
+    if not (os.path.isfile(path) and os.access(path, os.X_OK)):
+        return None
+    return tool("tls_probe", str(path), tlsprobe.PROBE_VERSION)
+
+
 def openssl_version(openssl):
     if not openssl:
         return ""
@@ -1470,10 +1482,9 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
     pyfiles = ["prove.py", "prove.sh", "pqlite/scan.py", "pqlite/verify.py", "pqlite/tlsprobe.py", "pqlite/receipt.py",
                "pqlite/allowlist.py", "pqlite/version.py"]
     tools += [tool(p, os.path.join(HERE, p)) for p in pyfiles]
-    try:
-        tools.append(tool("tls_probe", str(tlsprobe.host_binary()), tlsprobe.PROBE_VERSION))
-    except RuntimeError:
-        pass
+    probe = probe_tool()
+    if probe:
+        tools.append(probe)
     tools.append({"name": "tls_probe source", "path": str(tlsprobe.PROBE_SRC), "sha256": tlsprobe.source_sha256(),
                   "version": tlsprobe.PROBE_VERSION})
     tools.append({"name": "python", "path": sys.executable, "sha256": None, "version": sys.version.split()[0]})
