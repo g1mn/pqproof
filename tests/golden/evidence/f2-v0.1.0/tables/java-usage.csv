@@ -1,0 +1,15 @@
+﻿판,위치,종류,알고리즘,threat,비고
+원본,src/main/java/demo/sealer/Sealer.java:16,key-generation,RSA,shor,KeyPairGenerator.getInstance: 양자 컴퓨터로 깨지는 공개키 알고리즘
+원본,src/main/java/demo/sealer/Sealer.java:22,key-generation,EC,shor,KeyPairGenerator.getInstance: 양자 컴퓨터로 깨지는 공개키 알고리즘
+원본,src/main/java/demo/sealer/Sealer.java:23,key-generation,EC secp256r1,shor,new ECGenParameterSpec: 양자 컴퓨터로 깨지는 공개키 알고리즘
+원본,src/main/java/demo/sealer/Sealer.java:28,key-encryption,RSA/ECB/OAEPWithSHA-256AndMGF1Padding,shor,Cipher.getInstance: 양자 컴퓨터로 깨지는 공개키 알고리즘
+원본,src/main/java/demo/sealer/Sealer.java:34,key-encryption,RSA/ECB/OAEPWithSHA-256AndMGF1Padding,shor,Cipher.getInstance: 양자 컴퓨터로 깨지는 공개키 알고리즘
+원본,src/main/java/demo/sealer/Sealer.java:40,signature,SHA256withECDSA,shor,Signature.getInstance: 양자 컴퓨터로 깨지는 공개키 알고리즘
+원본,src/main/java/demo/sealer/Sealer.java:47,signature,SHA256withECDSA,shor,Signature.getInstance: 양자 컴퓨터로 깨지는 공개키 알고리즘
+고친 판,src/main/java/demo/sealer/Sealer.java:17,pqc-parameter,ML-KEM-768,pqc,PQC 이름: ML-KEM-768
+고친 판,src/main/java/demo/sealer/Sealer.java:18,pqc-parameter,ML-DSA-65,pqc,PQC 이름: ML-DSA-65
+고친 판,src/main/java/demo/sealer/Sealer.java:22,key-generation,ML-KEM-768,pqc,KeyPairGenerator.getInstance(상수): ML-KEM-768
+고친 판,src/main/java/demo/sealer/Sealer.java:26,key-generation,ML-DSA-65,pqc,KeyPairGenerator.getInstance(상수): ML-DSA-65
+고친 판,src/main/java/demo/sealer/Sealer.java:30,key-encapsulation,ML-KEM,pqc,KEM.getInstance: ML-KEM(매개변수는 다른 줄)
+고친 판,src/main/java/demo/sealer/Sealer.java:39,key-encapsulation,ML-KEM,pqc,KEM.getInstance: ML-KEM(매개변수는 다른 줄)
+고친 판,src/main/java/demo/sealer/Sealer.java:46,signature,ML-DSA-65,pqc,Signature.getInstance(상수): ML-DSA-65

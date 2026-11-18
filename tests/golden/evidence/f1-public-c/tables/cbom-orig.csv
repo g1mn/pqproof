@@ -1,0 +1,22 @@
+﻿위치,출처,용도·종류,알고리즘,양자 위협,판정,허용·참고 사유,비고
+src/main/java/demo/sealer/Sealer.java:16,둘 다(같은 위치),서명·암호화,RSA-3072,쇼어로 깨짐,막음,,"`KeyPairGenerator g = KeyPairGenerator.getInstance(""RSA"");`"
+src/main/java/demo/sealer/Sealer.java:16,둘 다(같은 위치),key-generation,RSA,shor,막음,,KeyPairGenerator.getInstance: 양자 컴퓨터로 깨지는 공개키 알고리즘
+src/main/java/demo/sealer/Sealer.java:22,둘 다(같은 위치),서명·키교환,EC secp256r1,쇼어로 깨짐,막음,,"`KeyPairGenerator g = KeyPairGenerator.getInstance(""EC"");`"
+src/main/java/demo/sealer/Sealer.java:22,둘 다(같은 위치),key-generation,EC,shor,막음,,KeyPairGenerator.getInstance: 양자 컴퓨터로 깨지는 공개키 알고리즘
+src/main/java/demo/sealer/Sealer.java:23,둘 다(같은 위치),서명·키교환,secp256r1,쇼어로 깨짐,막음,,"일반 패턴: 문맥 확인 · `g.initialize(new ECGenParameterSpec(""secp256r1""));`"
+src/main/java/demo/sealer/Sealer.java:23,둘 다(같은 위치),key-generation,EC secp256r1,shor,막음,,new ECGenParameterSpec: 양자 컴퓨터로 깨지는 공개키 알고리즘
+src/main/java/demo/sealer/Sealer.java:28,둘 다(같은 위치),암호화,RSA/ECB/OAEPWithSHA-256AndMGF1Padding,쇼어로 깨짐,막음,,"`Cipher c = Cipher.getInstance(""RSA/ECB/OAEPWithSHA-256AndMGF1Padding"");`"
+src/main/java/demo/sealer/Sealer.java:28,둘 다(같은 위치),key-encryption,RSA/ECB/OAEPWithSHA-256AndMGF1Padding,shor,막음,,Cipher.getInstance: 양자 컴퓨터로 깨지는 공개키 알고리즘
+src/main/java/demo/sealer/Sealer.java:34,둘 다(같은 위치),암호화,RSA/ECB/OAEPWithSHA-256AndMGF1Padding,쇼어로 깨짐,막음,,"`Cipher c = Cipher.getInstance(""RSA/ECB/OAEPWithSHA-256AndMGF1Padding"");`"
+src/main/java/demo/sealer/Sealer.java:34,둘 다(같은 위치),key-encryption,RSA/ECB/OAEPWithSHA-256AndMGF1Padding,shor,막음,,Cipher.getInstance: 양자 컴퓨터로 깨지는 공개키 알고리즘
+src/main/java/demo/sealer/Sealer.java:40,둘 다(같은 위치),서명,SHA256withECDSA,쇼어로 깨짐,막음,,"`Signature s = Signature.getInstance(""SHA256withECDSA"");`"
+src/main/java/demo/sealer/Sealer.java:40,둘 다(같은 위치),signature,SHA256withECDSA,shor,막음,,Signature.getInstance: 양자 컴퓨터로 깨지는 공개키 알고리즘
+src/main/java/demo/sealer/Sealer.java:47,둘 다(같은 위치),서명,SHA256withECDSA,쇼어로 깨짐,막음,,"`Signature s = Signature.getInstance(""SHA256withECDSA"");`"
+src/main/java/demo/sealer/Sealer.java:47,둘 다(같은 위치),signature,SHA256withECDSA,shor,막음,,Signature.getInstance: 양자 컴퓨터로 깨지는 공개키 알고리즘
+tools/sign_manifest.py:13,cbom-scan,서명·키교환,EC SECP256R1,쇼어로 깨짐,막음,,`signing = ec.generate_private_key(ec.SECP256R1())`
+tools/sign_manifest.py:14,cbom-scan,서명·암호화,RSA-3072,쇼어로 깨짐,막음,,"`backup = rsa.generate_private_key(public_exponent=65537, key_size=3072)`"
+tools/sign_manifest.py:19,cbom-scan,서명,ECDSA,쇼어로 깨짐,막음,,"일반 패턴: 문맥 확인 · `return signing.sign(manifest, ec.ECDSA(hashes.SHA256()))`"
+tools/sign_manifest.py:24,cbom-scan,서명,ECDSA,쇼어로 깨짐,막음,,"일반 패턴: 문맥 확인 · `public.verify(signature, manifest, ec.ECDSA(hashes.SHA256()))`"
+tools/sign_manifest.py:7,cbom-scan,서명·암호화,rsa,쇼어로 깨짐,막음,,"일반 패턴: 문맥 확인 · `from cryptography.hazmat.primitives.asymmetric import ec, padding, rsa`"
+tools/sign_manifest.py:9,cbom-scan,암호화,RSA-OAEP,쇼어로 깨짐,막음,,"`WRAP = padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()), algorithm=hashes.SHA256()…`"
+requirements.txt:1,cbom-scan,라이브러리,cryptography,간접(라이브러리),참고,,`cryptography>=42`

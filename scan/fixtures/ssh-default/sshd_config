@@ -1,0 +1,3 @@
+Port 2222
+HostKey /etc/ssh/ssh_host_ecdsa_key
+PasswordAuthentication no

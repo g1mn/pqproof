@@ -1,0 +1,179 @@
+# PQ-Proof 복합 Action. 원본과 전환본을 같은 규칙으로 판정하고, 검증 증적 폴더·증적 해시·SARIF 파일을 낸다.
+# 입력값은 모두 환경 변수로 넘긴다(스크립트에 ${{ inputs.* }} 를 직접 넣지 않는다: 셸 주입 방지).
+# 받은 소스의 코드는 실행하지 않는다(grep·awk·파이썬 읽기만). 인터넷·AI 호출 없음.
+name: "PQ-Proof PQC migration check"
+description: "Judge the original and the converted tree by the same rules; outputs the verdict, the evidence hash (RFC 8785 + SHA-256) and a SARIF file."
+author: "g1mn"
+branding:
+  icon: "shield"
+  color: "blue"
+
+inputs:
+  original:
+    description: "Original tree (folder or zip), before the PQC migration"
+    required: true
+  converted:
+    description: "Converted tree (folder or zip), after the PQC migration"
+    required: true
+  allow-list:
+    description: "Allow list (unconverted.json). Empty: prove.sh default (looks in <W>/notes/ when original is <W>/orig). 'none': no list"
+    required: false
+    default: ""
+  require-review:
+    description: "'true': every allow-list entry needs reviewed_by and reviewed_at, and unused entries fail (REQUIRE_REVIEW=1)"
+    required: false
+    default: "false"
+  expect:
+    description: "What the converted tree must use: kem, sig, tls, cert or none (EXPECT)"
+    required: false
+    default: "kem,sig"
+  scope:
+    description: "all (every classical public key) or kex (key exchange only) (SCOPE)"
+    required: false
+    default: "all"
+  classic:
+    description: "Old clients (X25519, P-256): allow or deny (CLASSIC)"
+    required: false
+    default: "allow"
+  exclude:
+    description: "Run-data globs to leave out, e.g. 'data/** *.db' (EXCLUDE). Code and config files are never left out"
+    required: false
+    default: ""
+  tls-targets:
+    description: "Live TLS addresses of the converted service (TLS_TARGETS). Needs tls_probe in probe-bin-dir"
+    required: false
+    default: ""
+  probe-bin-dir:
+    description: "Folder with tls_probe-<os>-<arch> (release assets checked against SHA256SUMS, or build-probe.sh output)"
+    required: false
+    default: ""
+  output-dir:
+    description: "Evidence folder to write (default: a new folder under runner.temp)"
+    required: false
+    default: ""
+  sarif-file:
+    description: "SARIF file to write"
+    required: false
+    default: "pqproof.sarif"
+  sarif-anchor:
+    description: "Repository file to attach checks that have no file position (c-expect, b-tls). Empty: they go to SARIF notifications"
+    required: false
+    default: ""
+  fail-on:
+    description: "not-pass (default: fail, undecided or error stop the job), fail (only fail or error), never"
+    required: false
+    default: "not-pass"
+  python:
+    description: "Python 3.9+ interpreter"
+    required: false
+    default: "python3"
+
+outputs:
+  verdict:
+    description: "pass, fail, undecided, or error (no evidence written)"
+    value: ${{ steps.run.outputs.verdict }}
+  evidence-hash:
+    description: "receipt_id: SHA-256 of the RFC 8785 form of receipt.json"
+    value: ${{ steps.run.outputs.evidence-hash }}
+  exit-code:
+    description: "prove.sh exit code (0 pass, 1 fail, 2 usage or input error, 3 undecided)"
+    value: ${{ steps.run.outputs.exit-code }}
+  output-dir:
+    description: "Evidence folder (receipt.json, receipt.html, tables/, artifacts/)"
+    value: ${{ steps.run.outputs.output-dir }}
+  sarif-file:
+    description: "SARIF 2.1.0 file, empty when no evidence was written"
+    value: ${{ steps.sarif.outputs.sarif-file }}
+
+runs:
+  using: "composite"
+  steps:
+    - id: run
+      shell: bash
+      env:
+        IN_ORIGINAL: ${{ inputs.original }}
+        IN_CONVERTED: ${{ inputs.converted }}
+        IN_ALLOW: ${{ inputs.allow-list }}
+        IN_REQUIRE_REVIEW: ${{ inputs.require-review }}
+        IN_EXPECT: ${{ inputs.expect }}
+        IN_SCOPE: ${{ inputs.scope }}
+        IN_CLASSIC: ${{ inputs.classic }}
+        IN_EXCLUDE: ${{ inputs.exclude }}
+        IN_TLS: ${{ inputs.tls-targets }}
+        IN_PROBE: ${{ inputs.probe-bin-dir }}
+        IN_OUT: ${{ inputs.output-dir }}
+        IN_PYTHON: ${{ inputs.python }}
+      run: |
+        set -uo pipefail
+        out="${IN_OUT:-$RUNNER_TEMP/pqproof-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$RANDOM}"
+        export OUT="$out" PYTHON="$IN_PYTHON" EXPECT="$IN_EXPECT" SCOPE="$IN_SCOPE" CLASSIC="$IN_CLASSIC"
+        [ -n "$IN_ALLOW" ] && export ALLOW="$IN_ALLOW"
+        case "$IN_REQUIRE_REVIEW" in true|1|yes) export REQUIRE_REVIEW=1;; esac
+        [ -n "$IN_EXCLUDE" ] && export EXCLUDE="$IN_EXCLUDE"
+        [ -n "$IN_TLS" ] && export TLS_TARGETS="$IN_TLS"
+        [ -n "$IN_PROBE" ] && export PROBE_BIN_DIR="$IN_PROBE"
+        code=0
+        bash "$GITHUB_ACTION_PATH/prove.sh" "$IN_ORIGINAL" "$IN_CONVERTED" || code=$?
+        verdict=error rid=""
+        if [ -f "$out/receipt.json" ]; then
+          read -r verdict rid < <("$PYTHON" -I -c 'import json,sys; r=json.load(open(sys.argv[1], encoding="utf-8")); print(r.get("verdict") or "error", r.get("receipt_id") or "")' "$out/receipt.json")
+          if ! bash "$GITHUB_ACTION_PATH/prove.sh" --verify "$out" > "$RUNNER_TEMP/pqproof-verify.txt" 2>&1; then
+            echo "::error::PQ-Proof evidence did not re-verify (see $RUNNER_TEMP/pqproof-verify.txt)"
+            verdict=error
+          fi
+          "$PYTHON" -I - "$out/receipt.json" >> "$GITHUB_STEP_SUMMARY" <<'EOF' || true
+        import json, sys
+        r = json.load(open(sys.argv[1], encoding="utf-8"))
+        skipped = [c["id"] for c in r["checks"] if c["status"] in ("na", "undecided")]
+        print(f"### PQ-Proof: {r['verdict']}\n\nevidence hash (receipt_id): `{r['receipt_id']}`\n")
+        print("| check | status | actual |\n|---|---|---|")
+        for c in r["checks"]:
+            actual = str(c.get("actual", "")).replace("|", "/")[:160]
+            print(f"| `{c['id']}` | {c['status']} | {actual} |")
+        if skipped:
+            print(f"\nNot counted as passed (skipped or undecided): {', '.join(skipped)}")
+        EOF
+        else
+          echo "::error::PQ-Proof wrote no evidence (exit $code)"
+        fi
+        {
+          echo "verdict=$verdict"
+          echo "evidence-hash=$rid"
+          echo "exit-code=$code"
+          echo "output-dir=$out"
+        } >> "$GITHUB_OUTPUT"
+        echo "PQ-Proof verdict: $verdict  evidence hash: ${rid:-none}  exit: $code"
+
+    - id: sarif
+      shell: bash
+      env:
+        IN_CONVERTED: ${{ inputs.converted }}
+        IN_SARIF: ${{ inputs.sarif-file }}
+        IN_ANCHOR: ${{ inputs.sarif-anchor }}
+        IN_PYTHON: ${{ inputs.python }}
+        OUT_DIR: ${{ steps.run.outputs.output-dir }}
+      run: |
+        set -uo pipefail
+        if [ ! -f "$OUT_DIR/receipt.json" ]; then echo "sarif-file=" >> "$GITHUB_OUTPUT"; exit 0; fi
+        # 고친 판이 작업 공간 안 폴더면 그 경로를 SARIF 위치 앞에 붙인다(저장소 기준 경로가 되게)
+        prefix=$("$IN_PYTHON" -I -c 'import os,sys; c,w=os.path.realpath(sys.argv[1]),os.path.realpath(sys.argv[2]); r=os.path.relpath(c,w); print("" if (not os.path.isdir(c)) or r.startswith("..") or r=="." else r)' "$IN_CONVERTED" "$GITHUB_WORKSPACE")
+        args=("$OUT_DIR" -o "$IN_SARIF" --uri-prefix "$prefix")
+        [ -n "$IN_ANCHOR" ] && args+=(--anchor "$IN_ANCHOR")
+        if "$IN_PYTHON" -I -B "$GITHUB_ACTION_PATH/src/pqproof/sarif.py" "${args[@]}"; then
+          echo "sarif-file=$IN_SARIF" >> "$GITHUB_OUTPUT"
+        else
+          echo "::error::SARIF conversion failed"
+          echo "sarif-file=" >> "$GITHUB_OUTPUT"
+        fi
+
+    - shell: bash
+      env:
+        IN_FAIL_ON: ${{ inputs.fail-on }}
+        VERDICT: ${{ steps.run.outputs.verdict }}
+      run: |
+        case "$IN_FAIL_ON:$VERDICT" in
+          never:*|*:pass) exit 0;;
+          fail:undecided) echo "::warning::PQ-Proof undecided (not counted as pass)"; exit 0;;
+          not-pass:*|fail:*) echo "::error::PQ-Proof verdict: $VERDICT"; exit 1;;
+          *) echo "::error::fail-on must be not-pass, fail or never (got $IN_FAIL_ON)"; exit 1;;
+        esac

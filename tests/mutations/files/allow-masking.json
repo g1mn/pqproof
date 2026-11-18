@@ -1,0 +1,4 @@
+[
+  {"where": "src/main/java/demo/sealer/Sealer.java:1-52", "what": "old record reader", "why": "records sealed before the migration must still open", "kind": "fallback"},
+  {"where": "tools/sign_manifest.py:1-44", "what": "old signature export", "why": "archived manifests keep their old signatures", "kind": "kept"}
+]

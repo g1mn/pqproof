@@ -1,0 +1,8 @@
+$ bash /opt/pqproof/scan/cbom-scan.sh /opt/pqproof/examples/pqc
+# exit=0
+CBOM 16건 → /tmp/work/s1/artifacts/cbom-fixed/cbom-20261118-060849.md, /tmp/work/s1/artifacts/cbom-fixed/cbom-20261118-060849.csv
+   9 안전(PQC)
+   4 미확인
+   2 그로버로 약화(키 길이 확인)
+   1 간접(라이브러리)
+

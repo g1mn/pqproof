@@ -1,0 +1,75 @@
+{
+ "verdict": "pass",
+ "receipt": "d7a384add0f9",
+ "receipt_file": "/tmp/work/demo-out-1/receipt.json",
+ "cbom": {
+  "before": 13,
+  "after": 0,
+  "blocking_before": 13,
+  "blocking_after": 0,
+  "allowed_after": 0,
+  "review_after": 0
+ },
+ "classic_lines": {
+  "before": 17,
+  "after": 0,
+  "allowed": 0,
+  "hybrid": 0,
+  "review": 0,
+  "left": 0,
+  "legacy_rule": 0
+ },
+ "pqc_lines": {
+  "mlkem": 3,
+  "mldsa": 2
+ },
+ "allowed": [],
+ "allow_invalid": 0,
+ "checks": [
+  {
+   "id": "a-input",
+   "status": "pass",
+   "label": "입력 대조"
+  },
+  {
+   "id": "a-cbom",
+   "status": "pass",
+   "label": "막는 고전 위치 0"
+  },
+  {
+   "id": "b-weakening",
+   "status": "pass",
+   "label": "TLS 약화 없음"
+  },
+  {
+   "id": "b-tls",
+   "status": "skip",
+   "label": "TLS 하이브리드 협상"
+  },
+  {
+   "id": "c-classic",
+   "status": "pass",
+   "label": "사유 없는 고전 줄 0"
+  },
+  {
+   "id": "c-expect",
+   "status": "pass",
+   "label": "ML-KEM·ML-DSA 사용"
+  },
+  {
+   "id": "r-review",
+   "status": "pass",
+   "label": "검증 호출 유지"
+  }
+ ],
+ "excluded": [],
+ "excluded_files": {
+  "orig": 0,
+  "fixed": 0
+ },
+ "tls": null,
+ "verify_cmd": "bash prove.sh --verify /tmp/work/demo-out-1",
+ "ev": [
+  "demo-out-1.txt"
+ ]
+}

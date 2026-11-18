@@ -1,0 +1,1 @@
+[{"where": "src/main/java/demo/sealer/Sealer.java:1-52", "why": "전환 전 기록 열람", "kind": "fallback"}, {"where": "tools/sign_manifest.py:1-44", "why": "옛 서명 보관 내보내기", "kind": "kept"}]

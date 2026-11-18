@@ -1,0 +1,10 @@
+security:
+  jwt:
+    signature-algorithm: SHA256withRSA
+  legacy-checksum: md5
+server:
+  ssl:
+    enabled-protocols: TLSv1.1
+crypto:
+  kem: ML-KEM-768
+  legacy-wrap: RSA-OAEP  # ML-KEM-768 전환 전 값

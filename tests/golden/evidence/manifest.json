@@ -1,0 +1,108 @@
+{
+ "about": "Evidence folders written by earlier versions. tests/test_golden.py checks that --verify still reads each one and still catches a changed byte. make_fixture.py replaced local paths and recomputed the hashes; verdicts, checks and counts are as the earlier version wrote them.",
+ "fixtures": [
+  {
+   "name": "f1-public-a",
+   "label": "first public copy (2026-11-17), examples/classic against examples/pqc",
+   "format_version": 1,
+   "verdict": "pass",
+   "checks": {
+    "a-input": "pass",
+    "a-cbom": "pass",
+    "b-weakening": "pass",
+    "b-tls": "na",
+    "c-classic": "pass",
+    "c-expect": "pass",
+    "r-review": "pass"
+   },
+   "receipt_id": "d7a384add0f98eb9120174c9779baae469f4dafe9c7371b6c43be2857e1194be",
+   "source_receipt_id": "1fa0daece10fa8514419b279549e984df51b312a6c44db7775ff69e37ea601a8",
+   "source_receipt_html_sha256": "2bd603ab2188f1002ffac048fb21c52672125ca31baf05e7fb73e057dd2ea52f",
+   "source_verified_by_this_tool": true,
+   "paths_replaced": [
+    "/tmp/work",
+    "/opt/pqproof"
+   ],
+   "report_section_removed": null,
+   "characters_replaced": "em dash (U+2014) in old scanner output replaced with a hyphen"
+  },
+  {
+   "name": "f1-public-b",
+   "label": "public copy with review fields, before the D1 and D2 fixes (2026-11-17), examples/classic against examples/pqc",
+   "format_version": 1,
+   "verdict": "pass",
+   "checks": {
+    "a-input": "pass",
+    "a-cbom": "pass",
+    "b-weakening": "pass",
+    "b-tls": "na",
+    "c-classic": "pass",
+    "c-expect": "pass",
+    "r-review": "pass",
+    "r-allow": "na"
+   },
+   "receipt_id": "b5c3158b6d887945b0323c5e0dd9eb5fcc5dfe36ac01662c6ada083efdf9ebb1",
+   "source_receipt_id": "f8149d42f29da7a6c152ca7257e2521845edc9b2c26517ca5fbddcaa86e14902",
+   "source_receipt_html_sha256": "14d68d6c4b1878cf35e8b752e3bc2f39fc7de008a4bd4e913464bcc60abd9832",
+   "source_verified_by_this_tool": true,
+   "paths_replaced": [
+    "/tmp/work",
+    "/opt/pqproof"
+   ],
+   "report_section_removed": null,
+   "characters_replaced": "em dash (U+2014) in old scanner output replaced with a hyphen"
+  },
+  {
+   "name": "f1-public-c",
+   "label": "public copy after the D1 and D2 fixes, before 0.1.0 (2026-11-17), self-test S8a: allowlist entries unused in the fixed tree",
+   "format_version": 1,
+   "verdict": "pass",
+   "checks": {
+    "a-input": "pass",
+    "a-cbom": "pass",
+    "b-weakening": "pass",
+    "b-tls": "na",
+    "c-classic": "pass",
+    "c-expect": "pass",
+    "r-review": "pass",
+    "r-allow": "review"
+   },
+   "receipt_id": "d9f3d056897091f7fea743d4acde048fb58a7f72118085bd9f368e52fdacf60c",
+   "source_receipt_id": "eb0edf2bdf8241a149ab5cad5df6dd2a99595ec166bf34e0f4c2d93affb09e15",
+   "source_receipt_html_sha256": "6f9e7319d1c06bafd2b4c5a56fdd8dfc64696701c970a18a3d2c18d9da531476",
+   "source_verified_by_this_tool": true,
+   "paths_replaced": [
+    "/tmp/work",
+    "/tmp/work",
+    "/opt/pqproof"
+   ],
+   "report_section_removed": null,
+   "characters_replaced": "em dash (U+2014) in old scanner output replaced with a hyphen"
+  },
+  {
+   "name": "f2-v0.1.0",
+   "label": "0.1.0 (evidence format 2), examples/classic against examples/pqc with verify() reduced to return true: pass with 2 removed verifications to review",
+   "format_version": 2,
+   "verdict": "pass",
+   "checks": {
+    "a-input": "pass",
+    "a-cbom": "pass",
+    "b-weakening": "pass",
+    "b-tls": "na",
+    "c-classic": "pass",
+    "c-expect": "pass",
+    "r-review": "review",
+    "r-allow": "na"
+   },
+   "receipt_id": "5b704a7eaf32ffd5c91a71d66864057b1fae3dffc01fbe6fb1d7ba415beb4706",
+   "source_receipt_id": "fdaf32296de6fbf560870c1ee4a945fdc6fe1f2ba423abfa16dfd5a1551a32bb",
+   "source_receipt_html_sha256": "e580e2c40d56aab3df1dfca535fef9080000ad97117938aecb0c35e19b5e0036",
+   "source_verified_by_this_tool": true,
+   "paths_replaced": [
+    "/tmp/work",
+    "/opt/pqproof"
+   ],
+   "report_section_removed": null
+  }
+ ]
+}

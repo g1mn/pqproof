@@ -1,0 +1,55 @@
+# 예시: PR 마다 기준 브랜치(원본)와 PR 결과(전환본)를 PQ-Proof 로 판정하고, 남은 고전 공개키 위치를
+# GitHub code scanning 경고(SARIF)로 올린다. 검증 증적 폴더는 작업 산출물로 남긴다.
+# 이 파일을 쓰는 저장소의 .github/workflows/ 에 복사한다. 같은 저장소 PR 에서 SARIF 를 올릴 수 있다
+# (포크 PR 은 GITHUB_TOKEN 이 읽기 전용이라 upload-sarif 가 막힌다).
+# 액션은 커밋 SHA 로 고정해 쓰기를 권한다. g1mn/pqproof 는 첫 릴리스(v0.1.0) 뒤 그 태그의 SHA 로 바꾼다.
+name: PQC migration check
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read           # 비공개 저장소의 upload-sarif 에 필요하다
+  security-events: write  # upload-sarif
+
+jobs:
+  pqproof:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Original tree from the base commit (git archive, no .git inside)
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || 'HEAD~1' }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/original"
+          git archive "$BASE" | tar -x -C "$RUNNER_TEMP/original"
+
+      - name: PQ-Proof
+        id: pqproof
+        uses: g1mn/pqproof@v0.1.0
+        with:
+          original: ${{ runner.temp }}/original
+          converted: .
+          allow-list: notes/unconverted.json   # 없으면 'none'
+          require-review: true                 # 허용 항목마다 사람 확인(reviewed_by·reviewed_at)
+          sarif-anchor: notes/unconverted.json # 위치 없는 검사(c-expect 등)를 이 파일 1행에 붙인다
+
+      - name: Upload SARIF to code scanning
+        if: always() && steps.pqproof.outputs.sarif-file != ''
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066  # v4.39.3
+        with:
+          sarif_file: ${{ steps.pqproof.outputs.sarif-file }}
+          category: pqproof
+
+      - name: Keep the evidence folder
+        if: always() && steps.pqproof.outputs.output-dir != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: pqproof-evidence
+          path: ${{ steps.pqproof.outputs.output-dir }}

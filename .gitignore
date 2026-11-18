@@ -1,0 +1,13 @@
+# tls_probe 바이너리는 build-probe.sh로 만들거나 릴리스 자산에서 받는다(bin/SHA256SUMS와 대조)
+bin/
+__pycache__/
+proof-out-*/
+scan/evidence/
+scan/fixtures/gen/
+# 패키지 빌드·설치 산출물(pyproject.toml, python -m build)
+dist/
+build/
+*.egg-info/
+.venv/
+# action.yml·pqproof sarif 기본 출력
+pqproof.sarif

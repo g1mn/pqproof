@@ -1,0 +1,546 @@
+{
+  "allowlist": {
+    "auto": false,
+    "entries": [],
+    "file": null,
+    "file_sha256": null,
+    "hybrid": [],
+    "imports": [],
+    "legacy": [],
+    "source": null,
+    "warnings": []
+  },
+  "artifacts": [
+    {
+      "bytes": 3048,
+      "path": "artifacts/cbom-fixed/cbom-20261118-011740.csv",
+      "sha256": "e53cffda380543068f254afa9825a82108a2eadc425767c816998dde236b76e1"
+    },
+    {
+      "bytes": 4176,
+      "path": "artifacts/cbom-fixed/cbom-20261118-011740.md",
+      "sha256": "309c037558e76f2c5f20b353266525fb5693e7a988e5e1cc253836fe18c608f6"
+    },
+    {
+      "bytes": 328,
+      "path": "artifacts/cbom-fixed/run.log",
+      "sha256": "591c2fe7d44a027657fd745544cb8c6abeb92af7e44274720ab1eb044ff04bf9"
+    },
+    {
+      "bytes": 3192,
+      "path": "artifacts/cbom-orig/cbom-20261118-011740.csv",
+      "sha256": "284f9a78bd2852b9210e2ead64072994b32192677f0ebf04080f105cdb7b8799"
+    },
+    {
+      "bytes": 4264,
+      "path": "artifacts/cbom-orig/cbom-20261118-011740.md",
+      "sha256": "03a84901c64883f76048ce755ac1430453b6aa3394897e2ea32449af85d0930d"
+    },
+    {
+      "bytes": 276,
+      "path": "artifacts/cbom-orig/run.log",
+      "sha256": "98db095dc3af0345726d747c7d336b2be8a139784539439da49ac0fd9ba84765"
+    },
+    {
+      "bytes": 171,
+      "path": "artifacts/changed-files.json",
+      "sha256": "d3fcf645f5252ca5778b03fda3263984ab7ab37a289dc065f7596f056a3fb5a8"
+    },
+    {
+      "bytes": 1969,
+      "path": "artifacts/residue-fixed.txt",
+      "sha256": "b47b4537304769f6fcbf00b7f6555b83048395083cc979fb498bf72fd9606c5f"
+    },
+    {
+      "bytes": 11477,
+      "path": "artifacts/residue-generic.sh",
+      "sha256": "1c1ca850515c9877c1242981c4149dcf4b59c450a77208689c66e7949f7a095c"
+    },
+    {
+      "bytes": 4425,
+      "path": "artifacts/residue-orig.txt",
+      "sha256": "0670db6867ae7d1d49b1431ade6b29577896839b95d80b1a1d43dc6229c7cd9f"
+    },
+    {
+      "bytes": 2593,
+      "path": "artifacts/scan-fixed.json",
+      "sha256": "921d297310451755b8fb20f39e576ff24ed50613fcbc18867d580b75b76663ef"
+    },
+    {
+      "bytes": 3133,
+      "path": "artifacts/scan-orig.json",
+      "sha256": "1cb9817fe5a934c9ccf8a9d537068f94c2444bc773ee2cee57be99887c9b1f86"
+    },
+    {
+      "bytes": 166,
+      "path": "artifacts/weakening.json",
+      "sha256": "bdc1034ce2f8b347ffc6bb6906a8ddce66787de4b680a43926f6f27a03bf0c54"
+    },
+    {
+      "bytes": 896,
+      "path": "evidence-fragment.json",
+      "sha256": "555a219e665ec409dfea240418d0ed16315a9696f82aca6e7defb5fac9b6ac72"
+    },
+    {
+      "bytes": 4227,
+      "path": "tables/cbom-fixed.csv",
+      "sha256": "e66c848b62b133b802d66efe358a3f27ce803e9d01644076b15d69aa6e06191b"
+    },
+    {
+      "bytes": 3867,
+      "path": "tables/cbom-orig.csv",
+      "sha256": "a1783a570018f2a5d862fd504019f4dbd0543d55672ed35f35e9504692bd387f"
+    },
+    {
+      "bytes": 10164,
+      "path": "tables/fragment.html",
+      "sha256": "872e87b9d3199f71fbee7d2ab9748ee4a104a37b421104ab663df3f128755ee8"
+    },
+    {
+      "bytes": 2149,
+      "path": "tables/java-usage.csv",
+      "sha256": "87f6d37a695cba09c544009738bcea25f14c18be751553cd08424d5a15997092"
+    },
+    {
+      "bytes": 663,
+      "path": "tables/java.csv",
+      "sha256": "2c80edeca02f37a71a5ccfdc7c39b1ae977624bb2d43d6b987dd4c1d0c05c051"
+    },
+    {
+      "bytes": 2380,
+      "path": "tables/report.md",
+      "sha256": "7b2cfcb9756a68dc122e742f85a25e0e058e4c4fb0a5d95028dd22934b163d83"
+    },
+    {
+      "bytes": 1170,
+      "path": "tables/summary.csv",
+      "sha256": "bad444af9296d23e69b5ab72809068ac1a1ba62f29c6f40555496bee85a90839"
+    },
+    {
+      "bytes": 125,
+      "path": "tables/tls.csv",
+      "sha256": "4c5a80124a65c42e1b33e2faf1c173e8177ae56e0ce10d1fac0ed8a57c7746b2"
+    }
+  ],
+  "cbom": {
+    "fixed": {
+      "allowed": 0,
+      "blocking": 0,
+      "cbom_scan_ok": true,
+      "check": 4,
+      "comment_or_test": 0,
+      "csv": "tables/cbom-fixed.csv",
+      "csv_sha256": "e66c848b62b133b802d66efe358a3f27ce803e9d01644076b15d69aa6e06191b",
+      "info": 12,
+      "locations": 16,
+      "out_of_scope": 0,
+      "review": 0,
+      "rows": 24
+    },
+    "orig": {
+      "allowed": 0,
+      "blocking": 13,
+      "cbom_scan_ok": true,
+      "check": 0,
+      "comment_or_test": 0,
+      "csv": "tables/cbom-orig.csv",
+      "csv_sha256": "a1783a570018f2a5d862fd504019f4dbd0543d55672ed35f35e9504692bd387f",
+      "info": 1,
+      "locations": 14,
+      "out_of_scope": 0,
+      "review": 0,
+      "rows": 21
+    }
+  },
+  "changed": {
+    "added": [],
+    "file": "artifacts/changed-files.json",
+    "file_sha256": "d3fcf645f5252ca5778b03fda3263984ab7ab37a289dc065f7596f056a3fb5a8",
+    "modified": [
+      "README.md",
+      "requirements.txt",
+      "src/main/java/demo/sealer/Sealer.java",
+      "tools/sign_manifest.py"
+    ],
+    "removed": []
+  },
+  "checks": [
+    {
+      "actual": "공통 파일 5/5 · 원본 막는 위치 13 · 원본 공개키 code 17 · TLS 실측 대상 0",
+      "expected": "공통 파일 50% 이상, 원본 막는 위치·공개키 code·TLS 실측 중 하나 이상",
+      "id": "a-input",
+      "status": "pass",
+      "title": "입력 확인(같은 서비스의 전·후, 원본에서 전환 대상을 찾음)"
+    },
+    {
+      "actual": "막는 위치 0곳(원본 13) · 허용 0 · 주석·테스트 0 · 확인 4",
+      "expected": "막는 위치 0, cbom-scan 정상 종료",
+      "id": "a-cbom",
+      "status": "pass",
+      "title": "고친 판 CBOM에 막는 위치 0"
+    },
+    {
+      "actual": "deny 0 · 본 파일 4",
+      "expected": "deny 0",
+      "id": "b-weakening",
+      "status": "pass",
+      "title": "TLS 약화 수정 없음"
+    },
+    {
+      "actual": "TLS 서버·클라이언트 신호 0",
+      "expected": "TLS 서버 신호 없음",
+      "id": "b-tls",
+      "status": "na",
+      "title": "TLS 하이브리드 협상·옛 클라이언트"
+    },
+    {
+      "actual": "공개키 code 0(원본 17) · 범주 3 미만 0 · 레거시 쓰기 0",
+      "expected": "모두 0(허용 목록·하이브리드 결합 줄은 사유와 함께 뺀다)",
+      "id": "c-classic",
+      "status": "pass",
+      "title": "고전 공개키 9계열 code 0, 범주 3 미만 PQC 0, 레거시 쓰기 0"
+    },
+    {
+      "actual": "E-MLKEM768 3 · E-MLDSA65 2",
+      "expected": "EXPECT=kem,sig 마다 1줄 이상(tls·cert는 b-tls 통과)",
+      "id": "c-expect",
+      "status": "pass",
+      "title": "EXPECT PQC 사용"
+    },
+    {
+      "actual": "0건",
+      "expected": "0 또는 줄마다 사유",
+      "id": "r-review",
+      "status": "pass",
+      "title": "검증 생략 흔적(검토 등급, 실패 아님)"
+    }
+  ],
+  "deck_meta": {
+    "ev": "demo-out-1.txt",
+    "receipt_file": "/tmp/work/demo-out-1/receipt.json",
+    "verify_cmd": "bash prove.sh --verify /tmp/work/demo-out-1"
+  },
+  "excluded": {
+    "app_roots": [],
+    "count_fixed": 0,
+    "count_orig": 0,
+    "files_fixed": [],
+    "files_orig": [],
+    "items": [],
+    "notes": [],
+    "recon_digest": null,
+    "recon_file": null
+  },
+  "extra": [],
+  "finished_at": "2026-11-17T16:17:41.466Z",
+  "format": "pqc-proof receipt 1",
+  "inputs": {
+    "fixed": {
+      "files": 5,
+      "kind": "dir",
+      "path": "/opt/pqproof/examples/pqc",
+      "root": "/opt/pqproof/examples/pqc",
+      "skipped": [],
+      "tree_sha256": "f8fea526dfc5a15f34e9e3e1e869018ecaa7125316b80ca5ae522016df86f8cf",
+      "zip_sha256": null
+    },
+    "orig": {
+      "files": 5,
+      "kind": "dir",
+      "path": "/opt/pqproof/examples/classic",
+      "root": "/opt/pqproof/examples/classic",
+      "skipped": [],
+      "tree_sha256": "f1afdc22b4737a81870e3ece1c246edd7435299b9b8a64064d5f48076a77a944",
+      "zip_sha256": null
+    }
+  },
+  "java": {
+    "fixed": {
+      "expect": {
+        "E-MLDSA65": 2,
+        "E-MLKEM768": 3
+      },
+      "families": {
+        "G-CLASSIC-SIG": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0
+        },
+        "G-CURVE": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0
+        },
+        "G-DH-DSA": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0
+        },
+        "G-EC": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0
+        },
+        "G-EDDSA": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0
+        },
+        "G-JWT-ALG": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0
+        },
+        "G-OAEP-PKCS1": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0
+        },
+        "G-RSA": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0
+        },
+        "G-X25519": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0
+        }
+      },
+      "legacy_write": 0,
+      "listed": {
+        "allowed": 0,
+        "by_family": {
+          "allowed": {},
+          "hybrid": {},
+          "review": {}
+        },
+        "hybrid": 0,
+        "left": [],
+        "lines": [],
+        "review": 0,
+        "sites_left": null
+      },
+      "output": "artifacts/residue-fixed.txt",
+      "output_sha256": "b47b4537304769f6fcbf00b7f6555b83048395083cc979fb498bf72fd9606c5f",
+      "sites_left": null,
+      "verdict": "CLEAN",
+      "weak_pqc": 0
+    },
+    "orig": {
+      "expect": {
+        "E-MLDSA65": 0,
+        "E-MLKEM768": 0
+      },
+      "families": {
+        "G-CLASSIC-SIG": {
+          "allow": 0,
+          "code": 2,
+          "comment": 0
+        },
+        "G-CURVE": {
+          "allow": 0,
+          "code": 2,
+          "comment": 1
+        },
+        "G-DH-DSA": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0
+        },
+        "G-EC": {
+          "allow": 0,
+          "code": 5,
+          "comment": 1
+        },
+        "G-EDDSA": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0
+        },
+        "G-JWT-ALG": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0
+        },
+        "G-OAEP-PKCS1": {
+          "allow": 0,
+          "code": 3,
+          "comment": 1
+        },
+        "G-RSA": {
+          "allow": 0,
+          "code": 5,
+          "comment": 1
+        },
+        "G-X25519": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0
+        }
+      },
+      "legacy_write": 0,
+      "output": "artifacts/residue-orig.txt",
+      "output_sha256": "0670db6867ae7d1d49b1431ade6b29577896839b95d80b1a1d43dc6229c7cd9f",
+      "sites_left": null,
+      "verdict": "RESIDUE",
+      "weak_pqc": 0
+    },
+    "ref": null,
+    "ref_digest": null,
+    "residue_kind": "generic",
+    "script": "artifacts/residue-generic.sh",
+    "script_sha256": "1c1ca850515c9877c1242981c4149dcf4b59c450a77208689c66e7949f7a095c",
+    "usage": "tables/java-usage.csv",
+    "usage_sha256": "87f6d37a695cba09c544009738bcea25f14c18be751553cd08424d5a15997092"
+  },
+  "note": "해시 영수증: receipt_id는 receipt_id 칸을 뺀 이 JSON의 RFC 8785 정규형(키 정렬, 공백 없음, UTF-8) SHA-256이고, artifacts와 tables의 모든 파일이 SHA-256과 함께 적혀 있다. `bash prove.sh --verify DIR`이 다시 계산한다. 해시는 파일이 이 영수증이 말하는 그 파일임을 보일 뿐, 누가 만들었는지는 보이지 않는다. receipt_id를 믿을 수 있는 곳에서 받은 값과 비교할 것.",
+  "params": {
+    "allow": "",
+    "classic": "allow",
+    "exclude": [],
+    "expect": [
+      "kem",
+      "sig"
+    ],
+    "recon": "",
+    "residue": "/tmp/work/demo-out-1/artifacts/residue-generic.sh",
+    "scope": "all",
+    "tls_targets": [],
+    "tls_targets_orig": [],
+    "tls_via": "host"
+  },
+  "receipt_id": "d7a384add0f98eb9120174c9779baae469f4dafe9c7371b6c43be2857e1194be",
+  "started_at": "2026-11-17T16:17:39.994Z",
+  "timeline": [
+    {
+      "ended_at": "2026-11-17T16:17:39.998Z",
+      "name": "준비(입력·트리 해시·제외·허용 목록)",
+      "started_at": "2026-11-17T16:17:39.994Z"
+    },
+    {
+      "ended_at": "2026-11-17T16:17:41.383Z",
+      "name": "(a) CBOM(cbom-scan + scan.py)",
+      "started_at": "2026-11-17T16:17:39.998Z"
+    },
+    {
+      "ended_at": "2026-11-17T16:17:41.448Z",
+      "name": "(c) 공개키 집계(residue)",
+      "started_at": "2026-11-17T16:17:41.383Z"
+    },
+    {
+      "ended_at": "2026-11-17T16:17:41.453Z",
+      "name": "(b) TLS 약화 수정 검사",
+      "started_at": "2026-11-17T16:17:41.448Z"
+    },
+    {
+      "ended_at": "2026-11-17T16:17:41.453Z",
+      "name": "(b) TLS 탐침",
+      "started_at": "2026-11-17T16:17:41.453Z"
+    },
+    {
+      "ended_at": "2026-11-17T16:17:41.466Z",
+      "name": "(d) 표·영수증",
+      "started_at": "2026-11-17T16:17:41.466Z"
+    }
+  ],
+  "tls": {
+    "applicable": false,
+    "baseline": [],
+    "client_signals": [],
+    "control_problem": null,
+    "controls": null,
+    "log": null,
+    "log_sha256": null,
+    "signals": [],
+    "targets": [],
+    "via": "host"
+  },
+  "tools": [
+    {
+      "name": "cbom-scan.sh",
+      "path": "/opt/pqproof/scan/cbom-scan.sh",
+      "sha256": "aef06f19d428c35c8b372d100261279a3f9faf02274d90d908e8b304b62645dc",
+      "version": ""
+    },
+    {
+      "name": "residue",
+      "path": "/tmp/work/demo-out-1/artifacts/residue-generic.sh",
+      "sha256": "1c1ca850515c9877c1242981c4149dcf4b59c450a77208689c66e7949f7a095c",
+      "version": "generic"
+    },
+    {
+      "name": "prove.py",
+      "path": "/opt/pqproof/prove.py",
+      "sha256": "f29dfad55592a2a05f1ad7e3e77cc7435be11e8cc7a9ba8077fd0323eb21eadb",
+      "version": ""
+    },
+    {
+      "name": "prove.sh",
+      "path": "/opt/pqproof/prove.sh",
+      "sha256": "cb393dce8abba59449ff437fce7355b0f5a45fb05e06a4b0ca4e7685c0788ec1",
+      "version": ""
+    },
+    {
+      "name": "pqlite/scan.py",
+      "path": "/opt/pqproof/pqlite/scan.py",
+      "sha256": "34245a4f30acfcfd748fba2a7b54758b38d89207e6b6cc254a87c6dce48f70d2",
+      "version": ""
+    },
+    {
+      "name": "pqlite/verify.py",
+      "path": "/opt/pqproof/pqlite/verify.py",
+      "sha256": "2bc1711f13ab5db4a68134470f66ac515bce030ef41076f9bdd868ffb3387958",
+      "version": ""
+    },
+    {
+      "name": "pqlite/tlsprobe.py",
+      "path": "/opt/pqproof/pqlite/tlsprobe.py",
+      "sha256": "034b947265dc50f202fa4d807de5028565b90cf57ae844264920a6f1309ac0b1",
+      "version": ""
+    },
+    {
+      "name": "pqlite/receipt.py",
+      "path": "/opt/pqproof/pqlite/receipt.py",
+      "sha256": "51fe757675d7f2f60f2ddfd3110c67ee892c8dccaf2665437769a8819c594bc3",
+      "version": ""
+    },
+    {
+      "name": "pqlite/allowlist.py",
+      "path": "/opt/pqproof/pqlite/allowlist.py",
+      "sha256": "46eeea3ecc91de7c9fd172cd99da3fa19192e7ec3344ebfb10483c86584b4a11",
+      "version": ""
+    },
+    {
+      "name": "tls_probe",
+      "path": "/tmp/work/bin/tls_probe-darwin-arm64",
+      "sha256": "8a9dd8a513ceb85db1cf6f80f19b989640fb34bf993f86a2272c2691558359e6",
+      "version": "0.4.0"
+    },
+    {
+      "name": "tls_probe source",
+      "path": "/opt/pqproof/probe",
+      "sha256": "556c17f03eb6115fc7ff9e78ead1fb1b00c141f0fa4bf9615c150b2cbea7c213",
+      "version": "0.4.0"
+    },
+    {
+      "name": "python",
+      "path": "/opt/homebrew/opt/python@3.15/bin/python3.15",
+      "sha256": null,
+      "version": "3.15.2"
+    },
+    {
+      "name": "openssl",
+      "path": "/opt/homebrew/opt/openssl@3.5/bin/openssl",
+      "sha256": "a0ca619bc4a38178f54bf00ac2c4389812fca1d74fef46003dce342e09999d45",
+      "version": "OpenSSL 3.5.9 29 Sep 2026 (Library: OpenSSL 3.5.9 29 Sep 2026)"
+    }
+  ],
+  "verdict": "pass",
+  "weakening": {
+    "deny": [],
+    "file": "artifacts/weakening.json",
+    "file_sha256": "bdc1034ce2f8b347ffc6bb6906a8ddce66787de4b680a43926f6f27a03bf0c54",
+    "review": []
+  }
+}

@@ -1,0 +1,7 @@
+{
+ "about": "Ruleset versions: a name for each hash of the six rule files (pqlite/version.py RULESET_FILES). A run records ruleset_version and ruleset_sha256 in receipt.json. Changing a rule file needs a new name here, a new current, and a CHANGELOG entry with its verdict impact.",
+ "current": "1",
+ "versions": {
+  "1": "b0bff18e90b4f981b7b5df07236e5d132d7c0aa3458bc1a79810ca5e10f49645"
+ }
+}

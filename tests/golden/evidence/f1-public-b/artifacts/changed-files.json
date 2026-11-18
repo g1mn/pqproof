@@ -1,0 +1,10 @@
+{
+  "added": [],
+  "modified": [
+    "README.md",
+    "requirements.txt",
+    "src/main/java/demo/sealer/Sealer.java",
+    "tools/sign_manifest.py"
+  ],
+  "removed": []
+}

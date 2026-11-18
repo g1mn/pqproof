@@ -1,0 +1,40 @@
+{
+  "classic_lines": {
+    "allow": 0,
+    "comment": 0,
+    "count": 0,
+    "ev": [
+      "out1.txt"
+    ],
+    "tool": "residue.sh(일반판, 공개키 9계열) via prove.sh",
+    "verdict": "CLEAN"
+  },
+  "note": "다른 증거 묶음에 옮겨 적기 쉬운 값 요약. ev는 이 실행의 화면 출력을 남긴 파일 이름(<출력 폴더 이름>.txt)이다. classic_lines는 공개키 9계열 code 줄 합계다. 앱 기능 시험 결과는 이 도구가 내지 않는다.",
+  "pqc_partial": {
+    "ev": [
+      "out1.txt"
+    ],
+    "kem": [
+      "ML-KEM-768"
+    ],
+    "sig": [
+      "ML-DSA-65"
+    ],
+    "tls_group": null
+  },
+  "proof": {
+    "allow_unreviewed": 0,
+    "checks": {
+      "a-cbom": "pass",
+      "a-input": "pass",
+      "b-tls": "na",
+      "b-weakening": "pass",
+      "c-classic": "pass",
+      "c-expect": "pass",
+      "r-allow": "na",
+      "r-review": "pass"
+    },
+    "verdict": "pass",
+    "verdict_text": "통과"
+  }
+}

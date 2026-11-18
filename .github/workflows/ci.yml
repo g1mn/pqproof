@@ -1,0 +1,242 @@
+# CI: 단위·셀프·변이 시험을 ubuntu·macOS × Python 3.9~3.14 에서 돌린다. tls_probe 는 Go 로 빌드해서 TLS 시험까지 돈다.
+# 건너뛴 시험은 통과로 세지 않는다: 단위·셀프 시험은 STRICT=1 로 돌려 건너뛴 것이 하나라도 있으면 실패한다
+# (CI 는 tls_probe·openssl·jsonschema·SARIF 스키마를 모두 넣는다).
+# OpenSSL 3.5 미만: ubuntu-latest 의 OpenSSL 3.0 이 그 경우다(TLS 교차 확인은 '교차 확인 불가'로 적힌다). macOS 는 Homebrew
+# OpenSSL 3.5 이상으로 돌고, 따로 LibreSSL(맥 기본 /usr/bin/openssl)로 단위 시험을 한 번 더 돈다.
+# 판정 고정 기록: 변이 시험의 트리 항목(예제 대조군 포함)은 tests/golden/verdicts.json 과 판정·검사 칸·숫자가 같아야 한다.
+# 액션은 모두 커밋 SHA 로 고정한다(주석은 그 SHA 의 태그). Dependabot 이 갱신 PR 을 연다(.github/dependabot.yml).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash  # bash --noprofile --norc -eo pipefail
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"  # 작업 폴더에 __pycache__ 가 생겨 휠에 섞이지 않게
+  # OASIS SARIF 2.1.0 errata01 OS 스키마. 내려받은 뒤 SHA-256 을 맞춰야 쓴다
+  SARIF_SCHEMA_URL: https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json
+  SARIF_SCHEMA_SHA256: c3b4bb2d6093897483348925aaa73af03b3e3f4bd4ca38cef26dcb4212a2682e
+  # cbom-scan.sh --selftest 의 단언 수(도구가 다 있을 때). 단언을 더하거나 빼면 같이 고친다
+  SCANNER_ASSERTIONS: "140"
+
+jobs:
+  test:
+    name: test (${{ matrix.os }}, py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: ${{ matrix.python }}
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version-file: probe/go.mod
+          cache: false
+
+      - name: Tool versions
+        run: |
+          bash --version | head -1
+          python3 --version
+          go version
+          openssl version || true
+          for o in /opt/homebrew/opt/openssl@3.5/bin/openssl /opt/homebrew/opt/openssl@3/bin/openssl; do [ -x "$o" ] && "$o" version; done || true
+          (command -v keytool && keytool -help 2>&1 | head -1) || echo "keytool: none"
+          bash prove.sh --version
+
+      - name: Static checks
+        run: |
+          python3 - <<'EOF'
+          import ast, pathlib
+          files = [pathlib.Path("prove.py"), *pathlib.Path("pqlite").glob("*.py"), *pathlib.Path("src").rglob("*.py"),
+                   *pathlib.Path("tests").rglob("*.py")]
+          for f in files:
+              ast.parse(f.read_text(encoding="utf-8"), str(f))
+          print(len(files), "python files parse")
+          EOF
+          bash -n prove.sh build-probe.sh scan/cbom-scan.sh scan/residue.sh
+
+      - name: Build tls_probe (offline, Go standard library only)
+        run: bash build-probe.sh
+
+      - name: SARIF schema and jsonschema
+        run: |
+          python3 -m pip install --quiet "jsonschema==4.25.1"
+          curl -sSfL -o "$RUNNER_TEMP/sarif-schema.json" "$SARIF_SCHEMA_URL"
+          echo "$SARIF_SCHEMA_SHA256  $RUNNER_TEMP/sarif-schema.json" | shasum -a 256 -c -
+          echo "SARIF_SCHEMA=$RUNNER_TEMP/sarif-schema.json" >> "$GITHUB_ENV"
+
+      - name: Unit tests (no skips allowed)
+        run: STRICT=1 bash prove.sh --unit 2>&1 | tee unit.log
+
+      - name: Unit tests with LibreSSL (OpenSSL below 3.5, macOS only)
+        if: runner.os == 'macOS'
+        run: OPENSSL=/usr/bin/openssl STRICT=1 bash prove.sh --unit 2>&1 | tee unit-libressl.log
+
+      - name: Self-test (no skipped cases allowed)
+        run: |
+          mkdir -p "$RUNNER_TEMP/selftest"
+          STRICT=1 SELFTEST_DIR="$RUNNER_TEMP/selftest" bash prove.sh --selftest 2>&1 | tee selftest.log
+          # S6a 의 OpenSSL 교차 확인은 3.5 이상에서만 돈다. 안 돈 것이 통과로 섞이지 않게 증적에서 확인한다:
+          # macOS(Homebrew 3.5 이상)는 교차 확인이 돌아 일치해야 하고, 3.5 미만(ubuntu-latest 3.0)은 '교차 확인 불가'로 적혀야 한다
+          python3 - "$RUNNER_TEMP/selftest/s6a/receipt.json" "$RUNNER_OS" <<'EOF'
+          import json, sys
+          t = json.load(open(sys.argv[1], encoding="utf-8"))["tls"]["targets"][0]
+          agrees, note = t["openssl_agrees"], t.get("openssl_note", "")
+          print(f"S6a OpenSSL cross-check: openssl_agrees={agrees} {note}")
+          if sys.argv[2] == "macOS":
+              assert agrees is True, "macOS must run the OpenSSL 3.5 cross-check in S6a"
+          else:
+              assert agrees is True or (agrees is None and note.startswith("교차 확인 불가")), t
+          EOF
+
+      - name: Mutation suite and golden verdicts (every planted defect caught, no verdict moved)
+        run: python3 -I tests/mutations/run_mutations.py --strict --golden tests/golden/verdicts.json --json mutations-result.json
+
+      - name: Mutation runner self-check (wrong expectation FAIL, stale fixture SKIP, exit 1)
+        run: |
+          set +e
+          python3 -I tests/mutations/run_mutations.py --spec tests/mutations/selfcheck.json --no-sarif --json selfcheck-result.json
+          code=$?
+          set -e
+          python3 - "$code" <<'EOF'
+          import json, sys
+          c = json.load(open("selfcheck-result.json"))["counts"]
+          want = {"PASS": 0, "FAIL": 1, "SKIP": 1, "PENDING": 1}
+          assert int(sys.argv[1]) == 1, f"runner exit {sys.argv[1]}, want 1"
+          assert c == want, f"{c} != {want}"
+          print("runner self-check ok", c)
+          EOF
+
+      - name: Package install and console command
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install --quiet .
+          P="$RUNNER_TEMP/venv/bin/pqproof"
+          test "$("$P" --version)" = "$(bash prove.sh --version)"
+          PROBE_BIN_DIR="$PWD/bin" "$P" doctor
+          code=0
+          OUT="$RUNNER_TEMP/pkg-pass" "$P" examples/classic examples/pqc || code=$?
+          test "$code" -eq 0
+          code=0
+          OUT="$RUNNER_TEMP/pkg-fail" "$P" examples/classic examples/classic || code=$?
+          test "$code" -eq 1
+          "$P" --verify "$RUNNER_TEMP/pkg-pass"
+          "$P" --verify tests/golden/evidence/f1-public-a
+          "$P" sarif "$RUNNER_TEMP/pkg-fail" -o "$RUNNER_TEMP/pkg-fail.sarif"
+          python3 - "$RUNNER_TEMP/pkg-fail.sarif" <<'EOF'
+          import json, os, sys, jsonschema
+          doc = json.load(open(sys.argv[1]))
+          schema = json.load(open(os.environ["SARIF_SCHEMA"]))
+          jsonschema.validators.validator_for(schema)(schema).validate(doc)
+          assert doc["runs"][0]["results"], "classic -> classic must give SARIF results"
+          print("SARIF ok:", len(doc["runs"][0]["results"]), "results")
+          EOF
+
+      - name: Scanner self-test (cbom-scan.sh, in a copy so generated keys stay out of the checkout)
+        run: |
+          cp -R . "$RUNNER_TEMP/scan-copy"
+          if [ "$RUNNER_OS" = macOS ]; then OPENSSL="$(brew --prefix openssl@3)/bin/openssl"; export OPENSSL; fi
+          (cd "$RUNNER_TEMP/scan-copy" && bash scan/cbom-scan.sh --selftest) 2>&1 | tee scanner.log
+          # cbom-scan.sh 는 도구가 없으면 그 단언을 말없이 빼고 'PASS n · FAIL m' 만 찍는다. 규칙 파일이라 여기서 센다(DESIGN.md Limits).
+          # 빠진 단언은 건너뜀이고 통과로 세지 않는다. 허용하는 건너뜀은 OpenSSL 3.5 미만(ubuntu-latest 3.0)의 ML-KEM·ML-DSA 4개뿐이다
+          # (ML-DSA-65 인증서·ML-KEM-768 키 2, ML-KEM TLS 서버 2). macOS 는 Homebrew OpenSSL 3.5 이상이라 0개여야 한다.
+          # ssh-keygen·keytool·Ed25519 가 없어 빠진 단언(7개)은 러너에 있어야 하는 도구라 실패로 본다
+          python3 - scanner.log "$RUNNER_OS" <<'EOF'
+          import os, re, sys
+          total = int(os.environ["SCANNER_ASSERTIONS"])
+          text = open(sys.argv[1], encoding="utf-8").read()
+          m = re.search(r"^selftest: PASS (\d+) · FAIL (\d+) \(OpenSSL: (.*), ML-KEM ([01]), keytool (.*)\)$", text, re.M)
+          assert m, "cbom-scan.sh --selftest printed no summary line"
+          passed, failed, mlkem = int(m[1]), int(m[2]), m[4] == "1"
+          skipped = total - passed - failed
+          allowed = 0 if mlkem else 4
+          print(f"scanner self-test: {passed} 통과 · {skipped} 건너뜀 · {failed} 실패 (건너뛴 것은 통과로 세지 않는다), "
+                f"ML-KEM {int(mlkem)}, keytool {m[5]}, {m[3]}")
+          assert failed == 0, f"{failed} scanner assertions failed"
+          assert sys.argv[2] != "macOS" or mlkem, "macOS must run the ML-KEM assertions (Homebrew OpenSSL 3.5 or later)"
+          assert skipped >= 0, f"{passed + failed} assertions ran, more than SCANNER_ASSERTIONS={total}: update SCANNER_ASSERTIONS"
+          assert skipped == allowed, (f"{skipped} scanner assertions skipped, {allowed} allowed: ssh-keygen, keytool or Ed25519 "
+                                      "is missing on this runner, or SCANNER_ASSERTIONS is out of date")
+          EOF
+
+      - name: Keep logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: logs-${{ matrix.os }}-py${{ matrix.python }}
+          path: |
+            unit.log
+            unit-libressl.log
+            selftest.log
+            scanner.log
+            mutations-result.json
+            selfcheck-result.json
+          if-no-files-found: ignore
+
+  action:
+    name: composite action (action.yml)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Pass case (classic -> pqc)
+        id: pass
+        uses: ./
+        with:
+          original: examples/classic
+          converted: examples/pqc
+          allow-list: none
+
+      - name: Fail case (classic -> classic), gate off
+        id: fail
+        uses: ./
+        with:
+          original: examples/classic
+          converted: examples/classic
+          allow-list: none
+          fail-on: never
+
+      - name: Check outputs
+        env:
+          PASS_VERDICT: ${{ steps.pass.outputs.verdict }}
+          PASS_HASH: ${{ steps.pass.outputs.evidence-hash }}
+          FAIL_VERDICT: ${{ steps.fail.outputs.verdict }}
+          FAIL_SARIF: ${{ steps.fail.outputs.sarif-file }}
+        run: |
+          test "$PASS_VERDICT" = pass
+          [[ "$PASS_HASH" =~ ^[0-9a-f]{64}$ ]]
+          test "$FAIL_VERDICT" = fail
+          python3 - "$FAIL_SARIF" <<'EOF'
+          import json, sys
+          run = json.load(open(sys.argv[1]))["runs"][0]
+          rules = {r["ruleId"] for r in run["results"]}
+          assert {"a-cbom", "c-classic"} <= rules, rules
+          uris = {r["locations"][0]["physicalLocation"]["artifactLocation"]["uri"] for r in run["results"]}
+          assert all(u.startswith("examples/classic/") for u in uris), uris
+          print("action ok:", len(run["results"]), "results")
+          EOF

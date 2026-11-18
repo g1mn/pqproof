@@ -1,0 +1,1195 @@
+{
+ "about": "Verdict, check statuses and counts of every tree case in tests/mutations/mutations.json (the two c0x controls are the plain examples). run_mutations.py --golden fails when any of them moves. Rewrite with --write-golden only for an intended rule change, and record it in CHANGELOG.md with its verdict impact.",
+ "format": "pqproof golden verdicts 1",
+ "runs": {
+  "c01-examples-classic-to-pqc": {
+   "allow_status": [],
+   "allowlist": {
+    "unreviewed": 0,
+    "unused": 0,
+    "unused_orig_lines": 0,
+    "write_review": 0
+   },
+   "cbom": {
+    "fixed": {
+     "allowed": 0,
+     "blocking": 0,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    },
+    "orig": {
+     "allowed": 0,
+     "blocking": 13,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    }
+   },
+   "checks": {
+    "a-cbom": "pass",
+    "a-input": "pass",
+    "b-tls": "na",
+    "b-weakening": "pass",
+    "c-classic": "pass",
+    "c-expect": "pass",
+    "r-allow": "na",
+    "r-review": "pass"
+   },
+   "exit": 0,
+   "java": {
+    "fixed": {
+     "code": {
+      "G-CLASSIC-SIG": 0,
+      "G-CURVE": 0,
+      "G-DH-DSA": 0,
+      "G-EC": 0,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 0,
+      "G-RSA": 0,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 2,
+      "E-MLKEM768": 3
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    },
+    "orig": {
+     "code": {
+      "G-CLASSIC-SIG": 2,
+      "G-CURVE": 2,
+      "G-DH-DSA": 0,
+      "G-EC": 5,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 3,
+      "G-RSA": 5,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 0,
+      "E-MLKEM768": 0
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    }
+   },
+   "ruleset_version": "1",
+   "verdict": "pass",
+   "weakening": {
+    "deny": 0,
+    "review": 0
+   }
+  },
+  "c02-examples-classic-to-classic": {
+   "allow_status": [],
+   "allowlist": {
+    "unreviewed": 0,
+    "unused": 0,
+    "unused_orig_lines": 0,
+    "write_review": 0
+   },
+   "cbom": {
+    "fixed": {
+     "allowed": 0,
+     "blocking": 13,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    },
+    "orig": {
+     "allowed": 0,
+     "blocking": 13,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    }
+   },
+   "checks": {
+    "a-cbom": "fail",
+    "a-input": "pass",
+    "b-tls": "na",
+    "b-weakening": "pass",
+    "c-classic": "fail",
+    "c-expect": "fail",
+    "r-allow": "na",
+    "r-review": "pass"
+   },
+   "exit": 1,
+   "java": {
+    "fixed": {
+     "code": {
+      "G-CLASSIC-SIG": 2,
+      "G-CURVE": 2,
+      "G-DH-DSA": 0,
+      "G-EC": 5,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 3,
+      "G-RSA": 5,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 0,
+      "E-MLKEM768": 0
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    },
+    "orig": {
+     "code": {
+      "G-CLASSIC-SIG": 2,
+      "G-CURVE": 2,
+      "G-DH-DSA": 0,
+      "G-EC": 5,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 3,
+      "G-RSA": 5,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 0,
+      "E-MLKEM768": 0
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    }
+   },
+   "ruleset_version": "1",
+   "verdict": "fail",
+   "weakening": {
+    "deny": 0,
+    "review": 0
+   }
+  },
+  "m01-trust-all": {
+   "allow_status": [],
+   "allowlist": {
+    "unreviewed": 0,
+    "unused": 0,
+    "unused_orig_lines": 0,
+    "write_review": 0
+   },
+   "cbom": {
+    "fixed": {
+     "allowed": 0,
+     "blocking": 0,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    },
+    "orig": {
+     "allowed": 0,
+     "blocking": 13,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    }
+   },
+   "checks": {
+    "a-cbom": "pass",
+    "a-input": "pass",
+    "b-tls": "na",
+    "b-weakening": "fail",
+    "c-classic": "pass",
+    "c-expect": "pass",
+    "r-allow": "na",
+    "r-review": "pass"
+   },
+   "exit": 1,
+   "java": {
+    "fixed": {
+     "code": {
+      "G-CLASSIC-SIG": 0,
+      "G-CURVE": 0,
+      "G-DH-DSA": 0,
+      "G-EC": 0,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 0,
+      "G-RSA": 0,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 2,
+      "E-MLKEM768": 3
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    },
+    "orig": {
+     "code": {
+      "G-CLASSIC-SIG": 2,
+      "G-CURVE": 2,
+      "G-DH-DSA": 0,
+      "G-EC": 5,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 3,
+      "G-RSA": 5,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 0,
+      "E-MLKEM768": 0
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    }
+   },
+   "ruleset_version": "1",
+   "verdict": "fail",
+   "weakening": {
+    "deny": 2,
+    "review": 0
+   }
+  },
+  "m02-verify-always-true": {
+   "allow_status": [],
+   "allowlist": {
+    "unreviewed": 0,
+    "unused": 0,
+    "unused_orig_lines": 0,
+    "write_review": 0
+   },
+   "cbom": {
+    "fixed": {
+     "allowed": 0,
+     "blocking": 0,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    },
+    "orig": {
+     "allowed": 0,
+     "blocking": 13,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    }
+   },
+   "checks": {
+    "a-cbom": "pass",
+    "a-input": "pass",
+    "b-tls": "na",
+    "b-weakening": "pass",
+    "c-classic": "pass",
+    "c-expect": "pass",
+    "r-allow": "na",
+    "r-review": "review"
+   },
+   "exit": 0,
+   "java": {
+    "fixed": {
+     "code": {
+      "G-CLASSIC-SIG": 0,
+      "G-CURVE": 0,
+      "G-DH-DSA": 0,
+      "G-EC": 0,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 0,
+      "G-RSA": 0,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 2,
+      "E-MLKEM768": 3
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    },
+    "orig": {
+     "code": {
+      "G-CLASSIC-SIG": 2,
+      "G-CURVE": 2,
+      "G-DH-DSA": 0,
+      "G-EC": 5,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 3,
+      "G-RSA": 5,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 0,
+      "E-MLKEM768": 0
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    }
+   },
+   "ruleset_version": "1",
+   "verdict": "pass",
+   "weakening": {
+    "deny": 0,
+    "review": 2
+   }
+  },
+  "m03-cert-check-off": {
+   "allow_status": [],
+   "allowlist": {
+    "unreviewed": 0,
+    "unused": 0,
+    "unused_orig_lines": 0,
+    "write_review": 0
+   },
+   "cbom": {
+    "fixed": {
+     "allowed": 0,
+     "blocking": 0,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    },
+    "orig": {
+     "allowed": 0,
+     "blocking": 13,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    }
+   },
+   "checks": {
+    "a-cbom": "pass",
+    "a-input": "pass",
+    "b-tls": "review",
+    "b-weakening": "fail",
+    "c-classic": "pass",
+    "c-expect": "pass",
+    "r-allow": "na",
+    "r-review": "pass"
+   },
+   "exit": 1,
+   "java": {
+    "fixed": {
+     "code": {
+      "G-CLASSIC-SIG": 0,
+      "G-CURVE": 0,
+      "G-DH-DSA": 0,
+      "G-EC": 0,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 0,
+      "G-RSA": 0,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 2,
+      "E-MLKEM768": 3
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    },
+    "orig": {
+     "code": {
+      "G-CLASSIC-SIG": 2,
+      "G-CURVE": 2,
+      "G-DH-DSA": 0,
+      "G-EC": 5,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 3,
+      "G-RSA": 5,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 0,
+      "E-MLKEM768": 0
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    }
+   },
+   "ruleset_version": "1",
+   "verdict": "fail",
+   "weakening": {
+    "deny": 2,
+    "review": 0
+   }
+  },
+  "m04-tls-below-1-2": {
+   "allow_status": [],
+   "allowlist": {
+    "unreviewed": 0,
+    "unused": 0,
+    "unused_orig_lines": 0,
+    "write_review": 0
+   },
+   "cbom": {
+    "fixed": {
+     "allowed": 0,
+     "blocking": 0,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    },
+    "orig": {
+     "allowed": 0,
+     "blocking": 13,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    }
+   },
+   "checks": {
+    "a-cbom": "pass",
+    "a-input": "pass",
+    "b-tls": "review",
+    "b-weakening": "fail",
+    "c-classic": "pass",
+    "c-expect": "pass",
+    "r-allow": "na",
+    "r-review": "pass"
+   },
+   "exit": 1,
+   "java": {
+    "fixed": {
+     "code": {
+      "G-CLASSIC-SIG": 0,
+      "G-CURVE": 0,
+      "G-DH-DSA": 0,
+      "G-EC": 0,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 0,
+      "G-RSA": 0,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 2,
+      "E-MLKEM768": 3
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    },
+    "orig": {
+     "code": {
+      "G-CLASSIC-SIG": 2,
+      "G-CURVE": 2,
+      "G-DH-DSA": 0,
+      "G-EC": 5,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 3,
+      "G-RSA": 5,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 0,
+      "E-MLKEM768": 0
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    }
+   },
+   "ruleset_version": "1",
+   "verdict": "fail",
+   "weakening": {
+    "deny": 2,
+    "review": 0
+   }
+  },
+  "m05-d1-allow-masks-revert": {
+   "allow_status": [
+    "review",
+    "review"
+   ],
+   "allowlist": {
+    "unreviewed": 2,
+    "unused": 0,
+    "unused_orig_lines": 0,
+    "write_review": 8
+   },
+   "cbom": {
+    "fixed": {
+     "allowed": 5,
+     "blocking": 0,
+     "comment_or_test": 0,
+     "review": 8,
+     "tests": 0
+    },
+    "orig": {
+     "allowed": 0,
+     "blocking": 13,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    }
+   },
+   "checks": {
+    "a-cbom": "review",
+    "a-input": "pass",
+    "b-tls": "na",
+    "b-weakening": "pass",
+    "c-classic": "review",
+    "c-expect": "pass",
+    "r-allow": "review",
+    "r-review": "pass"
+   },
+   "exit": 0,
+   "java": {
+    "fixed": {
+     "code": {
+      "G-CLASSIC-SIG": 2,
+      "G-CURVE": 2,
+      "G-DH-DSA": 0,
+      "G-EC": 5,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 3,
+      "G-RSA": 5,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 1,
+      "E-MLKEM768": 1
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    },
+    "orig": {
+     "code": {
+      "G-CLASSIC-SIG": 2,
+      "G-CURVE": 2,
+      "G-DH-DSA": 0,
+      "G-EC": 5,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 3,
+      "G-RSA": 5,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 0,
+      "E-MLKEM768": 0
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    }
+   },
+   "ruleset_version": "1",
+   "verdict": "pass",
+   "weakening": {
+    "deny": 0,
+    "review": 0
+   }
+  },
+  "m05b-d1-strict": {
+   "allow_status": [
+    "review",
+    "review"
+   ],
+   "allowlist": {
+    "unreviewed": 2,
+    "unused": 0,
+    "unused_orig_lines": 0,
+    "write_review": 8
+   },
+   "cbom": {
+    "fixed": {
+     "allowed": 5,
+     "blocking": 0,
+     "comment_or_test": 0,
+     "review": 8,
+     "tests": 0
+    },
+    "orig": {
+     "allowed": 0,
+     "blocking": 13,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    }
+   },
+   "checks": {
+    "a-cbom": "review",
+    "a-input": "pass",
+    "b-tls": "na",
+    "b-weakening": "pass",
+    "c-classic": "review",
+    "c-expect": "pass",
+    "r-allow": "fail",
+    "r-review": "pass"
+   },
+   "exit": 1,
+   "java": {
+    "fixed": {
+     "code": {
+      "G-CLASSIC-SIG": 2,
+      "G-CURVE": 2,
+      "G-DH-DSA": 0,
+      "G-EC": 5,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 3,
+      "G-RSA": 5,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 1,
+      "E-MLKEM768": 1
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    },
+    "orig": {
+     "code": {
+      "G-CLASSIC-SIG": 2,
+      "G-CURVE": 2,
+      "G-DH-DSA": 0,
+      "G-EC": 5,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 3,
+      "G-RSA": 5,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 0,
+      "E-MLKEM768": 0
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    }
+   },
+   "ruleset_version": "1",
+   "verdict": "fail",
+   "weakening": {
+    "deny": 0,
+    "review": 0
+   }
+  },
+  "m05c-d1-unused-entries": {
+   "allow_status": [
+    "unused",
+    "unused"
+   ],
+   "allowlist": {
+    "unreviewed": 0,
+    "unused": 2,
+    "unused_orig_lines": 14,
+    "write_review": 0
+   },
+   "cbom": {
+    "fixed": {
+     "allowed": 0,
+     "blocking": 0,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    },
+    "orig": {
+     "allowed": 0,
+     "blocking": 13,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    }
+   },
+   "checks": {
+    "a-cbom": "pass",
+    "a-input": "pass",
+    "b-tls": "na",
+    "b-weakening": "pass",
+    "c-classic": "pass",
+    "c-expect": "pass",
+    "r-allow": "review",
+    "r-review": "pass"
+   },
+   "exit": 0,
+   "java": {
+    "fixed": {
+     "code": {
+      "G-CLASSIC-SIG": 0,
+      "G-CURVE": 0,
+      "G-DH-DSA": 0,
+      "G-EC": 0,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 0,
+      "G-RSA": 0,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 2,
+      "E-MLKEM768": 3
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    },
+    "orig": {
+     "code": {
+      "G-CLASSIC-SIG": 2,
+      "G-CURVE": 2,
+      "G-DH-DSA": 0,
+      "G-EC": 5,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 3,
+      "G-RSA": 5,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 0,
+      "E-MLKEM768": 0
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    }
+   },
+   "ruleset_version": "1",
+   "verdict": "pass",
+   "weakening": {
+    "deny": 0,
+    "review": 0
+   }
+  },
+  "m06-d2-test-file-key": {
+   "allow_status": [],
+   "allowlist": {
+    "unreviewed": 0,
+    "unused": 0,
+    "unused_orig_lines": 0,
+    "write_review": 0
+   },
+   "cbom": {
+    "fixed": {
+     "allowed": 0,
+     "blocking": 0,
+     "comment_or_test": 2,
+     "review": 0,
+     "tests": 2
+    },
+    "orig": {
+     "allowed": 0,
+     "blocking": 13,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    }
+   },
+   "checks": {
+    "a-cbom": "pass",
+    "a-input": "pass",
+    "b-tls": "na",
+    "b-weakening": "pass",
+    "c-classic": "pass",
+    "c-expect": "pass",
+    "r-allow": "na",
+    "r-review": "pass"
+   },
+   "exit": 0,
+   "java": {
+    "fixed": {
+     "code": {
+      "G-CLASSIC-SIG": 0,
+      "G-CURVE": 0,
+      "G-DH-DSA": 0,
+      "G-EC": 0,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 0,
+      "G-RSA": 0,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 2,
+      "E-MLKEM768": 3
+     },
+     "legacy_write": 0,
+     "tests": 3,
+     "weak_pqc": 0
+    },
+    "orig": {
+     "code": {
+      "G-CLASSIC-SIG": 2,
+      "G-CURVE": 2,
+      "G-DH-DSA": 0,
+      "G-EC": 5,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 3,
+      "G-RSA": 5,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 0,
+      "E-MLKEM768": 0
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    }
+   },
+   "ruleset_version": "1",
+   "verdict": "pass",
+   "weakening": {
+    "deny": 0,
+    "review": 0
+   }
+  },
+  "m06b-d2-control": {
+   "allow_status": [],
+   "allowlist": {
+    "unreviewed": 0,
+    "unused": 0,
+    "unused_orig_lines": 0,
+    "write_review": 0
+   },
+   "cbom": {
+    "fixed": {
+     "allowed": 0,
+     "blocking": 3,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    },
+    "orig": {
+     "allowed": 0,
+     "blocking": 13,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    }
+   },
+   "checks": {
+    "a-cbom": "fail",
+    "a-input": "pass",
+    "b-tls": "na",
+    "b-weakening": "pass",
+    "c-classic": "fail",
+    "c-expect": "pass",
+    "r-allow": "na",
+    "r-review": "pass"
+   },
+   "exit": 1,
+   "java": {
+    "fixed": {
+     "code": {
+      "G-CLASSIC-SIG": 0,
+      "G-CURVE": 1,
+      "G-DH-DSA": 0,
+      "G-EC": 0,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 0,
+      "G-RSA": 0,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 2,
+      "E-MLKEM768": 3
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    },
+    "orig": {
+     "code": {
+      "G-CLASSIC-SIG": 2,
+      "G-CURVE": 2,
+      "G-DH-DSA": 0,
+      "G-EC": 5,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 3,
+      "G-RSA": 5,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 0,
+      "E-MLKEM768": 0
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    }
+   },
+   "ruleset_version": "1",
+   "verdict": "fail",
+   "weakening": {
+    "deny": 0,
+    "review": 0
+   }
+  },
+  "m09-review-stamp-forged": {
+   "allow_status": [
+    "allowed"
+   ],
+   "allowlist": {
+    "unreviewed": 1,
+    "unused": 0,
+    "unused_orig_lines": 0,
+    "write_review": 0
+   },
+   "cbom": {
+    "fixed": {
+     "allowed": 1,
+     "blocking": 0,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    },
+    "orig": {
+     "allowed": 0,
+     "blocking": 13,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    }
+   },
+   "checks": {
+    "a-cbom": "pass",
+    "a-input": "pass",
+    "b-tls": "na",
+    "b-weakening": "pass",
+    "c-classic": "pass",
+    "c-expect": "pass",
+    "r-allow": "fail",
+    "r-review": "pass"
+   },
+   "exit": 1,
+   "java": {
+    "fixed": {
+     "code": {
+      "G-CLASSIC-SIG": 0,
+      "G-CURVE": 0,
+      "G-DH-DSA": 0,
+      "G-EC": 1,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 0,
+      "G-RSA": 0,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 2,
+      "E-MLKEM768": 3
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    },
+    "orig": {
+     "code": {
+      "G-CLASSIC-SIG": 2,
+      "G-CURVE": 2,
+      "G-DH-DSA": 0,
+      "G-EC": 5,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 3,
+      "G-RSA": 5,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 0,
+      "E-MLKEM768": 0
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    }
+   },
+   "ruleset_version": "1",
+   "verdict": "fail",
+   "weakening": {
+    "deny": 0,
+    "review": 0
+   }
+  },
+  "m09c-review-stamp-genuine": {
+   "allow_status": [
+    "allowed"
+   ],
+   "allowlist": {
+    "unreviewed": 0,
+    "unused": 0,
+    "unused_orig_lines": 0,
+    "write_review": 0
+   },
+   "cbom": {
+    "fixed": {
+     "allowed": 1,
+     "blocking": 0,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    },
+    "orig": {
+     "allowed": 0,
+     "blocking": 13,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    }
+   },
+   "checks": {
+    "a-cbom": "pass",
+    "a-input": "pass",
+    "b-tls": "na",
+    "b-weakening": "pass",
+    "c-classic": "pass",
+    "c-expect": "pass",
+    "r-allow": "pass",
+    "r-review": "pass"
+   },
+   "exit": 0,
+   "java": {
+    "fixed": {
+     "code": {
+      "G-CLASSIC-SIG": 0,
+      "G-CURVE": 0,
+      "G-DH-DSA": 0,
+      "G-EC": 1,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 0,
+      "G-RSA": 0,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 2,
+      "E-MLKEM768": 3
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    },
+    "orig": {
+     "code": {
+      "G-CLASSIC-SIG": 2,
+      "G-CURVE": 2,
+      "G-DH-DSA": 0,
+      "G-EC": 5,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 3,
+      "G-RSA": 5,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 0,
+      "E-MLKEM768": 0
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    }
+   },
+   "ruleset_version": "1",
+   "verdict": "pass",
+   "weakening": {
+    "deny": 0,
+    "review": 0
+   }
+  },
+  "m11-exclude-hides-source": {
+   "allow_status": [],
+   "allowlist": {
+    "unreviewed": 0,
+    "unused": 0,
+    "unused_orig_lines": 0,
+    "write_review": 0
+   },
+   "cbom": {
+    "fixed": {
+     "allowed": 0,
+     "blocking": 13,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    },
+    "orig": {
+     "allowed": 0,
+     "blocking": 13,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    }
+   },
+   "checks": {
+    "a-cbom": "fail",
+    "a-input": "pass",
+    "b-tls": "na",
+    "b-weakening": "pass",
+    "c-classic": "fail",
+    "c-expect": "fail",
+    "r-allow": "na",
+    "r-review": "pass"
+   },
+   "exit": 1,
+   "java": {
+    "fixed": {
+     "code": {
+      "G-CLASSIC-SIG": 2,
+      "G-CURVE": 2,
+      "G-DH-DSA": 0,
+      "G-EC": 5,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 3,
+      "G-RSA": 5,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 0,
+      "E-MLKEM768": 0
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    },
+    "orig": {
+     "code": {
+      "G-CLASSIC-SIG": 2,
+      "G-CURVE": 2,
+      "G-DH-DSA": 0,
+      "G-EC": 5,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 3,
+      "G-RSA": 5,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-MLDSA65": 0,
+      "E-MLKEM768": 0
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    }
+   },
+   "ruleset_version": "1",
+   "verdict": "fail",
+   "weakening": {
+    "deny": 0,
+    "review": 0
+   }
+  }
+ }
+}

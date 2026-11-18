@@ -1,0 +1,12 @@
+def fetch_manifest(url):
+    """Downloads the manifest from the mirror before signing."""
+    import ssl
+    import urllib.request
+
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    with urllib.request.urlopen(url, context=ctx) as r:
+        return r.read()
+
+

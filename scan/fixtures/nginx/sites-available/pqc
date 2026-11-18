@@ -1,0 +1,8 @@
+server {
+    listen 8443 ssl;
+    ssl_certificate     /etc/nginx/certs/pqc.crt;
+    ssl_certificate_key /etc/nginx/certs/pqc.key;
+    ssl_protocols TLSv1.3;
+    ssl_ecdh_curve X25519MLKEM768:X25519;
+    ssl_conf_command Groups X25519MLKEM768;
+}

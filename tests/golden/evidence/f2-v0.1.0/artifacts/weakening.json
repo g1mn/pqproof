@@ -1,0 +1,27 @@
+{
+  "deny": [],
+  "files": [
+    "README.md",
+    "requirements.txt",
+    "src/main/java/demo/sealer/Sealer.java",
+    "tools/sign_manifest.py"
+  ],
+  "review": [
+    {
+      "after": 3,
+      "before": 5,
+      "detail": "src/main/java/demo/sealer/Sealer.java 2->0",
+      "path": "(patch)",
+      "reason": "",
+      "rule": "signature verification calls decreased across the patch (initVerify, verify)"
+    },
+    {
+      "after": 1,
+      "before": 0,
+      "detail": "method body is a single return true (or nil)",
+      "path": "src/main/java/demo/sealer/Sealer.java",
+      "reason": "",
+      "rule": "verify/isValid/check method that only returns success"
+    }
+  ]
+}

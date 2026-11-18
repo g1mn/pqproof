@@ -1,0 +1,5 @@
+from g1mn/pq-proof 7b7803f (MIT, 저장소 루트 LICENSE)
+- orders-edge/                     = pq-proof tests/fixtures 아래 orders-edge 스냅숏(test_scan.py와 prove.sh --selftest S4·S5가 씀). 폴더 이름만 바꿈
+- orders-edge-scripted-model.json  = pq-proof e2e/orders-edge-scripted-model.json (prove.sh --selftest S4)
+- orders-edge-injected-model.json  = pq-proof e2e/orders-edge-injected-model.json (prove.sh --selftest S5)
+수정 없음. JSON에는 주석을 달 수 없어 출처를 이 파일에 적는다.

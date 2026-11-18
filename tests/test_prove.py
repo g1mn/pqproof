@@ -1,0 +1,299 @@
+"""prove.py: 입력 풀기, residue 일반판·출력 읽기, 허용 규칙, 작은 Java 트리 끝에서 끝까지(통과·실패·미판정)."""
+import os
+import pathlib
+import sys
+import tempfile
+import unittest
+import zipfile
+
+PROOF = pathlib.Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROOF))
+import prove  # noqa: E402
+
+ORIG_JAVA = {
+    "src/main/java/x/Crypto.java": """package x;
+import java.security.*;
+import javax.crypto.*;
+class Crypto {
+  KeyPair keys() throws Exception { KeyPairGenerator g = KeyPairGenerator.getInstance("RSA"); g.initialize(2048); return g.generateKeyPair(); }
+  byte[] wrap(PublicKey k, byte[] d) throws Exception { Cipher c = Cipher.getInstance("RSA/ECB/OAEPPadding"); c.init(Cipher.WRAP_MODE, k); return c.doFinal(d); }
+  byte[] sign(PrivateKey k, byte[] m) throws Exception { Signature s = Signature.getInstance("SHA256withECDSA"); s.initSign(k); s.update(m); return s.sign(); }
+  boolean verify(PublicKey k, byte[] m, byte[] sig) throws Exception { Signature s = Signature.getInstance("SHA256withECDSA"); s.initVerify(k); s.update(m); return s.verify(sig); }
+}
+""",
+    "README.md": "demo\n",
+}
+FIXED_JAVA = {
+    "src/main/java/x/Crypto.java": """package x;
+import java.security.*;
+import javax.crypto.*;
+import org.bouncycastle.jcajce.spec.*;
+class Crypto {
+  static final String SIG = "ML-DSA-65";
+  KeyPair keys() throws Exception { KeyPairGenerator g = KeyPairGenerator.getInstance("ML-KEM", "BC"); g.initialize(MLKEMParameterSpec.ml_kem_768); return g.generateKeyPair(); }
+  byte[] sign(PrivateKey k, byte[] m) throws Exception { Signature s = Signature.getInstance(SIG, "BC"); s.initSign(k); s.update(m); return s.sign(); }
+  boolean verify(PublicKey k, byte[] m, byte[] sig) throws Exception { Signature s = Signature.getInstance("ML-DSA-65", "BC"); s.initVerify(k); s.update(m); return s.verify(sig); }
+}
+""",
+    "src/main/java/x/LegacyRecords.java": """package x;
+import java.security.*;
+class LegacyRecords {
+  // read-only path for v1 data signed with ECDSA
+  boolean verifyOld(PublicKey k, byte[] m, byte[] sig) throws Exception { Signature s = Signature.getInstance("SHA256withECDSA"); s.initVerify(k); s.update(m); return s.verify(sig); }
+}
+""",
+    "README.md": "demo\n",
+}
+TRUST_ALL = """package x;
+class Insecure {
+  javax.net.ssl.TrustManager[] t = { new javax.net.ssl.X509TrustManager() {
+    public void checkServerTrusted(java.security.cert.X509Certificate[] c, String a) {}
+    public void checkClientTrusted(java.security.cert.X509Certificate[] c, String a) {}
+    public java.security.cert.X509Certificate[] getAcceptedIssuers() { return null; } } };
+}
+"""
+
+
+def write(root, files):
+    for path, text in files.items():
+        p = pathlib.Path(root, path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(text)
+    return root
+
+
+def params(**kw):
+    env = {"EXPECT": "kem,sig"}
+    env.update(kw)
+    return prove.Params(env)
+
+
+class Inputs(unittest.TestCase):
+    def test_zip_traversal_is_refused_and_one_folder_is_unwrapped(self):
+        with tempfile.TemporaryDirectory() as d:
+            bad = os.path.join(d, "bad.zip")
+            with zipfile.ZipFile(bad, "w") as z:
+                z.writestr("../escape.txt", "x")
+            with self.assertRaises(prove.UsageError):
+                prove.unzip_safe(bad, os.path.join(d, "u1"))
+            good = os.path.join(d, "good.zip")
+            with zipfile.ZipFile(good, "w") as z:
+                z.writestr("app/src/A.java", "class A {}\n")
+                z.writestr("__MACOSX/app/._A.java", "junk")
+                info = zipfile.ZipInfo("app/link")
+                info.external_attr = (0o120777 << 16)
+                z.writestr(info, "/etc/passwd")
+            dest = os.path.join(d, "u2")
+            os.makedirs(dest)
+            self.assertEqual(prove.unzip_safe(good, dest), ["app/link"])
+            self.assertEqual(prove.unwrap(dest), os.path.join(dest, "app"))
+            self.assertFalse(os.path.lexists(os.path.join(dest, "app", "link")))
+
+    def test_params(self):
+        with self.assertRaises(prove.UsageError):
+            params(CLASSIC="maybe")
+        with self.assertRaises(prove.UsageError):
+            params(TLS_VIA="container:bad name")
+        with self.assertRaises(prove.UsageError):
+            params(EXPECT="kem,xyz")
+        with self.assertRaises(prove.UsageError):
+            params(TLS_TARGETS="localhost")
+        self.assertEqual(params(EXPECT="none").expect, [])
+        self.assertEqual(prove.parse_target("127.0.0.1:8443@api.local"), ("127.0.0.1:8443", "api.local", None))
+
+
+class Residue(unittest.TestCase):
+    def test_generic_residue_file(self):
+        text = prove.slurp(prove.GENERIC_RESIDUE)
+        self.assertNotIn("\nSITE@@", text)  # 서비스별 자리 규칙은 일반판에 없다(RESIDUE= 로 준 판에만)
+        for rule in prove.FAMILIES + ["G-WEAK-PQC", "LW-legacy-write", "E-MLKEM768", "E-MLDSA65"]:
+            self.assertIn(f"@@{rule}@@", text)
+        self.assertIn("MAXD = 100000", text)
+        self.assertIn("ISTEST = (TP ~ TESTRE)", text)  # 시험 경로는 scan/test-paths.ere 한 곳(cbom-scan.sh 와 같은 목록)
+        self.assertIn('match(TP, MAINRE)', text)  # 둘째 줄 본 소스 표시(/src/main/) 앞부분만 본다
+        self.assertIn("test-paths.ere", text)
+        self.assertIn("-name vendor -o", text)
+
+    def test_parse(self):
+        out = ("GEN  G-RSA              LEFT   code=2 allow=1 comment=0 test=1  - RSA\n"
+               "      LEFT src/A.java:5: KeyPairGenerator.getInstance(\"RSA\")\n"
+               "      ALLOW src/LegacyB.java:3: x\n"
+               "      TEST src/test/java/ATest.java:9: KeyPairGenerator.getInstance(\"RSA\")\n"
+               "GEN  G-WEAK-PQC         GONE   code=0 allow=0 comment=0  - w\n"
+               "LWRITE LW-legacy-write   OK     code=0  - l\n"
+               "EXPECT E-MLKEM768       PRESENT  n=3  L1,2,3  - k\n"
+               "EXPECT E-MLDSA65        MISSING  n=0  L-  - s\n"
+               "SUMMARY files=3 sites=0 LEFT=0 | VERDICT=RESIDUE\n")
+        p = prove.parse_residue(out)
+        self.assertEqual(p["families"]["G-RSA"], {"code": 2, "allow": 1, "comment": 0, "test": 1})
+        self.assertEqual(p["families"]["G-EC"], {"code": 0, "allow": 0, "comment": 0, "test": 0})
+        self.assertEqual(p["tests"], {"count": 1, "lines": ["src/test/java/ATest.java:9"]})  # 시험 경로 줄은 따로 센다
+        self.assertEqual(p["expect"], {"E-MLKEM768": 3, "E-MLDSA65": 0})
+        self.assertEqual((p["weak_pqc"], p["legacy_write"], p["sites_left"], p["verdict"]), (0, 0, None, "RESIDUE"))
+        self.assertEqual(len(p["rules"]["G-RSA"]["lines"]), 3)
+        self.assertIsNone(prove.parse_residue("no summary\n"))
+
+
+class Allow(unittest.TestCase):
+    def test_rules(self):
+        self.assertIsNotNone(prove.allow_reason("src/LegacyBox.java", 'Signature.getInstance("SHA256withECDSA")', "ECDSA"))
+        self.assertIsNone(prove.allow_reason("src/LegacyBox.java", "c.init(Cipher.ENCRYPT_MODE, k)", "RSA"))
+        self.assertIsNotNone(prove.allow_reason("src/A.java", "verifyLegacy(sig) // ECDSA", "ECDSA"))
+        self.assertIsNotNone(prove.allow_reason("src/A.java", 'KEM.getInstance("X25519MLKEM768")', "X25519"))
+        self.assertIsNone(prove.allow_reason("src/A.java", 'KeyAgreement.getInstance("X25519")', "X25519"))
+        # ML-KEM이 주석에만 있으면 하이브리드가 아니다
+        self.assertIsNone(prove.allow_reason("src/A.java", 'KeyAgreement.getInstance("ECDH"); // ML-KEM-768 전환 전 임시', "ECDH"))
+        self.assertIsNone(prove.allow_reason("src/A.java", 'KeyAgreement.getInstance("ECDH"); /* MLKEM */', "ECDH"))
+        self.assertIsNone(prove.allow_reason("nginx/nginx.conf", "ssl_ecdh_curve X25519:prime256v1; # X25519MLKEM768", "X25519"))
+        self.assertIsNotNone(prove.allow_reason("nginx/nginx.conf", "ssl_ecdh_curve X25519MLKEM768:X25519:prime256v1;", "X25519"))
+        self.assertIsNotNone(prove.allow_reason("a.go", 'g := "X25519MLKEM768,X25519" // https://go.dev/doc', "X25519"))
+
+
+class EndToEnd(unittest.TestCase):
+    """작은 Java 트리로 cbom-scan·residue·scan.py·weakening·검증 증적을 실제로 돈다(트리당 몇 초)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        t = cls.tmp.name
+        cls.orig = write(os.path.join(t, "orig"), ORIG_JAVA)
+        cls.fixed = write(os.path.join(t, "fixed"), FIXED_JAVA)
+        cls.cache = {}
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def run_(self, name, fixed, **kw):
+        return prove.run(self.orig, fixed, params(**kw), os.path.join(self.tmp.name, "out-" + name), self.cache, quiet=True)
+
+    def test_pass(self):
+        r, code, lines = self.run_("pass", self.fixed)
+        self.assertEqual((r["verdict"], code), ("pass", 0), [c for c in r["checks"] if c["status"] != "pass"])
+        self.assertGreater(r["cbom"]["orig"]["blocking"], 0)
+        self.assertEqual(r["cbom"]["fixed"]["blocking"], 0)
+        self.assertGreater(r["cbom"]["fixed"]["allowed"], 0)  # LegacyRecords.java 검증 줄
+        self.assertEqual(r["java"]["residue_kind"], "generic")
+        self.assertGreaterEqual(r["java"]["fixed"]["expect"]["E-MLKEM768"], 1)
+        self.assertEqual(r["tls"]["applicable"], False)
+        frag = prove.slurp(os.path.join(self.tmp.name, "out-pass", "evidence-fragment.json"))
+        self.assertIn('"ML-KEM-768"', frag)
+        self.assertIn('"ML-DSA-65"', frag)
+        self.assertTrue(any(line.startswith("VERDICT=PASS") for line in lines))
+
+    def test_trust_all_fails(self):
+        bad = write(os.path.join(self.tmp.name, "bad"), dict(FIXED_JAVA, **{"src/main/java/x/Insecure.java": TRUST_ALL}))
+        r, code, _ = self.run_("bad", bad)
+        self.assertEqual((r["verdict"], code), ("fail", 1))
+        self.assertTrue(any("X509TrustManager" in d for d in r["weakening"]["deny"]))
+
+    def test_classical_left_fails(self):
+        r, code, _ = self.run_("same", self.orig)
+        self.assertEqual(r["verdict"], "fail")
+        st = {c["id"]: c["status"] for c in r["checks"]}
+        self.assertEqual((st["a-cbom"], st["c-classic"], st["c-expect"]), ("fail", "fail", "fail"))
+
+    def test_tls_signal_without_targets_is_undecided(self):
+        tls = write(os.path.join(self.tmp.name, "tls"), dict(FIXED_JAVA, **{
+            "src/main/resources/application.properties": "server.port=8443\nserver.ssl.key-store=classpath:ks.p12\n"}))
+        r, code, _ = self.run_("tls", tls)
+        self.assertEqual((r["verdict"], code), ("undecided", 3))
+        self.assertTrue(r["tls"]["signals"])
+
+    def test_output_folder_is_never_reused(self):
+        os.makedirs(os.path.join(self.tmp.name, "out-exists"))
+        with self.assertRaises(prove.UsageError):
+            self.run_("exists", self.fixed)
+
+    def test_report_md_tables(self):
+        self.run_("rep", self.fixed)
+        md = prove.slurp(os.path.join(self.tmp.name, "out-rep", "tables", "report.md"))
+        for want in ("검사 결과", "| # | 검사 | 도구 | 기대 | 실제 |", "전환 뒤 남은 항목", "| 남은 고전 항목 | 위치 | 남은 이유 | 할 일 |",
+                     "LegacyRecords.java", "bash prove.sh --verify"):
+            self.assertIn(want, md)
+        self.assertNotIn("<style", md)  # 붙여 넣는 문서의 글꼴·색을 건드리지 않는다
+
+
+class FalsePass(unittest.TestCase):
+    """반박 검증에서 찾은 꼴: 아무것도 못 찾고 통과하던 입력이 이제 미판정·사용법 오류로 끝나는지."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+
+    def run_(self, name, orig, fixed, **kw):
+        t = self.tmp.name
+        return prove.run(write(os.path.join(t, name + "-o"), orig), write(os.path.join(t, name + "-f"), fixed),
+                         params(**dict({"EXPECT": "none"}, **kw)), os.path.join(t, "out-" + name), quiet=True)
+
+    def test_empty_fixed_is_a_usage_error(self):
+        with self.assertRaises(prove.UsageError):
+            self.run_("empty", ORIG_JAVA, {})
+
+    def test_nothing_found_in_orig_is_undecided(self):
+        netty = {"src/main/java/a/Srv.java": "package a;\nimport io.netty.handler.ssl.SslContextBuilder;\nclass Srv {\n"
+                                             "  Object c(java.io.File c, java.io.File k) throws Exception {"
+                                             " return SslContextBuilder.forServer(c, k).build(); }\n}\n"}
+        r, code, _ = self.run_("netty", netty, netty)
+        st = {c["id"]: c["status"] for c in r["checks"]}
+        self.assertEqual((r["verdict"], code, st["a-input"], st["b-tls"]), ("undecided", 3, "undecided", "undecided"))
+
+    def test_other_tree_is_undecided(self):
+        other = {"x/y/README.md": "other\n", "x/y/main.py": "print(1)\n"}
+        r, code, _ = self.run_("other", ORIG_JAVA, other)
+        self.assertEqual(next(c for c in r["checks"] if c["id"] == "a-input")["status"], "undecided")
+        self.assertNotEqual(r["verdict"], "pass")
+
+    def test_tls_removed_is_undecided(self):
+        tls = {"main.go": "package main\nimport (\"crypto/tls\"; \"net/http\")\nfunc main() {\n"
+                          "\ts := &http.Server{TLSConfig: &tls.Config{CurvePreferences: []tls.CurveID{tls.X25519}}}\n"
+                          "\t_ = s.ListenAndServeTLS(\"c.pem\", \"k.pem\")\n}\n"}
+        plain = {"main.go": "package main\nimport \"net/http\"\nfunc main() {\n\t_ = http.ListenAndServe(\":8080\", nil)\n}\n"}
+        r, code, _ = self.run_("tlsgone", tls, plain)
+        b = next(c for c in r["checks"] if c["id"] == "b-tls")
+        self.assertEqual((b["status"], r["verdict"]), ("undecided", "undecided"))
+
+    # 반박 검증에서 찾은 꼴: 서버 TLS를 못 봐서 '해당 없음'으로 통과하던 꼴과 클라이언트 TLS만 있는 꼴
+    def b_tls(self, name, extra, **kw):
+        r, code, _ = self.run_(name, dict(ORIG_JAVA, **extra), dict(FIXED_JAVA, **extra), **kw)
+        return {c["id"]: c["status"] for c in r["checks"]}, r
+
+    def test_tomcat_server_xml_is_a_tls_signal(self):
+        xml = {"conf/server.xml": '<Server><Service><Connector port="8443" SSLEnabled="true">\n'
+                                  '<SSLHostConfig><Certificate certificateKeystoreFile="ks.p12"/></SSLHostConfig>\n'
+                                  "</Connector></Service></Server>\n"}
+        st, r = self.b_tls("tomcat", xml)
+        self.assertEqual((st["b-tls"], r["verdict"]), ("undecided", "undecided"))
+
+    def test_spring_ssl_in_dockerfile_is_a_tls_signal(self):
+        df = {"Dockerfile": 'FROM eclipse-temurin:21-jre\nENV JAVA_OPTS="-Dserver.ssl.enabled=true -Dserver.port=8443"\n'
+                            "ENV SERVER_SSL_KEY_STORE=/k/ks.p12\nCMD java $JAVA_OPTS -jar app.jar\n"}
+        st, r = self.b_tls("dockerfile", df)
+        self.assertEqual(st["b-tls"], "undecided")
+        self.assertTrue(any(s.startswith("Dockerfile:") for s in r["tls"]["signals"]), r["tls"]["signals"])
+
+    def test_client_only_tls_is_review_not_silent(self):
+        cl = {"src/main/java/x/Up.java": "package x;\nclass Up {\n  javax.net.ssl.SSLContext c() throws Exception {"
+                                         ' return javax.net.ssl.SSLContext.getInstance("TLS"); }\n}\n'}
+        st, r = self.b_tls("client", cl, EXPECT="kem,sig")
+        self.assertEqual((st["b-tls"], r["verdict"]), ("review", "pass"))
+        st, r = self.b_tls("client-expect-tls", cl, EXPECT="kem,sig,tls")
+        self.assertEqual((st["c-expect"], r["verdict"]), ("undecided", "undecided"))
+
+    def test_app_key_agreement_is_not_a_tls_signal(self):
+        hy = {"src/main/java/x/Wrap.java": "package x;\nclass Wrap {\n  Object k() throws Exception {"
+                                           ' return javax.crypto.KeyAgreement.getInstance("X25519"); }\n}\n'}
+        st, r = self.b_tls("keyagree", hy)
+        self.assertEqual(st["b-tls"], "na", r["tls"]["signals"])
+
+    def test_openssl_version_gate(self):
+        if sys.platform == "darwin" and os.path.isfile("/usr/bin/openssl"):
+            self.assertFalse(prove.openssl_35("/usr/bin/openssl"))  # 맥 LibreSSL 3.3
+        self.assertFalse(prove.openssl_35(None))
+        brew = "/opt/homebrew/opt/openssl@3.5/bin/openssl"
+        if os.path.isfile(brew):
+            self.assertTrue(prove.openssl_35(brew))
+
+
+if __name__ == "__main__":
+    unittest.main()

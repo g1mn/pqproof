@@ -1,0 +1,5 @@
+{
+  "unconverted": [
+    {"where": "tools/verify_v1.py:1-12", "what": "v1 manifest check", "why": "manifests signed before the migration must still verify; read only", "kind": "fallback"}
+  ]
+}

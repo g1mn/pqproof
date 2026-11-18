@@ -1,0 +1,18 @@
+{
+  "format": "pqproof mutations 1",
+  "about": "Self-check for run_mutations.py. Every entry here is built to NOT pass: a wrong expectation must be FAIL, a stale anchor must be SKIP, and a pending entry must be PENDING without --strict. The runner must exit 1 on this list.",
+  "about_ko": "run_mutations.py 자체 점검. 여기 항목은 모두 통과하면 안 된다: 틀린 기대값은 FAIL, 낡은 앵커는 SKIP, pending 항목은 --strict 없이 PENDING. 이 목록에서 실행기는 1로 끝나야 한다.",
+  "mutations": [
+    {"id": "x1-wrong-expectation", "title": "trust-all TrustManager with a wrong expectation (pass)", "title_ko": "TrustManager 주입에 틀린 기대값(통과)",
+     "kind": "tree", "orig": "classic", "base": "pqc",
+     "edits": [{"op": "insert_before", "file": "src/main/java/demo/sealer/Sealer.java", "find": "\n}\n", "text_file": "files/trust_all.java.txt"}],
+     "expect": {"exit": 0, "verdict": "pass"}},
+    {"id": "x2-stale-anchor", "title": "anchor that is not in the file", "title_ko": "파일에 없는 앵커",
+     "kind": "tree", "orig": "classic", "base": "pqc",
+     "edits": [{"op": "replace", "file": "src/main/java/demo/sealer/Sealer.java", "find": "this text is not in Sealer.java", "replace": "x"}],
+     "expect": {"exit": 1}},
+    {"id": "x3-pending-wrong", "title": "pending entry with a wrong expectation", "title_ko": "틀린 기대값을 단 pending 항목",
+     "pending": "SELFCHECK", "kind": "tree", "orig": "classic", "base": "pqc",
+     "expect": {"verdict": "fail"}}
+  ]
+}

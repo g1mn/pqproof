@@ -1,0 +1,669 @@
+{
+  "allowlist": {
+    "auto": false,
+    "entries": [
+      {
+        "allowed": [],
+        "digest": "848830c8515a3247",
+        "kind": "fallback",
+        "lines_fixed": 0,
+        "lines_orig": 8,
+        "n": 1,
+        "note": "범위 안에 고전 공개키 줄 없음(공개키 암호가 아니거나 줄 번호가 밀림)",
+        "orig": [
+          "src/main/java/demo/sealer/Sealer.java:9",
+          "src/main/java/demo/sealer/Sealer.java:16",
+          "src/main/java/demo/sealer/Sealer.java:22",
+          "src/main/java/demo/sealer/Sealer.java:23",
+          "src/main/java/demo/sealer/Sealer.java:28",
+          "src/main/java/demo/sealer/Sealer.java:34",
+          "src/main/java/demo/sealer/Sealer.java:40",
+          "src/main/java/demo/sealer/Sealer.java:47"
+        ],
+        "review": [],
+        "reviewed_at": null,
+        "reviewed_by": null,
+        "reviewed_via": null,
+        "status": "unused",
+        "targets": [
+          "src/main/java/demo/sealer/Sealer.java:1-52"
+        ],
+        "what": "",
+        "where": "src/main/java/demo/sealer/Sealer.java:1-52",
+        "why": "전환 전 기록 열람"
+      },
+      {
+        "allowed": [],
+        "digest": "d40be79e3f00b9c5",
+        "kind": "kept",
+        "lines_fixed": 0,
+        "lines_orig": 6,
+        "n": 2,
+        "note": "범위 안에 고전 공개키 줄 없음(공개키 암호가 아니거나 줄 번호가 밀림)",
+        "orig": [
+          "tools/sign_manifest.py:7",
+          "tools/sign_manifest.py:9",
+          "tools/sign_manifest.py:13",
+          "tools/sign_manifest.py:14",
+          "tools/sign_manifest.py:19",
+          "tools/sign_manifest.py:24"
+        ],
+        "review": [],
+        "reviewed_at": null,
+        "reviewed_by": null,
+        "reviewed_via": null,
+        "status": "unused",
+        "targets": [
+          "tools/sign_manifest.py:1-44"
+        ],
+        "what": "",
+        "where": "tools/sign_manifest.py:1-44",
+        "why": "옛 서명 보관 내보내기"
+      }
+    ],
+    "file": "artifacts/allow-list.json",
+    "file_sha256": "e5f7e4a2e9825fe588ddffda6229dc8eb52ba2e517ad9a81fb0cb86ac9987f55",
+    "hybrid": [],
+    "imports": [],
+    "legacy": [],
+    "source": "/tmp/work/s8-allow.json",
+    "top_digest": "8eab994656c421ef",
+    "unreviewed": 0,
+    "unused": 2,
+    "unused_orig_lines": 14,
+    "warnings": [
+      "#1 src/main/java/demo/sealer/Sealer.java:1-52: 고친 판에서 덮은 고전 줄 0(안 쓰인 항목). 원본에서는 고전 8줄을 덮는다(src/main/java/demo/sealer/Sealer.java:9, src/main/java/demo/sealer/Sealer.java:16, src/main/java/demo/sealer/Sealer.java:22 외): 이 목록을 원본 같은 다른 트리에 대면 그 줄을 가린다. 사람 확인 전으로 센다. 쓰지 않는 항목이면 목록에서 지운다(REQUIRE_REVIEW=1 이면 실패)",
+      "#2 tools/sign_manifest.py:1-44: 고친 판에서 덮은 고전 줄 0(안 쓰인 항목). 원본에서는 고전 6줄을 덮는다(tools/sign_manifest.py:7, tools/sign_manifest.py:9, tools/sign_manifest.py:13 외): 이 목록을 원본 같은 다른 트리에 대면 그 줄을 가린다. 사람 확인 전으로 센다. 쓰지 않는 항목이면 목록에서 지운다(REQUIRE_REVIEW=1 이면 실패)"
+    ],
+    "write_review": 0
+  },
+  "artifacts": [
+    {
+      "bytes": 211,
+      "path": "artifacts/allow-list.json",
+      "sha256": "e5f7e4a2e9825fe588ddffda6229dc8eb52ba2e517ad9a81fb0cb86ac9987f55"
+    },
+    {
+      "bytes": 3046,
+      "path": "artifacts/cbom-fixed/cbom-20261118-060849.csv",
+      "sha256": "8df266297c8cf5b5a96bdacc07fb02e1e7ac1d3ca91a1b6c50b6b753b1ce71d8"
+    },
+    {
+      "bytes": 4174,
+      "path": "artifacts/cbom-fixed/cbom-20261118-060849.md",
+      "sha256": "d44ca6007f07d173d7fbaaae078287e765e79d9d5af5a5dfa7f63bac3c1ced18"
+    },
+    {
+      "bytes": 312,
+      "path": "artifacts/cbom-fixed/run.log",
+      "sha256": "c3c7f31c784e614eb7acaacf8f9378b30f8eba7941bbc1ee09d4fa9d61157cbe"
+    },
+    {
+      "bytes": 3192,
+      "path": "artifacts/cbom-orig/cbom-20261118-060849.csv",
+      "sha256": "284f9a78bd2852b9210e2ead64072994b32192677f0ebf04080f105cdb7b8799"
+    },
+    {
+      "bytes": 4260,
+      "path": "artifacts/cbom-orig/cbom-20261118-060849.md",
+      "sha256": "58a09805d9bc2a1907b8b1fec3a5ad11035f29b8bb6c3c36b726af66c3f5671d"
+    },
+    {
+      "bytes": 258,
+      "path": "artifacts/cbom-orig/run.log",
+      "sha256": "c6908305f48c8a2f25b8eb1b8cd1ec7966f7ced9b490f60b8d995902dceb7e06"
+    },
+    {
+      "bytes": 171,
+      "path": "artifacts/changed-files.json",
+      "sha256": "d3fcf645f5252ca5778b03fda3263984ab7ab37a289dc065f7596f056a3fb5a8"
+    },
+    {
+      "bytes": 2092,
+      "path": "artifacts/residue-fixed.txt",
+      "sha256": "8d3e008aa88e0dd7a996ff4cd5c2d2da46012f40ce0f65704934e0e9d945b260"
+    },
+    {
+      "bytes": 12621,
+      "path": "artifacts/residue-generic.sh",
+      "sha256": "f132807612a45ab1d1b73f2c747dba395ef70f6b39614c3abd0ed5c86321ebf0"
+    },
+    {
+      "bytes": 4548,
+      "path": "artifacts/residue-orig.txt",
+      "sha256": "669b09808567e57698020a4ca555ff86581251941bb9e11008b4a4e2d166984b"
+    },
+    {
+      "bytes": 2593,
+      "path": "artifacts/scan-fixed.json",
+      "sha256": "921d297310451755b8fb20f39e576ff24ed50613fcbc18867d580b75b76663ef"
+    },
+    {
+      "bytes": 3133,
+      "path": "artifacts/scan-orig.json",
+      "sha256": "1cb9817fe5a934c9ccf8a9d537068f94c2444bc773ee2cee57be99887c9b1f86"
+    },
+    {
+      "bytes": 1300,
+      "path": "artifacts/test-paths.ere",
+      "sha256": "9f03d194aa19b4d561610706281ae76f0cf8594e8970dfc943b1ccbe696bf457"
+    },
+    {
+      "bytes": 166,
+      "path": "artifacts/weakening.json",
+      "sha256": "bdc1034ce2f8b347ffc6bb6906a8ddce66787de4b680a43926f6f27a03bf0c54"
+    },
+    {
+      "bytes": 990,
+      "path": "evidence-fragment.json",
+      "sha256": "0c438b44034d8158fc1b79b244b48fcaa2b465f93a551a877668f53a4daceaa0"
+    },
+    {
+      "bytes": 4225,
+      "path": "tables/cbom-fixed.csv",
+      "sha256": "f77a6a032a101e21e54ed0317c9794f7edd1db13590b00d70ff0abc5c3b99e8c"
+    },
+    {
+      "bytes": 3867,
+      "path": "tables/cbom-orig.csv",
+      "sha256": "a1783a570018f2a5d862fd504019f4dbd0543d55672ed35f35e9504692bd387f"
+    },
+    {
+      "bytes": 14452,
+      "path": "tables/fragment.html",
+      "sha256": "fceebf3fb2d5de1ced3a5fc1001905458f456311e3a5de3d5d0f05ed5bdce16b"
+    },
+    {
+      "bytes": 2149,
+      "path": "tables/java-usage.csv",
+      "sha256": "87f6d37a695cba09c544009738bcea25f14c18be751553cd08424d5a15997092"
+    },
+    {
+      "bytes": 663,
+      "path": "tables/java.csv",
+      "sha256": "2c80edeca02f37a71a5ccfdc7c39b1ae977624bb2d43d6b987dd4c1d0c05c051"
+    },
+    {
+      "bytes": 2906,
+      "path": "tables/report.md",
+      "sha256": "47742f8c6a700a9efc09d0e4e1773b601fb65ef3c5afcf560fbd350053634345"
+    },
+    {
+      "bytes": 1619,
+      "path": "tables/summary.csv",
+      "sha256": "280262f1a680be8958c1ea4705382439c4497cd9c31d267dde9b47372a2675c3"
+    },
+    {
+      "bytes": 125,
+      "path": "tables/tls.csv",
+      "sha256": "4c5a80124a65c42e1b33e2faf1c173e8177ae56e0ce10d1fac0ed8a57c7746b2"
+    }
+  ],
+  "cbom": {
+    "fixed": {
+      "allowed": 0,
+      "blocking": 0,
+      "cbom_scan_ok": true,
+      "check": 4,
+      "comment_or_test": 0,
+      "csv": "tables/cbom-fixed.csv",
+      "csv_sha256": "f77a6a032a101e21e54ed0317c9794f7edd1db13590b00d70ff0abc5c3b99e8c",
+      "info": 12,
+      "locations": 16,
+      "out_of_scope": 0,
+      "review": 0,
+      "rows": 24,
+      "tests": 0
+    },
+    "orig": {
+      "allowed": 0,
+      "blocking": 13,
+      "cbom_scan_ok": true,
+      "check": 0,
+      "comment_or_test": 0,
+      "csv": "tables/cbom-orig.csv",
+      "csv_sha256": "a1783a570018f2a5d862fd504019f4dbd0543d55672ed35f35e9504692bd387f",
+      "info": 1,
+      "locations": 14,
+      "out_of_scope": 0,
+      "review": 0,
+      "rows": 21,
+      "tests": 0
+    }
+  },
+  "changed": {
+    "added": [],
+    "file": "artifacts/changed-files.json",
+    "file_sha256": "d3fcf645f5252ca5778b03fda3263984ab7ab37a289dc065f7596f056a3fb5a8",
+    "modified": [
+      "README.md",
+      "requirements.txt",
+      "src/main/java/demo/sealer/Sealer.java",
+      "tools/sign_manifest.py"
+    ],
+    "removed": []
+  },
+  "checks": [
+    {
+      "actual": "공통 파일 5/5 · 원본 막는 위치 13 · 원본 공개키 code 17 · TLS 실측 대상 0",
+      "expected": "공통 파일 50% 이상, 원본 막는 위치·공개키 code·TLS 실측 중 하나 이상",
+      "id": "a-input",
+      "status": "pass",
+      "title": "입력 확인(같은 서비스의 전·후, 원본에서 전환 대상을 찾음)"
+    },
+    {
+      "actual": "막는 위치 0곳(원본 13) · 허용 0 · 주석·테스트 0 · 확인 4",
+      "expected": "막는 위치 0, cbom-scan 정상 종료",
+      "id": "a-cbom",
+      "status": "pass",
+      "title": "고친 판 CBOM에 막는 위치 0"
+    },
+    {
+      "actual": "deny 0 · 본 파일 4",
+      "expected": "deny 0",
+      "id": "b-weakening",
+      "status": "pass",
+      "title": "TLS 약화 수정 없음"
+    },
+    {
+      "actual": "TLS 서버·클라이언트 신호 0",
+      "expected": "TLS 서버 신호 없음",
+      "id": "b-tls",
+      "status": "na",
+      "title": "TLS 하이브리드 협상·옛 클라이언트"
+    },
+    {
+      "actual": "공개키 code 0(원본 17) · 보안레벨 3 미만 0 · 레거시 쓰기 0",
+      "expected": "모두 0(허용 목록·하이브리드 결합 줄은 사유와 함께 뺀다)",
+      "id": "c-classic",
+      "status": "pass",
+      "title": "고전 공개키 9계열 code 0, 보안레벨 3 미만 PQC 0, 레거시 쓰기 0"
+    },
+    {
+      "actual": "E-MLKEM768 3 · E-MLDSA65 2",
+      "expected": "EXPECT=kem,sig 마다 1줄 이상(tls·cert는 b-tls 통과)",
+      "id": "c-expect",
+      "status": "pass",
+      "title": "EXPECT PQC 사용"
+    },
+    {
+      "actual": "0건",
+      "expected": "0 또는 줄마다 사유",
+      "id": "r-review",
+      "status": "pass",
+      "title": "검증 생략 흔적(검토 등급, 실패 아님)"
+    },
+    {
+      "actual": "고친 판에서 안 쓰인 항목 2건(원본 고전 14줄을 덮음, 사람 확인 전): #1 src/main/java/demo/sealer/Sealer.java:1-52, #2 tools/sign_manifest.py:1-44",
+      "expected": "허용 항목마다 reviewed_by·reviewed_at(목록 맨 위 칸은 reviewed_digest 도), 고친 판에서 안 쓰인 항목 0(아니면 검토 필요, 실패 아님)",
+      "id": "r-allow",
+      "status": "review",
+      "title": "허용 항목 사람 확인(검토 등급, REQUIRE_REVIEW=1이면 실패)"
+    }
+  ],
+  "deck_meta": {
+    "ev": "s8a.txt",
+    "receipt_file": "/tmp/work/s8a/receipt.json",
+    "verify_cmd": "bash prove.sh --verify /tmp/work/s8a"
+  },
+  "excluded": {
+    "app_roots": [],
+    "count_fixed": 0,
+    "count_orig": 0,
+    "files_fixed": [],
+    "files_orig": [],
+    "items": [],
+    "notes": [],
+    "recon_digest": null,
+    "recon_file": null
+  },
+  "extra": [],
+  "finished_at": "2026-11-17T21:08:55.078Z",
+  "format": "pqc-proof receipt 1",
+  "inputs": {
+    "fixed": {
+      "files": 5,
+      "kind": "dir",
+      "path": "/opt/pqproof/examples/pqc",
+      "root": "/opt/pqproof/examples/pqc",
+      "skipped": [],
+      "tree_sha256": "d24f82ad46fd4c839b56fd3acca4875380c6cb5bd71db1717f0725ccb373b0ba",
+      "zip_sha256": null
+    },
+    "orig": {
+      "files": 5,
+      "kind": "dir",
+      "path": "/opt/pqproof/examples/classic",
+      "root": "/opt/pqproof/examples/classic",
+      "skipped": [],
+      "tree_sha256": "631801533fa3d427f01d7d88c96545c5a63e7fcbff7d2611daa082d739474260",
+      "zip_sha256": null
+    }
+  },
+  "java": {
+    "fixed": {
+      "expect": {
+        "E-MLDSA65": 2,
+        "E-MLKEM768": 3
+      },
+      "families": {
+        "G-CLASSIC-SIG": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0,
+          "test": 0
+        },
+        "G-CURVE": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0,
+          "test": 0
+        },
+        "G-DH-DSA": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0,
+          "test": 0
+        },
+        "G-EC": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0,
+          "test": 0
+        },
+        "G-EDDSA": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0,
+          "test": 0
+        },
+        "G-JWT-ALG": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0,
+          "test": 0
+        },
+        "G-OAEP-PKCS1": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0,
+          "test": 0
+        },
+        "G-RSA": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0,
+          "test": 0
+        },
+        "G-X25519": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0,
+          "test": 0
+        }
+      },
+      "legacy_write": 0,
+      "listed": {
+        "allowed": 0,
+        "by_family": {
+          "allowed": {},
+          "hybrid": {},
+          "review": {}
+        },
+        "hybrid": 0,
+        "left": [],
+        "lines": [],
+        "review": 0,
+        "sites_left": null
+      },
+      "output": "artifacts/residue-fixed.txt",
+      "output_sha256": "8d3e008aa88e0dd7a996ff4cd5c2d2da46012f40ce0f65704934e0e9d945b260",
+      "sites_left": null,
+      "tests": {
+        "count": 0,
+        "lines": []
+      },
+      "verdict": "CLEAN",
+      "weak_pqc": 0
+    },
+    "orig": {
+      "expect": {
+        "E-MLDSA65": 0,
+        "E-MLKEM768": 0
+      },
+      "families": {
+        "G-CLASSIC-SIG": {
+          "allow": 0,
+          "code": 2,
+          "comment": 0,
+          "test": 0
+        },
+        "G-CURVE": {
+          "allow": 0,
+          "code": 2,
+          "comment": 1,
+          "test": 0
+        },
+        "G-DH-DSA": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0,
+          "test": 0
+        },
+        "G-EC": {
+          "allow": 0,
+          "code": 5,
+          "comment": 1,
+          "test": 0
+        },
+        "G-EDDSA": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0,
+          "test": 0
+        },
+        "G-JWT-ALG": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0,
+          "test": 0
+        },
+        "G-OAEP-PKCS1": {
+          "allow": 0,
+          "code": 3,
+          "comment": 1,
+          "test": 0
+        },
+        "G-RSA": {
+          "allow": 0,
+          "code": 5,
+          "comment": 1,
+          "test": 0
+        },
+        "G-X25519": {
+          "allow": 0,
+          "code": 0,
+          "comment": 0,
+          "test": 0
+        }
+      },
+      "legacy_write": 0,
+      "output": "artifacts/residue-orig.txt",
+      "output_sha256": "669b09808567e57698020a4ca555ff86581251941bb9e11008b4a4e2d166984b",
+      "sites_left": null,
+      "tests": {
+        "count": 0,
+        "lines": []
+      },
+      "verdict": "RESIDUE",
+      "weak_pqc": 0
+    },
+    "ref": null,
+    "ref_digest": null,
+    "residue_kind": "generic",
+    "script": "artifacts/residue-generic.sh",
+    "script_sha256": "f132807612a45ab1d1b73f2c747dba395ef70f6b39614c3abd0ed5c86321ebf0",
+    "usage": "tables/java-usage.csv",
+    "usage_sha256": "87f6d37a695cba09c544009738bcea25f14c18be751553cd08424d5a15997092"
+  },
+  "note": "검증 증적: receipt_id는 receipt_id 칸을 뺀 이 JSON의 RFC 8785 정규형(키 정렬, 공백 없음, UTF-8) SHA-256이고, artifacts·tables의 모든 파일과 evidence-fragment.json이 SHA-256과 함께 적혀 있다. `bash prove.sh --verify DIR`이 다시 계산한다. 해시는 파일이 이 증적이 말하는 그 파일임을 보일 뿐, 누가 만들었는지는 보이지 않는다. receipt_id를 믿을 수 있는 곳에서 받은 값과 비교할 것.",
+  "params": {
+    "allow": "/tmp/work/s8-allow.json",
+    "classic": "allow",
+    "exclude": [],
+    "expect": [
+      "kem",
+      "sig"
+    ],
+    "recon": "",
+    "require_review": false,
+    "residue": "/tmp/work/s8a/artifacts/residue-generic.sh",
+    "scope": "all",
+    "tls_targets": [],
+    "tls_targets_orig": [],
+    "tls_via": "host"
+  },
+  "receipt_id": "d9f3d056897091f7fea743d4acde048fb58a7f72118085bd9f368e52fdacf60c",
+  "started_at": "2026-11-17T21:08:54.985Z",
+  "test_paths": {
+    "file": "artifacts/test-paths.ere",
+    "file_sha256": "9f03d194aa19b4d561610706281ae76f0cf8594e8970dfc943b1ccbe696bf457"
+  },
+  "timeline": [
+    {
+      "ended_at": "2026-11-17T21:08:54.987Z",
+      "name": "준비(입력·트리 해시·제외·허용 목록)",
+      "started_at": "2026-11-17T21:08:54.985Z"
+    },
+    {
+      "ended_at": "2026-11-17T21:08:54.993Z",
+      "name": "(a) CBOM(cbom-scan + scan.py)",
+      "started_at": "2026-11-17T21:08:54.987Z"
+    },
+    {
+      "ended_at": "2026-11-17T21:08:55.065Z",
+      "name": "(c) 공개키 집계(residue)",
+      "started_at": "2026-11-17T21:08:54.993Z"
+    },
+    {
+      "ended_at": "2026-11-17T21:08:55.070Z",
+      "name": "(b) TLS 약화 수정 검사",
+      "started_at": "2026-11-17T21:08:55.065Z"
+    },
+    {
+      "ended_at": "2026-11-17T21:08:55.070Z",
+      "name": "(b) TLS 탐침",
+      "started_at": "2026-11-17T21:08:55.070Z"
+    },
+    {
+      "ended_at": "2026-11-17T21:08:55.078Z",
+      "name": "(d) 표·검증 증적",
+      "started_at": "2026-11-17T21:08:55.077Z"
+    }
+  ],
+  "tls": {
+    "applicable": false,
+    "baseline": [],
+    "client_signals": [],
+    "control_problem": null,
+    "controls": null,
+    "log": null,
+    "log_sha256": null,
+    "signals": [],
+    "targets": [],
+    "via": "host"
+  },
+  "tools": [
+    {
+      "name": "cbom-scan.sh",
+      "path": "/opt/pqproof/scan/cbom-scan.sh",
+      "sha256": "607a1fdb9608ee7d0a162d546caeb75bf9203c7500f1b021be7ebb86ab005cdb",
+      "version": ""
+    },
+    {
+      "name": "residue",
+      "path": "/tmp/work/s8a/artifacts/residue-generic.sh",
+      "sha256": "f132807612a45ab1d1b73f2c747dba395ef70f6b39614c3abd0ed5c86321ebf0",
+      "version": "generic"
+    },
+    {
+      "name": "test-paths.ere",
+      "path": "/opt/pqproof/scan/test-paths.ere",
+      "sha256": "9f03d194aa19b4d561610706281ae76f0cf8594e8970dfc943b1ccbe696bf457",
+      "version": ""
+    },
+    {
+      "name": "prove.py",
+      "path": "/opt/pqproof/prove.py",
+      "sha256": "2439a10b24d5d1645af61a352dbe86a4593a6e6197d00c76067c3d744f039c53",
+      "version": ""
+    },
+    {
+      "name": "prove.sh",
+      "path": "/opt/pqproof/prove.sh",
+      "sha256": "6e570c36f874e55fe43fa654019f4159880ecdbecaa7f221a8f248e91c000c00",
+      "version": ""
+    },
+    {
+      "name": "pqlite/scan.py",
+      "path": "/opt/pqproof/pqlite/scan.py",
+      "sha256": "9fc7ae3b295f48059cf743836039aa3e47d3e1f0bc3940a1ceadcf998d938f31",
+      "version": ""
+    },
+    {
+      "name": "pqlite/verify.py",
+      "path": "/opt/pqproof/pqlite/verify.py",
+      "sha256": "2bc1711f13ab5db4a68134470f66ac515bce030ef41076f9bdd868ffb3387958",
+      "version": ""
+    },
+    {
+      "name": "pqlite/tlsprobe.py",
+      "path": "/opt/pqproof/pqlite/tlsprobe.py",
+      "sha256": "82ca986379c3a6174626afe25ff057575de712458e899eeacea51534fe77aed9",
+      "version": ""
+    },
+    {
+      "name": "pqlite/receipt.py",
+      "path": "/opt/pqproof/pqlite/receipt.py",
+      "sha256": "0c44076f4b11a11ddffa17d030e2c17c77cfe114b9a8d6486b87067197d8f876",
+      "version": ""
+    },
+    {
+      "name": "pqlite/allowlist.py",
+      "path": "/opt/pqproof/pqlite/allowlist.py",
+      "sha256": "bf4ea034537aef71c305ba6acc2fa97ddda8a1b0b208fd0127272746cca38eb6",
+      "version": ""
+    },
+    {
+      "name": "tls_probe",
+      "path": "/tmp/work/emptybin/tls_probe-darwin-arm64",
+      "sha256": null,
+      "version": "0.4.0"
+    },
+    {
+      "name": "tls_probe source",
+      "path": "/opt/pqproof/probe",
+      "sha256": "eafeaa7387aa18dda42a729180af0329d3004dbdcf57e03808dee940cfb47633",
+      "version": "0.4.0"
+    },
+    {
+      "name": "python",
+      "path": "/opt/homebrew/opt/python@3.15/bin/python3.15",
+      "sha256": null,
+      "version": "3.15.2"
+    },
+    {
+      "name": "openssl",
+      "path": "/opt/homebrew/opt/openssl@3.5/bin/openssl",
+      "sha256": "a0ca619bc4a38178f54bf00ac2c4389812fca1d74fef46003dce342e09999d45",
+      "version": "OpenSSL 3.5.9 29 Sep 2026 (Library: OpenSSL 3.5.9 29 Sep 2026)"
+    }
+  ],
+  "verdict": "pass",
+  "weakening": {
+    "deny": [],
+    "file": "artifacts/weakening.json",
+    "file_sha256": "bdc1034ce2f8b347ffc6bb6906a8ddce66787de4b680a43926f6f27a03bf0c54",
+    "review": []
+  }
+}

@@ -1,0 +1,580 @@
+{
+ "format": "pqproof mutations 1",
+ "about": "Planted defects built from examples/classic and examples/pqc. Each one states the result PQ-Proof must give. run_mutations.py applies them in a temp folder, runs the tool, and compares. A mutation whose setup cannot be applied is SKIP, and SKIP is never counted as PASS.",
+ "about_ko": "examples/classic·pqc 에서 만든 심어 둔 결함. 각 항목에 PQ-Proof가 반드시 내야 할 결과를 적었다. run_mutations.py 가 임시 폴더에 적용하고 도구를 돌려 비교한다. 준비를 못 한 항목은 SKIP 이고 SKIP 은 PASS 로 세지 않는다.",
+ "mutations": [
+  {
+   "id": "c01-examples-classic-to-pqc",
+   "title": "control: examples/classic against examples/pqc (the migration done right)",
+   "title_ko": "대조군: examples/classic → examples/pqc(제대로 된 전환)",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [],
+   "control": true,
+   "expect": {
+    "exit": 0,
+    "verdict": "pass",
+    "checks": {
+     "a-cbom": "pass",
+     "c-classic": "pass",
+     "c-expect": "pass",
+     "b-weakening": "pass",
+     "r-review": "pass"
+    },
+    "stdout_regex_not": [
+     "(?m)^VERDICT=PASS \\("
+    ]
+   },
+   "sarif": {
+    "max_results": 0
+   }
+  },
+  {
+   "id": "c02-examples-classic-to-classic",
+   "title": "control: examples/classic on both sides (nothing migrated)",
+   "title_ko": "대조군: 양쪽 모두 examples/classic(전환 안 함)",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "classic",
+   "edits": [],
+   "control": true,
+   "expect": {
+    "exit": 1,
+    "verdict": "fail",
+    "checks": {
+     "a-cbom": "fail",
+     "c-classic": "fail",
+     "c-expect": "fail"
+    }
+   },
+   "sarif": {
+    "rules": {
+     "a-cbom": "error",
+     "c-classic": "error"
+    }
+   }
+  },
+  {
+   "id": "m01-trust-all",
+   "title": "trust-all TrustManager added to the converted Java code",
+   "title_ko": "전환본 Java에 모든 인증서를 믿는 TrustManager",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "insert_before",
+     "file": "src/main/java/demo/sealer/Sealer.java",
+     "find": "\n}\n",
+     "text_file": "files/trust_all.java.txt"
+    }
+   ],
+   "expect": {
+    "exit": 1,
+    "verdict": "fail",
+    "checks": {
+     "b-weakening": "fail"
+    },
+    "contains": {
+     "weakening.deny": "TrustManager"
+    }
+   },
+   "sarif": {
+    "rules": {
+     "b-weakening": "error"
+    }
+   }
+  },
+  {
+   "id": "m02-verify-always-true",
+   "title": "signature verify() body replaced by return true",
+   "title_ko": "서명 verify() 몸통을 return true 로",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "replace",
+     "file": "src/main/java/demo/sealer/Sealer.java",
+     "find": "        Signature s = Signature.getInstance(SIGNING_KEYS);\n        s.initVerify(key);\n        s.update(message);\n        return s.verify(signature);\n",
+     "replace": "        return true;\n"
+    }
+   ],
+   "expect": {
+    "checks": {
+     "r-review": "review"
+    },
+    "verdict_not": [
+     "undecided"
+    ],
+    "min": {
+     "weakening.review": 1
+    },
+    "contains": {
+     "weakening.review": "only returns success"
+    },
+    "stdout_regex": [
+     "(?m)^VERDICT=PASS \\([0-9]+ removed verifications? needs? review"
+    ],
+    "verdict": "pass"
+   },
+   "note": "Review grade by design: the verdict stays pass, r-review is review, the line is listed, and the verdict line counts the removed verifications ('2 removed verifications need review' here: the dropped call and the body that only returns success) (0.1.0; before that the pass was silent).",
+   "note_ko": "설계상 검토 등급이다. 판정은 통과로 남지만 r-review 는 검토 필요이고 줄이 목록에 나오며, 판정 줄에 '검증 호출 제거 n건 검토 필요'(여기서는 빠진 호출과 성공만 돌려주는 몸통 2건)가 붙는다(0.1.0부터. 그 전에는 말없는 통과였다).",
+   "sarif": {
+    "rules": {
+     "r-review": "warning"
+    }
+   }
+  },
+  {
+   "id": "m03-cert-check-off",
+   "title": "certificate check turned off in Python (check_hostname False, CERT_NONE)",
+   "title_ko": "Python 인증서 검증 끄기(check_hostname False, CERT_NONE)",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "insert_before",
+     "file": "tools/sign_manifest.py",
+     "find": "def wrap_key(",
+     "text_file": "files/fetch_unverified.py.txt"
+    }
+   ],
+   "expect": {
+    "exit": 1,
+    "verdict": "fail",
+    "checks": {
+     "b-weakening": "fail"
+    },
+    "contains": {
+     "weakening.deny": [
+      "CERT_NONE",
+      "check_hostname"
+     ]
+    }
+   },
+   "sarif": {
+    "rules": {
+     "b-weakening": "error"
+    }
+   }
+  },
+  {
+   "id": "m04-tls-below-1-2",
+   "title": "TLS below 1.2 allowed (SSLContext TLSv1.1, setEnabledProtocols TLSv1)",
+   "title_ko": "TLS 1.2 미만 허용(SSLContext TLSv1.1, setEnabledProtocols TLSv1)",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "src/main/java/demo/sealer/Uplink.java",
+     "text_file": "files/Uplink.java"
+    }
+   ],
+   "expect": {
+    "exit": 1,
+    "verdict": "fail",
+    "checks": {
+     "b-weakening": "fail"
+    },
+    "contains": {
+     "weakening.deny": "TLS 1.0/1.1"
+    }
+   },
+   "sarif": {
+    "rules": {
+     "b-weakening": "error"
+    }
+   }
+  },
+  {
+   "id": "m05-d1-allow-masks-revert",
+   "title": "D1: allow-list entries hide classical code that came back (original plus two PQC names)",
+   "title_ko": "D1: 허용 항목이 되돌아온 고전 코드를 가림(원본 + PQC 이름 두 줄)",
+   "pending": "D1",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "classic",
+   "edits": [
+    {
+     "op": "add",
+     "file": "src/main/java/demo/sealer/PqcNames.java",
+     "text_file": "files/PqcNames.java"
+    }
+   ],
+   "allow": "files/allow-masking.json",
+   "expect": {
+    "checks_not": {
+     "r-allow": [
+      "pass",
+      "na"
+     ]
+    },
+    "min": {
+     "allowlist.write_review": 1,
+     "allowlist.unreviewed": 1
+    },
+    "stdout_regex_not": [
+     "(?m)^VERDICT=PASS\\s+receipt_id="
+    ]
+   },
+   "note": "Default mode may still pass, but never silently: r-allow must be review and the verdict line must carry the warning.",
+   "note_ko": "기본 모드에서는 통과일 수 있지만 조용히 통과하면 안 된다. r-allow 가 검토 필요이고 판정 줄에 경고가 붙어야 한다.",
+   "sarif": {
+    "rules": {
+     "r-allow": "warning"
+    }
+   }
+  },
+  {
+   "id": "m05b-d1-strict",
+   "title": "D1 under REQUIRE_REVIEW=1: the same masking fails",
+   "title_ko": "D1, REQUIRE_REVIEW=1: 같은 가림은 실패",
+   "pending": "D1",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "classic",
+   "edits": [
+    {
+     "op": "add",
+     "file": "src/main/java/demo/sealer/PqcNames.java",
+     "text_file": "files/PqcNames.java"
+    }
+   ],
+   "allow": "files/allow-masking.json",
+   "env": {
+    "REQUIRE_REVIEW": "1"
+   },
+   "expect": {
+    "exit": 1,
+    "verdict": "fail",
+    "checks": {
+     "r-allow": "fail"
+    }
+   },
+   "sarif": {
+    "rules": {
+     "r-allow": "error"
+    }
+   }
+  },
+  {
+   "id": "m05c-d1-unused-entries",
+   "title": "D1: entries that cover nothing in the converted tree are reported as unused",
+   "title_ko": "D1: 고친 판에서 아무 줄도 덮지 않는 항목은 '안 쓰인 항목'으로 나온다",
+   "pending": "D1",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "allow": "files/allow-masking.json",
+   "expect": {
+    "checks": {
+     "r-allow": [
+      "review",
+      "fail"
+     ]
+    },
+    "eq": {
+     "allowlist.unused": 2
+    },
+    "min": {
+     "allowlist.unused_orig_lines": 1
+    }
+   },
+   "sarif": {
+    "rules": {
+     "r-allow": "warning"
+    }
+   }
+  },
+  {
+   "id": "m06-d2-test-file-key",
+   "title": "D2: classical key inside a Go test file (_test.go) is counted apart, the same way by both scanners",
+   "title_ko": "D2: Go 시험 파일(_test.go) 안 고전 키는 두 스캐너가 같은 기준으로 따로 센다",
+   "pending": "D2",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "internal/seal/seal_test.go",
+     "text_file": "files/seal_test.go"
+    }
+   ],
+   "expect": {
+    "exit": 0,
+    "verdict": "pass",
+    "checks": {
+     "a-cbom": "pass",
+     "c-classic": "pass"
+    },
+    "min": {
+     "java.fixed.tests.count": 1,
+     "cbom.fixed.tests": 1
+    },
+    "contains": {
+     "checks[c-classic].actual": "시험 경로"
+    }
+   },
+   "sarif": {
+    "absent": [
+     "a-cbom",
+     "c-classic"
+    ]
+   }
+  },
+  {
+   "id": "m06b-d2-control",
+   "title": "D2 control: the same Go key code outside a test file must fail both checks",
+   "title_ko": "D2 대조군: 같은 Go 키 코드가 시험 파일 밖에 있으면 두 검사 모두 실패",
+   "pending": "D2",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "internal/seal/keys.go",
+     "text_file": "files/seal_keys.go"
+    }
+   ],
+   "expect": {
+    "exit": 1,
+    "verdict": "fail",
+    "checks": {
+     "a-cbom": "fail",
+     "c-classic": "fail"
+    }
+   },
+   "sarif": {
+    "rules": {
+     "a-cbom": "error",
+     "c-classic": "error"
+    }
+   }
+  },
+  {
+   "id": "m07-evidence-one-byte",
+   "title": "evidence: one byte of tables/summary.csv flipped",
+   "title_ko": "증적 한 바이트 변조(tables/summary.csv)",
+   "kind": "evidence",
+   "orig": "classic",
+   "base": "pqc",
+   "evidence_ops": [
+    {
+     "op": "flip_byte",
+     "file": "tables/summary.csv",
+     "offset": -2
+    }
+   ],
+   "expect": {
+    "verify_exit": "nonzero",
+    "verify_contains": [
+     "summary.csv"
+    ]
+   }
+  },
+  {
+   "id": "m08-evidence-number",
+   "title": "evidence: a count in receipt.json changed (13 blocking positions in the original written as 12)",
+   "title_ko": "증적 숫자 변조(receipt.json 원본 막는 위치 13 → 12)",
+   "kind": "evidence",
+   "orig": "classic",
+   "base": "pqc",
+   "evidence_ops": [
+    {
+     "op": "json_set",
+     "file": "receipt.json",
+     "path": "cbom.orig.blocking",
+     "value": 12
+    }
+   ],
+   "expect": {
+    "verify_exit": "nonzero",
+    "verify_contains": [
+     "receipt_id"
+    ]
+   },
+   "sarif": {
+    "exit": 2
+   }
+  },
+  {
+   "id": "m08b-evidence-verdict-rehashed",
+   "title": "evidence: failed run rewritten as pass and receipt_id recomputed",
+   "title_ko": "증적 판정 위조: 실패를 통과로 고치고 receipt_id 까지 다시 계산",
+   "kind": "evidence",
+   "orig": "classic",
+   "base": "classic",
+   "evidence_ops": [
+    {
+     "op": "json_set",
+     "file": "receipt.json",
+     "path": "verdict",
+     "value": "pass"
+    },
+    {
+     "op": "json_set",
+     "file": "receipt.json",
+     "path": "checks[*].status",
+     "value": "pass",
+     "where": {
+      "status": "fail"
+     }
+    },
+    {
+     "op": "rehash_receipt"
+    }
+   ],
+   "expect": {
+    "verify_exit": "nonzero"
+   },
+   "note": "The receipt_id alone cannot catch this; the cross-checks (re-rendered receipt.html and deck.json, counts against tables) must.",
+   "note_ko": "receipt_id 만으로는 못 잡는다. receipt.html·deck.json 다시 그리기와 수·표 대조가 잡아야 한다."
+  },
+  {
+   "id": "m09-review-stamp-forged",
+   "title": "allow-list human review forged (reviewed_by and reviewed_at with a made-up reviewed_digest), REQUIRE_REVIEW=1",
+   "title_ko": "허용 목록 사람 확인 칸 위조(reviewed_by·reviewed_at + 지어낸 reviewed_digest), REQUIRE_REVIEW=1",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "tools/verify_v1.py",
+     "text_file": "files/verify_v1.py"
+    }
+   ],
+   "allow": "files/allow-v1-forged.json",
+   "env": {
+    "REQUIRE_REVIEW": "1"
+   },
+   "expect": {
+    "exit": 1,
+    "verdict": "fail",
+    "checks": {
+     "r-allow": "fail"
+    },
+    "eq": {
+     "allowlist.unreviewed": 1
+    },
+    "contains": {
+     "allowlist.warnings": "reviewed_digest"
+    }
+   },
+   "sarif": {
+    "rules": {
+     "r-allow": "error"
+    }
+   }
+  },
+  {
+   "id": "m09c-review-stamp-genuine",
+   "title": "control for m09: the same list with the digest the run printed passes under REQUIRE_REVIEW=1",
+   "title_ko": "m09 대조군: 실행이 찍어 준 digest 를 적은 같은 목록은 REQUIRE_REVIEW=1 에서 통과",
+   "control": true,
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "tools/verify_v1.py",
+     "text_file": "files/verify_v1.py"
+    }
+   ],
+   "allow": "files/allow-v1-forged.json",
+   "allow_set": {
+    "reviewed_digest": "@allowlist.top_digest:m09-review-stamp-forged"
+   },
+   "env": {
+    "REQUIRE_REVIEW": "1"
+   },
+   "expect": {
+    "exit": 0,
+    "verdict": "pass",
+    "checks": {
+     "r-allow": "pass"
+    },
+    "eq": {
+     "allowlist.unreviewed": 0
+    }
+   },
+   "sarif": {
+    "max_results": 0
+   }
+  },
+  {
+   "id": "m10-evidence-review-copy-rehashed",
+   "title": "evidence: review stamp added to the allow-list copy, its hash and receipt_id rewritten",
+   "title_ko": "증적 속 허용 목록 사본에 사람 확인 칸을 넣고 해시·receipt_id 까지 다시 씀",
+   "kind": "evidence",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "tools/verify_v1.py",
+     "text_file": "files/verify_v1.py"
+    }
+   ],
+   "allow": "files/allow-v1.json",
+   "evidence_ops": [
+    {
+     "op": "json_set",
+     "file": "artifacts/allow-list.json",
+     "path": "unconverted[0].reviewed_by",
+     "value": "reviewer@example.org"
+    },
+    {
+     "op": "json_set",
+     "file": "artifacts/allow-list.json",
+     "path": "unconverted[0].reviewed_at",
+     "value": "2026-11-18"
+    },
+    {
+     "op": "rehash_artifact",
+     "file": "artifacts/allow-list.json"
+    },
+    {
+     "op": "rehash_receipt"
+    }
+   ],
+   "expect": {
+    "verify_exit": "nonzero"
+   },
+   "note": "verify re-reads the review fields from the copy and must disagree with the receipt, which still says not reviewed.",
+   "note_ko": "verify 는 사본에서 사람 확인 칸을 다시 풀어 receipt 와 맞춰 본다. receipt 는 여전히 '확인 전'이라 어긋나야 한다."
+  },
+  {
+   "id": "m11-exclude-hides-source",
+   "title": "EXCLUDE glob tries to hide the source folders of an unconverted tree",
+   "title_ko": "EXCLUDE 글롭으로 전환 안 된 소스 폴더를 감추려 함",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "classic",
+   "env": {
+    "EXCLUDE": "src/** tools/**"
+   },
+   "expect": {
+    "exit": 1,
+    "verdict": "fail",
+    "checks": {
+     "a-cbom": "fail"
+    }
+   },
+   "sarif": {
+    "rules": {
+     "a-cbom": "error"
+    }
+   }
+  }
+ ],
+ "golden": "tests/golden/verdicts.json holds the verdict, check statuses and counts of every tree case. run_mutations.py --golden compares them; a rule change that moves any of them fails CI until the golden file and CHANGELOG.md are updated together."
+}

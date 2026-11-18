@@ -1,0 +1,19 @@
+# Dependabot: 워크플로가 쓰는 액션(커밋 SHA 고정)과 파이썬 빌드 의존(pyproject 의 build-system)을 매주 본다.
+# 액션 PR 은 SHA 와 버전 주석을 같이 바꾼다. 런타임 파이썬 의존은 없다.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "ci"
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "build"
