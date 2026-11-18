@@ -28,11 +28,46 @@
 
 ```bash
 pip install pqproof                   # or from source: pip install git+https://github.com/g1mn/pqproof
-pqproof <original> <converted>        # 0 pass · 1 fail · 3 undecided
+pqproof doctor                        # external programs found and missing (bash, OpenSSL, keytool, tls_probe)
+ex=$(python3 -c 'import os, pqproof; print(os.path.join(os.path.dirname(pqproof.__file__), "_tool", "examples"))')
+pqproof "$ex/classic" "$ex/pqc"       # bundled example: RSA and ECDSA moved to ML-KEM-768 and ML-DSA-65, passes
+pqproof <original> <converted>        # your two trees
 pqproof --verify <output folder>      # recompute the evidence hash and every file hash
 ```
 
-Rules, outputs and limits: [DESIGN.md](https://github.com/g1mn/pqproof/blob/main/DESIGN.md) · What changed: [CHANGELOG.md](https://github.com/g1mn/pqproof/blob/main/CHANGELOG.md) · Reporting a problem: [SECURITY.md](https://github.com/g1mn/pqproof/blob/main/SECURITY.md)
+The run writes `proof-out-YYYYMMDD-HHMMSS/`. Open `receipt.html` (for people) or `receipt.json` (for programs); `tables/report.md` is ready to paste into a document. When the run fails, the console ends with where the full lists are and what to do next. A line that has to stay classical goes into an allowlist with its reason, and a person signs it off ([guide/allowlist.md](https://github.com/g1mn/pqproof/blob/main/guide/allowlist.md)).
+
+| Exit code | Meaning |
+|---|---|
+| 0 | pass: no check failed or stayed undecided |
+| 1 | fail |
+| 2 | usage or input error (no verdict) |
+| 3 | undecided, for example a TLS server with no address to measure; never counted as a pass |
+
+| System | Judge two trees | `--verify`, `sarif` |
+|---|---|---|
+| Linux, macOS | yes (bash, OpenSSL; 3.5 or later for the TLS cross-check) | yes |
+| Windows | in WSL | yes, Python alone |
+
+## In CI
+
+The GitHub Action judges a pull request against its base commit and uploads SARIF to code scanning; [examples/github-actions/](https://github.com/g1mn/pqproof/blob/main/examples/github-actions/pqproof-sarif.yml) reads the allowlist from the base commit so an author cannot approve their own entries. GitLab, Jenkins and SonarQube examples are in [guide/ci.md](https://github.com/g1mn/pqproof/blob/main/guide/ci.md). Release assets carry build provenance: `gh attestation verify <file> --repo g1mn/pqproof`.
+
+## Words
+
+| Word | Meaning |
+|---|---|
+| PQ-Proof, `pqproof` | the tool; the Python package and its command |
+| original, converted (fixed) | the tree before and after the migration |
+| check, verdict | eight checks (`a-cbom`, `c-classic`, `b-weakening` ...) and the one verdict they give |
+| blocking location | a quantum-breakable public-key use in the converted tree with no recorded reason |
+| allowlist | the classical lines a migration keeps on purpose, each with a reason and a reviewer |
+| evidence (검증 증적), evidence hash | the output folder, and `receipt_id`, the SHA-256 of `receipt.json` in RFC 8785 form |
+| ruleset | the six rule files; their hash is in every receipt |
+
+## Documentation
+
+[Quick start](https://github.com/g1mn/pqproof/blob/main/guide/quickstart.md) · [Configuration](https://github.com/g1mn/pqproof/blob/main/guide/configuration.md) · [Allowlist](https://github.com/g1mn/pqproof/blob/main/guide/allowlist.md) · [Outputs](https://github.com/g1mn/pqproof/blob/main/guide/outputs.md) · [CI](https://github.com/g1mn/pqproof/blob/main/guide/ci.md) · [Rules and evidence format (DESIGN.md)](https://github.com/g1mn/pqproof/blob/main/DESIGN.md) · [History](https://github.com/g1mn/pqproof/blob/main/HISTORY.md) · [Changelog](https://github.com/g1mn/pqproof/blob/main/CHANGELOG.md) · [Contributing](https://github.com/g1mn/pqproof/blob/main/CONTRIBUTING.md) · [Security](https://github.com/g1mn/pqproof/blob/main/SECURITY.md)
 
 ## Related
 

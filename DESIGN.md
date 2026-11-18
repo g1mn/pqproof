@@ -2,46 +2,11 @@
 
 PQ-Proof takes a codebase before and after a post-quantum migration and checks whether the migration is finished. It looks for classical public-key code left without a recorded reason, checks that ML-KEM-768 and ML-DSA-65 are in use, and checks that no TLS setting got weaker along the way. It runs offline and calls no AI model. It reads the code it inspects and never runs it. Each run leaves verification evidence: the raw tool output, a CBOM for both versions, and an evidence hash that anyone can recompute.
 
-I built it for the finals of 2026년 양자내성암호 전환 해커톤 (2026 Post-Quantum Cryptography Transition Hackathon), organized by the Ministry of Science and ICT and hosted by KISA. I won 대상 (Grand Prize), given as the 부총리상 (Deputy Prime Minister's Award). The English names are my translations. An AI coding agent made the code changes, and PQ-Proof (then just `prove.sh`) was the completion check in its pipeline. This repository is based on the version that ran in the finals, minus contest material, local paths and contest-only report tables. I fixed two flaws found in testing after the finals and closed two gaps that a review of those fixes turned up; [Changes since the finals](#changes-since-the-finals) lists what moved. This is a participant's own tool; the organizers have not reviewed or endorsed it.
+It started as the completion check at the end of my migration pipeline in the finals of a 2026 post-quantum hackathon. [HISTORY.md](HISTORY.md) tells that story and lists what changed after the finals. This is a participant's own tool; the organizers have not reviewed or endorsed it.
 
 Some parts come from an earlier hackathon version of PQ-Proof (`g1mn/pq-proof` at commit `7b7803f`, MIT). Those files say so in their first line.
 
-This page describes what one run decides, the rules behind each check, how the verification evidence and its evidence hash are built, and what the tool cannot tell you. The code is the reference: `prove.py` for the checks, `pqlite/allowlist.py` for the allowlist, `pqlite/receipt.py` for the evidence. The [site](https://g1mn.github.io/pqproof/) has the overview, the public test results and the KISA mapping. [CHANGELOG.md](CHANGELOG.md) lists releases and their verdict impact.
-
-## Install and first run
-
-You need Python 3.9 or later (standard library only), bash 3.2 or later and OpenSSL. The TLS cross-check wants OpenSSL 3.5 or later; with an older OpenSSL or LibreSSL the run still works and records the cross-check as not possible. Go 1.27 or later is only needed to build the TLS probe. Judging needs bash, so on Windows run it in WSL; `pqproof` says so and exits 2 even when a Git Bash `bash` is on the PATH. Re-checking evidence (`pqproof --verify`), `pqproof sarif`, `--env` and `--version` need only Python and run on Windows as well.
-
-```bash
-pip install pqproof
-pqproof doctor        # lists the external programs it found and what is missing
-```
-
-`pqproof` and `bash prove.sh` run the same files and read the same environment variables (`pqproof --env` lists them). To try the bundled examples, clone the repository:
-
-```bash
-git clone https://github.com/g1mn/pqproof && cd pqproof
-bash prove.sh examples/classic examples/pqc
-```
-
-`examples/classic` is a small Java and Python "sealer": it wraps a data key with RSA-OAEP and signs with ECDSA P-256. `examples/pqc` is the same code moved to ML-KEM-768 (with AES-256-GCM) and ML-DSA-65. Both versions compile, and both Python tools run; the Java classes have no `main`. The migrated version needs JDK 24 or later, and pyca/cryptography 48 or later on OpenSSL 3.5 or later. The tool prints one line per check, in Korean, and then the verdict:
-
-```
-[a-input] 통과  공통 파일 5/5 · 원본 막는 위치 13 · 원본 공개키 code 17 · TLS 실측 대상 0
-[a-cbom] 통과  막는 위치 0곳(원본 13) · 허용 0 · 주석·테스트 0 · 확인 4
-[b-weakening] 통과  deny 0 · 본 파일 4
-[b-tls] 해당 없음  TLS 서버·클라이언트 신호 0
-[c-classic] 통과  공개키 code 0(원본 17) · 보안레벨 3 미만 0 · 레거시 쓰기 0
-[c-expect] 통과  E-MLKEM768 3 · E-MLDSA65 2
-[r-review] 통과  0건
-[r-allow] 해당 없음  허용 목록 없음
-VERDICT=PASS  receipt_id=78c2995e6ef5…
-검사 8개: 통과 6 · 해당 없음 2 (통과로 세는 것은 '통과'뿐) · 도구 0.1.0 · 규칙 묶음 1 · 증적 형식 2
-```
-
-(통과 = pass, 실패 = fail, 해당 없음 = not applicable, 검토 필요 = needs review. The last line counts the checks per state and names the tool version, ruleset and evidence format.) The `receipt_id` changes on every run (see [Outputs](#outputs)). Give it `examples/classic` on both sides and the run fails, listing each `file:line` that still uses RSA, ECDSA or P-256.
-
-Exit codes: 0 pass, 1 fail, 2 usage or input error, 3 undecided.
+This page is the specification: what one run decides, the rules behind each check, how the verification evidence and its evidence hash are built, and what the tool cannot tell you. The code is the reference: `prove.py` for the checks, `pqlite/allowlist.py` for the allowlist, `pqlite/receipt.py` for the evidence. How to install, configure and read the results is in [guide/](guide/): [quick start](guide/quickstart.md), [configuration](guide/configuration.md), [allowlist](guide/allowlist.md), [outputs](guide/outputs.md) and [CI](guide/ci.md). The [site](https://g1mn.github.io/pqproof/) has the overview, the public test results and the KISA mapping. [CHANGELOG.md](CHANGELOG.md) lists releases and their verdict impact.
 
 ## One run
 
@@ -147,22 +112,7 @@ A migration often has to keep a few classical lines, for example to read data wr
 
 ## Outputs
 
-Each run writes a new folder (`OUT=...`, default `./proof-out-YYYYMMDD-HHMMSS`, with `-2`, `-3` added when two runs start in the same second) and refuses to reuse a folder given in `OUT`. While it runs, it prints the applied settings and one progress line per step, with the time taken, to stderr. It warns about a variable whose name is one letter off a setting (`REQUIRE_REVEIW=1` would otherwise leave strict mode off without a word) and about unknown `PQPROOF_` names. The console ends with the files to open first (`receipt.html` for people, `receipt.json` for programs, `tables/report.md` to paste) and the re-check command for the entry point that ran (`pqproof --verify` or `bash prove.sh --verify`). A failed run then lists where the full lists are (`tables/cbom-fixed.csv`, `artifacts/residue-fixed.txt`, `artifacts/weakening.json`) and points to the allowlist example, and `tables/report.md` gets a table of the blocking locations.
-
-- `receipt.json`: the verification evidence. It records the tool version, the ruleset and the evidence format (see [Versions in the evidence](#versions-in-the-evidence)), the inputs (absolute path, tree SHA-256, zip SHA-256), every tool with its path and SHA-256, the parameters, each check with expected and actual values, the start and end time of each step, and every output file with its size and SHA-256.
-- `receipt.html`: the same evidence as one self-contained page, with no external references.
-- `deck.json`: a short summary for slides or a dashboard.
-- `evidence-fragment.json`: the main numbers in a flat form (classical line count, PQC algorithms found, TLS group, verdict and check results), for copying into another record.
-- `tables/cbom-orig.csv`, `tables/cbom-fixed.csv`: the CBOM of both versions, one row per location, with its verdict and reason.
-- `tables/report.md`: the check table and what is left after the migration, ready to paste into a document. `tables/fragment.html` is the same for an HTML page.
-- `tables/summary.csv` (the checks), `tables/java.csv` and `tables/java-usage.csv` (classical lines per rule and per location), `tables/tls.csv` (TLS results).
-- `artifacts/`: raw scanner output, the copies of `residue.sh` and `scan/test-paths.ere` that ran, TLS probe transcripts, the weakening result and the list of changed files.
-
-Before you hand the folder to someone else, check what it carries. It names absolute paths on your machine: the input folders, the tools and the output folder in `receipt.json` and `receipt.html`, and the scanned folder and command line at the top of each CBOM report. For a zip input, `in/` holds the whole unpacked source. The scanner output under `artifacts/` quotes source lines as they are. In the excerpts the tool writes itself (the note column of `tables/cbom-*.csv`, `tables/report.md`) and in SARIF snippets, values that look like secrets are replaced by `***`: the value after `-storepass`, `-keypass` or `pass:`, after `password=`, `secret=`, `token=` and similar names, after `Bearer`, and strings with known token prefixes. The console says how many it masked. Masking inside the scanner output itself comes with the next ruleset, because `cbom-scan.sh` is a rule file.
-
-The evidence hash is the `receipt_id` field. It is the SHA-256 of `receipt.json` without that field, written in RFC 8785 canonical form (JSON Canonicalization Scheme). `bash prove.sh --verify <folder>` recomputes it, checks every file hash and the unpacked input tree, rebuilds the HTML page and `deck.json` to compare, and checks that `evidence-fragment.json` and `tables/report.md` give the same verdict. Anyone can edit the files and write fresh hashes, so the hash only tells you something when you compare it with a value from a place you trust, such as the console output of the run or a submission record.
-
-Each run gets its own evidence hash. The evidence holds the run times, the absolute input paths and CBOM file names with a time stamp, so running the same inputs again gives the same verdict and check results but a new evidence hash.
+A run writes `receipt.json` (the verification evidence), `receipt.html` (the same as one self-contained page), `deck.json`, `evidence-fragment.json`, the tables under `tables/` and the raw tool output under `artifacts/`; zip inputs are unpacked under `in/`. [guide/outputs.md](guide/outputs.md) describes each file, what to open first, what to check before sharing the folder, and the fields that stay stable within an evidence format. The run, its progress lines, the settings line, the typo warnings and the console's next steps are described in [guide/quickstart.md](guide/quickstart.md) and [guide/configuration.md](guide/configuration.md).
 
 ## Verification evidence and the evidence hash
 
@@ -211,7 +161,7 @@ From evidence format 2 (0.1.0), `receipt.json` also records:
 
 `format` is the fixed string `pqc-proof receipt 1` that the first public copy wrote. It has not changed since and does not track the format; read `format_version`.
 
-**Machine-readable contract.** `schemas/receipt-v2.schema.json` is the JSON Schema (draft 2020-12) of format 2, and `schemas/unconverted.schema.json` that of the allowlist. `tests/make_schemas.py` writes both from the code that reads these files, and a test fails when they drift. Within one `format_version` these fields keep their name, type and meaning: `format_version`, `tool_version`, `ruleset_version`, `ruleset_sha256`, `receipt_id`, `verdict`, `checks[].id`, `checks[].status`, `inputs.*.tree_sha256`, `inputs.*.zip_sha256`, `artifacts[].path`, `artifacts[].sha256`, the counts under `cbom`, `java` and `allowlist`, and the exit codes and Action outputs. Text meant for people (`checks[].title`, `expected`, `actual`, `note`, `warnings`, the Korean words in tables) can change in any release; do not parse it. The schema is closed (`additionalProperties: false`), so adding, removing or renaming a field, or changing its type or meaning, raises `format_version`.
+The JSON Schemas under `schemas/` and the list of stable fields are in [guide/outputs.md](guide/outputs.md#machine-readable-contract). `tests/make_schemas.py` writes the schemas from the code, and a test fails when they drift.
 
 ### Older evidence
 
@@ -219,33 +169,11 @@ From evidence format 2 (0.1.0), `receipt.json` also records:
 
 ## TLS targets
 
-`b-tls` needs a running server. Build the probe once (static Go binaries, nothing downloaded), start the fixed service, and pass its address:
-
-```bash
-bash build-probe.sh      # bin/tls_probe-{darwin-arm64,darwin-amd64,linux-amd64,linux-arm64}
-EXPECT=kem,sig,tls TLS_TARGETS="127.0.0.1:8443@localhost#/abs/path/ca.pem" bash prove.sh orig/ fixed/
-```
-
-Before it measures your server, the probe tests itself against two local reference servers, one hybrid and one X25519-only. If either control comes out wrong, the run is undecided. When the probe runs on the host (the default, `TLS_VIA=host`) and OpenSSL 3.5 or later is found, the tool repeats the hybrid-only handshake with `openssl s_client` and compares the group. The binaries are not in git; build them with `build-probe.sh`.
-
-`bash prove.sh --help` lists every setting, including `SCOPE=kex` (key exchange only) and `TLS_VIA=container:<name>` (measure inside a container's network).
+`b-tls` measures a running server: [guide/configuration.md](guide/configuration.md#tls-targets) shows how to build the probe and pass addresses. Before it measures a target, the probe tests itself against two local reference servers, one hybrid and one X25519-only, and the run is undecided if either control comes out wrong. On the host with OpenSSL 3.5 or later, the tool repeats the hybrid-only handshake with `openssl s_client` and compares the group; a disagreement is undecided too.
 
 ## SARIF and the GitHub Action
 
-`pqproof sarif <output folder> [-o file] [--uri-prefix path/] [--anchor file]` (or `bash prove.sh sarif ...` from a clone) turns the evidence into SARIF 2.1.0 for GitHub code scanning. It first recomputes `receipt_id` and the SHA-256 of every file it reads. On a mismatch it writes nothing and exits 2. Fingerprints hash the rule, path, algorithm and snippet without the line number, so an alert survives a line shift. Snippets go through the same secret masking as the tables, before they are written and before they are hashed, and `run.properties.redactedSnippets` counts the masked values.
-
-| Rule | Source | Level |
-|---|---|---|
-| `a-cbom` | blocking rows of `tables/cbom-fixed.csv`, one result per location, and rows left for review (a write path inside an allowed range) | error; review rows warning |
-| `c-classic` | `LEFT` lines of the nine public-key families, weak PQC, legacy writes and site rules in `artifacts/residue-fixed.txt`, minus allowed and hybrid lines | error; listed review lines warning |
-| `b-weakening` | `weakening.deny` | error, at file level |
-| `r-review` | `weakening.review` | warning, at file level |
-| `r-allow` | allowlist entries in effect without review, unused entries, write paths | warning; error under `REQUIRE_REVIEW=1` |
-| `c-expect`, `b-tls`, `a-input` | the check status | error on fail, warning on review or undecided, attached to the `--anchor` file or kept as a run notification |
-
-Checks that ended not applicable or undecided are listed in `run.properties.notCountedAsPass`.
-
-`action.yml` is a composite Action. Inputs: `original`, `converted`, `allow-list`, `require-review`, `expect`, `scope`, `classic`, `exclude`, `tls-targets`, `probe-bin-dir`, `output-dir`, `sarif-file`, `sarif-anchor`, `fail-on` (`not-pass`, `fail` or `never`) and `python`. Outputs: `verdict`, `evidence-hash`, `exit-code`, `output-dir` and `sarif-file`. Inputs reach the scripts only through environment variables. The Action runs `--verify` on the evidence it wrote and reports `error` if that fails. `examples/github-actions/pqproof-sarif.yml` judges a pull request against its base commit and uploads the SARIF file to code scanning. It reads the allowlist from the base commit and warns when the pull request changes it, so an author cannot add entries and fill in their review fields in the same pull request; `CODEOWNERS.example` puts the list behind a security owner's approval. The Action reference is pinned to the commit of `v0.1.0`. `examples/gitlab/` (a merge request job with a Code Quality report, converted by `sarif_to_codequality.py`) and `examples/jenkins/Jenkinsfile` (the Warnings Next Generation plugin) do the same outside GitHub, and SonarQube imports the SARIF file with `sonar.sarifReportPaths`.
+`pqproof sarif` turns the evidence into SARIF 2.1.0 after recomputing every hash it reads, and `action.yml` wraps a run, `--verify` and the SARIF step. The rule table, the Action inputs and outputs, and the GitHub, GitLab, Jenkins and SonarQube examples are in [guide/ci.md](guide/ci.md).
 
 ## Tests
 
@@ -326,44 +254,6 @@ A different ruleset name alone (`1+modified` while rule files are being edited) 
 - A release starts from a tag `vX.Y.Z` (`.github/workflows/release.yml`). It first runs the whole CI workflow (`ci.yml` through `workflow_call`), so a release passes every job a push does. The tag must match the version and a dated `CHANGELOG.md` entry, and the tagged commit must be on `main`. The workflow builds the four `tls_probe` binaries with `SHA256SUMS` and `BUILDINFO`, and the wheel and the sdist with build tools pinned by hash (`.github/requirements/build.txt`, no build isolation). It writes a CycloneDX SBOM of the wheel and adds the file hashes, the `tls_probe` binaries with their Go version, and the external programs the tool runs (bash, OpenSSL, keytool) to it (`.github/scripts/sbom_extend.py`), then checks it against the CycloneDX schema. Every asset, `BUILDINFO` included, gets GitHub build provenance (`gh attestation verify <file> --repo g1mn/pqproof`), and the wheel gets an SBOM attestation. Then it publishes to PyPI with Trusted Publishing.
 - Workflow actions are pinned to commit SHAs, release and lint tools to versions with hashes, and Dependabot proposes updates for both. A `lint` job runs ruff (error rules only), shellcheck on the shell scripts (`scan/cbom-scan.sh` waits for the next ruleset, because fixing its warnings changes the ruleset hash) and zizmor on the workflows and the Action.
 
-## Use in the finals
-
-In the finals, `prove.sh` was the completion check at the end of my migration pipeline. On all five tasks the first run failed and the last run passed. On four of them the fixed code did not change between those runs: the agent added or widened allowlist entries, each with a reason, and the verdict turned to pass. None of those entries had a review record, because the review fields came after the finals. That is why `r-allow` exists. The organizers' own grading made the final call.
-
-I wanted the fixing and the judging kept apart. A coding agent changes code quickly, and it can also write changes that look finished when they are not. So the step that says "finished" has no model in it: the same inputs give the same verdict. The evidence hash still changes from run to run, because the evidence also records when and where the run happened.
-
-## Changes since the finals
-
-Three things changed after the finals: one new check, and fixes for two flaws I found while re-checking the tool. Both flaws were already in the finals version. A review of the first fixes then found a gap in each, and I closed both. The 0.1.0 packaging, SARIF output, Action, versioning and test changes are listed in [CHANGELOG.md](CHANGELOG.md).
-
-### Review record (`r-allow`)
-
-`r-allow` shows whether a person read each allowlist entry (see above). It changes the verdict only under `REQUIRE_REVIEW=1`.
-
-### Unused allowlist entries
-
-You write the allowlist for the fixed tree, but it applies to any tree you run it on. An entry that matched no classical line in the fixed tree used to stay in the list as "unused" with no warning. Run against the original, the same list let that entry allow the classical lines in its range, and in one case it hid every blocking location of the original. A key-generating line inside an allowed range showed up only as "needs review" in the check rows.
-
-The tool now also resolves the list against the original and records, per entry, how many classical lines it covers in each tree (`lines_fixed`, `lines_orig`). It warns about every unused entry, names the original lines that entry would cover, and marks `r-allow` as needs review. Under `REQUIRE_REVIEW=1` an unused entry fails the run. The verdict line also counts write paths left inside allowed ranges, and `--verify` checks all of these counts against the entries.
-
-The lines an unused entry would hide do not go back to being blocking locations. Within one run they sit in the original, which the tool never judges. If someone puts the original in the fixed slot, the entry matches lines there, and nothing in the list says which tree it was written for. So the tool flags the entry in the run where it is unused, and `REQUIRE_REVIEW=1` makes you delete it. In a unit test (`tests/test_allowlist.py`, masked case), deleting the unused entry makes the same tree fail and lists its blocking locations.
-
-The first version of this fix missed one case. An entry that points to a file deleted from the fixed tree, or to lines past the end of a file that got shorter, is invalid there and allows nothing, so it only got a warning. In the original the same entry is valid and hides those lines, and with a review record on it the run passed even under `REQUIRE_REVIEW=1`. Such an entry now counts as unused whenever it covers classical lines in the original, and so does an entry that points only outside the tree or at excluded data files. `--verify` recounts this from each entry's status and `lines_orig`, and fails newer evidence when someone deletes its unused and write-path counts.
-
-### One list of test paths
-
-In the finals version, three places decided what a test path was. `cbom-scan.sh` marked twelve test and example folder names and test file patterns such as `*_test.go` as tests. `pqlite/scan.py`, the other scanner behind `a-cbom`, skipped only Java files under `src/test/`, `test/` or `tests/` or named `*Test`, and Go files named `*_test.go`. `residue.sh`, which `c-classic` and `c-expect` read, skipped only `src/test/`, `test/` and `tests/`. A Go test in `seal_test.go` that builds a P-256 key to check that it gets rejected passed `a-cbom` and failed `c-classic`. Now one file, `scan/test-paths.ere`, holds the rule, and `cbom-scan.sh`, `residue.sh`, `pqlite/scan.py` and the TLS signal check all read it.
-
-My first version of the shared rule matched folder names such as `example` anywhere in the path. That made `src/main/java/com/example/`, the default Spring package, test code: classical Java left there passed, and a correct Java-only migration there failed `c-expect`. The file now has a second line, a main-source marker (`/src/main/`). When a path contains it, the tool matches only the part before the marker, so nothing under `src/main/` is a test path, while `tests/it/src/main/` still is. `examples/`, `samples/`, `spec/`, `fixtures/` and `mock(s)/` count only at the top of the tree. `test/`, `tests/`, `__tests__/` and `testdata/` count at any depth, and so do test file names.
-
-Skipping more paths risks missing production code kept in a folder named like a test folder. Skipping fewer fails good migrations that test the rejection of old keys and pushes test code into the allowlist. The skipped lines stay visible: `c-classic` prints how many classical lines sit in test paths and where, `a-cbom` counts them apart, and the evidence keeps them. ML-KEM and ML-DSA lines in test paths do not count as PQC use.
-
-### Effect on verdicts
-
-A tree whose only classical lines sit in test paths used to fail `c-classic` and now passes. The shared rule moved `a-cbom` and `c-expect` as well. Compared with the finals version, `c-classic` and `c-expect` now also skip test file names (`*_test.go`, `*Test.java`, `test_*.py` and the like), `__tests__/`, `testdata/` and the top-level example folders. `a-cbom` now also skips Go files in `test/` and `tests/`, and Java and Go files in `__tests__/`, `testdata/` and the top-level example folders. For Python, Node and the other files that only `cbom-scan.sh` reads, an `examples/`, `samples/`, `spec/`, `fixtures/` or `mock(s)/` folder below the top of the tree no longer counts as tests. Below `src/main/` nothing counts as a test path for any check, not even a class named `*Test.java`, unless a test folder sits above `src/main/`.
-
-On the eight practice tasks I wrote for rehearsal, the verdicts did not change, and the review fixes changed no verdict, check or count. One change does show up: a list whose entries are all unused now makes `r-allow` need review where it used to be not applicable. That happened on five rehearsal runs, and none of their verdicts moved.
-
 ## Limits
 
 - **Rules, not proof.** A pass means the rules found nothing. Whether the rules are right, complete or fit your service is a human judgement.
@@ -380,34 +270,17 @@ On the eight practice tasks I wrote for rehearsal, the verdicts did not change, 
 - **No function or performance testing.** Use your own tests for that.
 - **Scale.** I have run it only on small services so far, not yet on production codebases.
 
-## Layout
-
-| Path | What |
-|---|---|
-| `prove.sh`, `prove.py` | entry point and the checks |
-| `pqlite/` | code scanner, TLS-weakening rules, probe output parser, evidence writer and verifier, allowlist, versions |
-| `scan/` | `cbom-scan.sh` (CBOM scanner, bash and OpenSSL), `residue.sh` (classical-line counter), `test-paths.ere` (the test-path list both read), `ruleset.json` (ruleset names, hashes, first version and verdict impact) |
-| `src/pqproof/` | the `pqproof` command, the SARIF converter and the external-program check |
-| `probe/`, `build-probe.sh` | `tls_probe` source (Go standard library) and its offline build script |
-| `examples/` | the before and after trees used above and by the tests, and a GitHub Actions example |
-| `tests/` | unit tests, the mutation suite, golden verdicts, older evidence and a snapshot of the orders-edge fixture |
-| `action.yml`, `.github/` | the GitHub Action, CI, Pages and release workflows, Dependabot |
-| `docs/` | the site, deployed to GitHub Pages |
-
-Code comments and tool output are in Korean, as they were in the finals. Two words changed: the output now says 검증 증적 (verification evidence) where the finals version said 영수증 (receipt), and 보안레벨 (security level) where it said 범주 (category). Both Korean words stand for the NIST security category, and the English CBOM column keeps that term. File and field names still use `receipt`.
-
 ## 한국어 요약
 
 2026년 양자내성암호 전환 해커톤 본선에서 실제로 쓴 검증 도구다. 이 대회에서 대상(부총리상)을 받았다. 전환 전과 후의 소스를 넣으면 사유 없이 남은 기존 공개키 암호 코드가 없는지, ML-KEM-768과 ML-DSA-65를 쓰는지, TLS 설정을 약하게 바꾸지 않았는지 보고 전환이 끝났는지 판정한다. 판정에 AI 모델을 쓰지 않으므로 입력이 같으면 판정도 같다.
 
-- 실행: `pip install pqproof` 뒤 `pqproof <전환 전 폴더|zip> <전환 후 폴더|zip>`, 저장소에서는 `bash prove.sh <전환 전> <전환 후>`. 예제로 돌려 보려면 `bash prove.sh examples/classic examples/pqc`.
-- 출력: 판정(종료 코드 0 통과, 1 실패, 3 미판정), 전후 CBOM 표, 검증 증적(`receipt.json`, `receipt.html`), 증적 해시. 증적 해시는 증적 JSON을 RFC 8785 방식으로 정규화해 SHA-256으로 계산한 값이다. `bash prove.sh --verify <출력 폴더>`로 누구든 다시 계산해 볼 수 있다. 증적에 실행 시각과 입력 폴더의 절대 경로가 들어가서, 입력이 같아도 증적 해시는 실행할 때마다 달라진다.
+- 실행: `pip install pqproof` 뒤 `pqproof <전환 전 폴더|zip> <전환 후 폴더|zip>`, 저장소에서는 `bash prove.sh <전환 전> <전환 후>`. 예제로 돌려 보려면 `bash prove.sh examples/classic examples/pqc`(휠에도 예제가 들어 있다: guide/quickstart.md). 판정에는 bash·OpenSSL 이 있어야 해서 Windows 에서는 WSL 안에서 돌리고, 증적 재검증(`pqproof --verify`)과 SARIF 변환은 파이썬만으로 Windows 에서도 된다.
+- 출력: 판정(종료 코드 0 통과, 1 실패, 2 사용법·입력 오류, 3 미판정), 전후 CBOM 표, 검증 증적(`receipt.json`, `receipt.html`), 증적 해시. 증적 해시는 증적 JSON을 RFC 8785 방식으로 정규화해 SHA-256으로 계산한 값이다. `pqproof --verify <출력 폴더>`(저장소에서는 `bash prove.sh --verify`)로 누구든 다시 계산해 볼 수 있다. 증적에 실행 시각과 입력 폴더의 절대 경로가 들어가서, 입력이 같아도 증적 해시는 실행할 때마다 달라진다.
 - 용어: 본선판 출력의 '영수증'을 '검증 증적'으로, '범주 3'을 '보안레벨 3'으로 바꿨다. 둘 다 NIST의 security category를 가리키며 영어 출력(CBOM 표의 NIST 칸)은 security category를 그대로 쓴다. 파일과 칸 이름은 `receipt.json`, `receipt_id`처럼 receipt를 그대로 쓴다.
 - 사람 확인: 도구는 허용 목록의 사유가 맞는지 모르므로 사람이 읽고 항목(또는 목록 맨 위)에 `reviewed_by`(이름·계정)와 `reviewed_at`(ISO 8601 날짜·시각)을 적는다. 목록 맨 위에 적을 때는 실행할 때 찍히는 `reviewed_digest` 값도 함께 적는다. 그 뒤에 항목을 더하거나 고치면 값이 맞지 않게 되어 맨 위 칸을 물려받던 항목이 모두 확인 전으로 돌아간다. 확인 전 허용 항목이 있어도 통과와 종료 코드 0은 그대로다. 판정을 '통과(허용 n건 사람 확인 전)'으로 적을 뿐이고 `REQUIRE_REVIEW=1`을 주면 실패로 끝난다. 칸 형식이 틀리거나 값이 맞지 않으면 경고를 남기고 확인 전으로 센다. 두 칸은 `receipt.json`에 들어가 증적 해시에 반영되며 `--verify`가 증적과 함께 남긴 허용 목록 사본과 맞춰 본다.
-- 경로: 출력에는 입력 폴더, 도구, 출력 폴더의 절대 경로가 적힌다. 출력 폴더를 남에게 넘기기 전에 확인한다.
-- 본선에서 코드는 AI 코딩 에이전트가 고쳤고 이 도구는 그 흐름 끝에서 전환이 끝났는지 확인하는 단계였다. 다섯 과제 모두 첫 판정은 실패, 마지막 판정은 통과였다. 네 과제는 고친 코드를 그대로 둔 채 허용 목록 항목을 더하거나 범위를 넓혀 통과로 바뀌었고 그 항목에는 사람 확인 기록이 없다(확인 칸은 본선 뒤에 더했다). 그래서 `r-allow`를 더했다. 최종 판정은 주최 측 채점이 했다.
-- 본선 뒤 바뀐 점은 셋이다. 하나는 새 검사이고 둘은 다시 점검하다 찾은 결함(본선판에도 있던 것)을 고친 것이다. 이 고침을 따로 검토해서 나온 빈틈 두 개도 막았다. (1) 허용 목록 사람 확인 검사 `r-allow`를 더했다. (2) 고친 판에서 고전 줄을 하나도 덮지 않는 허용 항목(안 쓰인 항목)이 있으면 경고한다. 이런 항목은 같은 목록을 원본에 대면 그 범위의 고전 줄을 가린다. 원본에서 그 항목이 덮는 줄 수는 증적에 남기고 판정은 그대로 두되 `r-allow`를 검토 필요로 바꾸며 `REQUIRE_REVIEW=1`이면 실패로 끝낸다. 허용 범위 안 쓰기 경로 수도 판정 옆에 적어 둔다. 가린 줄을 막는 위치로 되돌리지는 않았다. 한 번 실행할 때 가려지는 줄은 판정하지 않는 원본 쪽에 있고 원본을 고친 판 자리에 넣으면 그 항목이 쓰이는 항목이 되어 구별할 수 없어서다. 대신 안 쓰인 항목을 지우게 했고 단위 시험에서 지워 보면 원본의 막는 위치가 다시 나온다(`tests/test_allowlist.py` 가림 재현). 고친 판에서 지운 파일을 가리킨 항목처럼 고친 판에서는 무효인데 원본에서는 고전 줄을 덮는 항목도 안 쓰인 항목으로 센다. 처음 고친 판은 이런 항목에 경고만 남겨 사람 확인 칸이 있으면 `REQUIRE_REVIEW=1`에서도 통과했다. (3) 시험 경로 기준을 `scan/test-paths.ere` 한 곳으로 모았다. cbom-scan.sh, residue.sh, pqlite/scan.py, TLS 신호 검사가 모두 이 파일을 읽는다. 본선판은 세 곳이 따로 정했다. cbom-scan.sh는 시험·예제 폴더 열두 가지와 시험 파일 이름을 시험으로 봤지만 a-cbom의 Java·Go 행을 내는 pqlite/scan.py는 Java의 `src/test/`·`test/`·`tests/`·`*Test`와 Go의 `_test.go`만 뺐고 c-classic이 읽는 residue.sh는 `src/test/`·`test/`·`tests/`만 뺐다. 그래서 `_test.go` 같은 음성 시험이 c-classic에서만 실패했다. 처음 고친 판은 폴더 이름을 경로 어디서든 맞춰서 Spring 기본 패키지 `src/main/java/com/example/`이 통째로 시험이 됐다. 지금은 목록 둘째 줄의 본 소스 표시(`/src/main/`) 앞부분만 맞춰 보므로 `src/main/` 아래는 시험이 아니다. `examples/`·`samples/`·`spec/`·`fixtures/`·`mock(s)/`는 트리 맨 위 폴더일 때만 시험으로 본다. 시험 경로의 고전 줄은 줄마다 따로 세어 보이며 이 규칙은 c-classic뿐 아니라 a-cbom과 c-expect에도 똑같이 걸린다. 고전 줄이 시험 경로에만 있는 소스는 실패에서 통과로 바뀐다. 리허설용으로 직접 만든 연습 과제 여덟 개의 판정은 바뀌지 않았다. 안 쓰인 항목만 있는 목록이면 r-allow가 해당 없음에서 검토 필요로 바뀐다(리허설 5회, 판정은 그대로).
+- 경로·비밀: 출력에는 입력 폴더, 도구, 출력 폴더의 절대 경로가 적히고, zip 입력이면 in/ 에 소스 전체가, artifacts/ 의 스캐너 출력에는 소스 줄이 그대로 들어 있다. 도구가 직접 쓰는 표 발췌와 SARIF snippet 은 비밀번호·토큰처럼 보이는 값을 *** 로 가린다. 출력 폴더를 남에게 넘기기 전에 확인한다.
 - 한계: 통과는 이 규칙으로 찾은 것이 없다는 뜻일 뿐, 규칙이 옳다는 보장은 아니다. 기능과 성능은 보지 않는다. 허용 목록은 판정을 바꾼다. 사유가 맞는지는 도구가 모르니 사람이 확인해야 하고 실무 검토에서는 `REQUIRE_REVIEW=1`로 돌리기를 권한다. JSON·YAML 설정 값이 고르는 알고리즘은 보지 않는다. 넣은 소스 밖의 설정(호스트의 TLS 설정 등)도 못 보므로 판정이 실행 중인 서비스를 직접 시험한 결과와 다를 수 있다. 작은 서비스에서만 써 봤고 실서비스 규모로는 아직 검증하지 않았다.
 - 공개하면서 대회 문제와 관련된 내용, 개인 경로, 대회용 보고서 표를 뺐다. 참가자가 만든 도구이며 주최·주관기관이 검토하거나 보증하지 않았다.
 - 건너뛴 검사는 통과로 세지 않는다. 돌지 못한 검사는 이름과 함께 '해당 없음'이나 '미판정'으로 남고, 판정 뒤에 상태별 개수를 따로 찍는다. 단위·셀프 시험도 '통과 n · 건너뜀 m'으로 세며 `STRICT=1`이면 건너뛴 것이 있을 때 실패한다.
 - 버전: 도구 버전은 `src/pqproof/__init__.py` 한 곳에서 정한다. 증적에 도구 버전, 규칙 묶음 이름과 해시(스캐너 패턴·시험 경로·허용·약화 규칙 파일 여섯), 증적 형식을 남기고 `--verify`가 규칙 묶음 해시를 다시 계산한다. 이전 공개본이 쓴 옛 증적도 계속 읽는다. 판정이 바뀔 수 있는 변경과 새 명령·옵션은 0.x 동안 MINOR로, 그 밖 고침은 PATCH로 올린다. 판정이 바뀌는 릴리스는 PATCH가 될 수 없고 CI와 릴리스 작업이 앞 릴리스 태그와 대조해 막는다(`tests/version_policy.py`). 바뀐 내용은 CHANGELOG.md의 '판정 영향' 칸에 적는다.
+- 문서: 설치·설정·결과 읽기는 [guide/](guide/), 규칙과 증적 형식은 이 파일, 본선에서 쓴 이야기와 본선 뒤 바뀐 점은 [HISTORY.md](HISTORY.md)에 있다.

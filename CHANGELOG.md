@@ -16,6 +16,8 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 ### Added
 
+- `CONTRIBUTING.md` (local checks, layout, a checklist for changing a rule or adding a language, site rules, evidence format changes) and a pull request template that asks for the verdict impact.
+- A docs test: every relative link and every `github.com/g1mn/pqproof/blob/main/` link in the Markdown files points to a file and heading that exist, the SARIF help anchor exists on the site, and the pages the tool prints exist.
 - CI outside GitHub: a GitLab merge request job (`examples/gitlab/`) that turns the SARIF file into a Code Quality report, a Jenkinsfile that records it with the Warnings Next Generation plugin, and a SonarQube note.
 - JSON Schemas for the evidence and the allowlist (`schemas/receipt-v2.schema.json`, `schemas/unconverted.schema.json`), written from the code by `tests/make_schemas.py` and tested against the golden evidence, a fresh run and the allowlist example. DESIGN lists the fields that stay stable within a `format_version` and the text that is only for people.
 - `examples/allowlist/`: an allowlist with an unreviewed fallback entry and a reviewed boundary entry, and what each field means.
@@ -25,6 +27,7 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 ### Changed
 
+- Documentation split: the README has a five-minute path, exit-code and platform tables and a word list; `guide/` holds the quick start, configuration (all settings in English), allowlist, outputs and CI pages; `DESIGN.md` keeps the rules and the evidence format; `HISTORY.md` keeps the contest story and the changes since the finals. The README's exit-code line used to leave out 2, and the docs told pip users to clone the repository for the bundled examples that the wheel already carries.
 - The GitHub example workflow reads the allowlist from the base commit and warns when a pull request changes it, so the author of a change cannot also approve its allowlist entries. `CODEOWNERS.example` shows how to require a security owner. The Action reference is pinned to the `v0.1.0` commit instead of the movable tag, and permissions are set per job.
 - Release workflow: it runs the whole CI workflow first (`workflow_call`), so a release no longer passes on one Ubuntu job alone. It checks that the tagged commit is on `main`, builds with `build` and `hatchling` pinned by hash, without build isolation, and attests `BUILDINFO` too. The SBOM now lists the wheel and sdist hashes, the `tls_probe` binaries with their Go version and the external programs (bash, OpenSSL, keytool), passes the CycloneDX schema check and gets an SBOM attestation. The release notes say `shasum -a 256 -c --ignore-missing SHA256SUMS`, which works when only one binary was downloaded.
 - CI: a `lint` job (ruff with error rules, shellcheck, zizmor) with hash-pinned tools, and Python 3.15 in the test matrix. A fourth `tls_probe` binary for Intel Macs (`darwin-amd64`).
