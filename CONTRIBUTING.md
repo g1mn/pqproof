@@ -9,7 +9,7 @@ STRICT=1 bash prove.sh --unit && STRICT=1 bash prove.sh --selftest \
   && python3 -I tests/mutations/run_mutations.py --strict --golden tests/golden/verdicts.json
 cp -R . /tmp/pqproof-scan && (cd /tmp/pqproof-scan && bash scan/cbom-scan.sh --selftest)   # writes test keys, so use a copy
 python3 -m pip install --require-hashes -r .github/requirements/lint.txt
-ruff check . && shellcheck -S warning prove.sh build-probe.sh scan/residue.sh && zizmor --offline --min-severity medium .github/workflows/ action.yml
+ruff check . && shellcheck -S warning prove.sh build-probe.sh scan/residue.sh scan/cbom-scan.sh && zizmor --offline --min-severity medium .github/workflows/ action.yml
 ```
 
 `STRICT=1` fails on any skipped test. The TLS tests need `tls_probe` (`bash build-probe.sh`, Go 1.27 or later) and the SARIF schema test needs `jsonschema` and the schema file in `SARIF_SCHEMA` (see `.github/workflows/ci.yml`). The weekly `python3 -I tests/code_mutants.py --baseline` checks that the behaviour tests still catch small changes to the rule code.
@@ -34,7 +34,7 @@ Code comments and tool output are in Korean; documentation is in English, with a
 
 ## Changing a rule
 
-The ruleset is the files in `RULESET_FILES` of `pqlite/version.py`: `scan/cbom-scan.sh`, `scan/residue.sh`, `scan/test-paths.ere`, `pqlite/scan.py`, `pqlite/verify.py`, `pqlite/allowlist.py`, `pqlite/rules.py` and `pqlite/tlsprobe.py`. A verdict constant or pattern belongs in `pqlite/rules.py`, not in `prove.py`; a test fails when `prove.py` gets a new pattern constant. Changing any byte of them, a comment included, changes the ruleset hash, and a run with a changed file is named `<current>+modified` until the change has its own ruleset name. That is why lint warnings in these files wait for the next ruleset.
+The ruleset is the files in `RULESET_FILES` of `pqlite/version.py`: `scan/cbom-scan.sh`, `scan/residue.sh`, `scan/test-paths.ere`, `scan/skip-dirs`, `pqlite/scan.py`, `pqlite/verify.py`, `pqlite/allowlist.py`, `pqlite/rules.py`, `pqlite/skipdirs.py` and `pqlite/tlsprobe.py`. A folder to skip goes in `scan/skip-dirs`, nowhere else. A verdict constant or pattern belongs in `pqlite/rules.py`, not in `prove.py`; a test fails when `prove.py` gets a new pattern constant. Changing any byte of them, a comment included, changes the ruleset hash, and a run with a changed file is named `<current>+modified` until the change has its own ruleset name. That is why lint warnings in these files wait for the next ruleset.
 
 A rule ID or a value can live in more than one file. For a new or changed rule:
 

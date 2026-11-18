@@ -6,6 +6,8 @@
 #       곡선 표·JWT/JOSE 상수·OID 상수 행, 못 가른 이름도 '확인' 행.
 #       시험·예제 경로는 scan/test-paths.ere 한 곳(cbom-scan.sh·residue.sh·prove.py 와 같은 목록)으로 가른다(TEST_PATH, is_test).
 #       같은 파일 둘째 줄의 본 소스 표시(/src/main/) 뒤쪽은 시험으로 보지 않는다(MAIN_PATH, com/example 회귀 수정).
+#       건너뛰는 폴더는 scan/skip-dirs 한 곳(pqlite/skipdirs.py)에서 읽는다. vendor·build·target 은 트리 맨 위나 빌드 파일 옆일
+#       때만 건너뛰고 src/main 아래는 본다(교차 리뷰 X02·X03·X09).
 """암호 사용처 목록(CBOM) 행을 만든다(PQ-Proof scan.py에 Java BC/JCA를 보탬).
 
 오프라인판 추가분:
@@ -60,7 +62,7 @@ import re
 import stat
 from dataclasses import asdict, dataclass, replace
 
-from . import verify
+from . import skipdirs, verify
 
 MAX_FILE = 1 << 20
 # 시험·예제 경로 목록 한 곳(scan/test-paths.ere). cbom-scan.sh(flag_of)·residue.sh(TEST 줄)·prove.py(TLS 신호)와 같은 줄을 쓴다.
@@ -92,7 +94,7 @@ def is_test(path):
 
 PATH_SAFE = re.compile(r"[A-Za-z0-9._/-]{1,200}")
 PATH_UNSAFE = re.compile(r"[^A-Za-z0-9._/-]")
-SKIP_DIRS = {".git", "vendor", "node_modules", "target", "build", ".gradle", "__pycache__"}
+SKIP_RULES = skipdirs.load()  # 건너뛰는 폴더: scan/skip-dirs 한 곳(트리 해시·cbom-scan.sh·residue.sh 와 같은 규칙, 교차 리뷰 X09)
 HYBRID = "X25519MLKEM768"
 NIST_KEX = "quantum-vulnerable: deprecated after 2030, disallowed after 2035 (NIST IR 8547, Table 4)"
 NIST_SIG = "quantum-vulnerable: deprecated after 2030, disallowed after 2035 (NIST IR 8547, Table 2)"
@@ -182,17 +184,16 @@ def _turns_off_mlkem(settings):
 
 
 def _files(root):
-    """(relative path, text) of regular files under root, without following symlinks."""
-    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
-        dirnames[:] = sorted(d for d in dirnames if d not in SKIP_DIRS)
-        for name in sorted(filenames):
-            full = os.path.join(dirpath, name)
-            st = os.lstat(full)
-            if not stat.S_ISREG(st.st_mode) or st.st_size > MAX_FILE:
-                continue
-            with open(full, "rb") as f:
-                data = f.read(MAX_FILE)
-            yield os.path.relpath(full, root).replace(os.sep, "/"), data.decode("utf-8", errors="replace")
+    """(relative path, text) of regular files under root, without following symlinks. Folders are skipped by scan/skip-dirs."""
+    for rel, full, kind in skipdirs.walk(root, SKIP_RULES)[0]:
+        if kind != "file":
+            continue
+        st = os.lstat(full)
+        if not stat.S_ISREG(st.st_mode) or st.st_size > MAX_FILE:
+            continue
+        with open(full, "rb") as f:
+            data = f.read(MAX_FILE)
+        yield rel, data.decode("utf-8", errors="replace")
 
 
 def _groups_row(path, line, component, names, detail_prefix):

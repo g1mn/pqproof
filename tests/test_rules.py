@@ -8,15 +8,19 @@
 표에 없는 규칙이나 대안이 생기면 실패한다. 규칙을 더할 때 행동 행을 같이 넣는다.
 
 알려진 실패(KNOWN_GAPS): 교차 리뷰에서 찾은 우회·오탐을 지금 동작 그대로 고정했다. 고치면 그 시험이 실패하니 기대값을 뒤집고
-KNOWN_GAPS 에서 지운다. 판정이 바뀌는 고침이라 0.2.0(규칙 묶음 2)에서 golden 과 함께 바꾼다.
+KNOWN_GAPS 에서 지운다. 판정이 바뀌는 고침이라 규칙 묶음을 올리고 golden 과 함께 바꾼다. 규칙 묶음 2(0.2.0)에서 X01·X02·X03·X04·X06·
+X07·X58 을 고쳐 기대값을 뒤집었다(Bypasses 칸과 아래 표의 해당 행).
 """
 import os
 import pathlib
 import re
 import shutil
 import sys
+import subprocess
 import tempfile
 import unittest
+import zipfile
+from unittest import mock
 
 PROOF = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROOF))
@@ -28,12 +32,6 @@ from pqlite import verify  # noqa: E402
 
 EXAMPLES = PROOF / "examples"
 KNOWN_GAPS = {
-    "X01": "줄에 legacy 한 단어만 있으면 Python 고전 키 생성도 허용(residue 쓰기 연산 규칙이 Java 다섯 개뿐)",
-    "X02": "이름이 vendor 인 폴더는 깊이와 상관없이 건너뜀(src/main 아래도)",
-    "X03": "build·target 이름 폴더는 어느 깊이에서나 트리 목록에서 빠져 약화 검사를 안 받음",
-    "X04": "트리 밖을 가리키는 심볼릭 링크 소스를 residue 가 읽지 않음",
-    "X06": "CBOM 비고(원본 줄 발췌)에 한국어 '테스트'·'주석'이 있으면 운영 코드 행이 주석·테스트로 빠짐",
-    "X07": "Node 소문자 'ml-kem-512'·'ml-dsa-44' 를 보안레벨 3 미만 PQC 로 못 셈",
     "X11": "ML-KEM-1024·ML-DSA-87 은 EXPECT(c-expect)가 세지 않음",
     "X18": "Go 코드의 MaxVersion TLS 1.2(TLS 1.3 끄기)는 약화 규칙에 안 걸림",
     "X19": "소문자 ed25519·x25519 를 residue 가 못 셈",
@@ -41,7 +39,6 @@ KNOWN_GAPS = {
     "X22": "Python 독스트링 줄을 코드로 셈",
     "X23": "G-EC 짧은 토큰 오탐(AWS::EC2, CSS #EC4899)",
     "X24": "시험 경로 빈틈(.test.tsx, Django tests.py)",
-    "X58": "residue 의 같은 줄 하이브리드 허용이 주석 속 ML-KEM 도 인정",
     # 이번 행동 시험을 쓰다 찾은 것(교차 리뷰 목록 밖). 판정이 바뀌는 고침이라 0.2.0 에서 같이 고친다
     "N1": "-Djdk.internal.httpclient.disableHostnameVerification 꼴(JVM 옵션)은 앞 글자 D 때문에 \\b 가 안 맞아 약화 규칙에 안 걸림",
 }
@@ -169,9 +166,14 @@ RESIDUE_CASES = [
     R("c/WqNo1.java", 'String a = "ML-KEM-768";', G_WEAK_PQC=None),
     R("c/WqNo2.java", 'String a = "Dilithium3";', G_WEAK_PQC=None),
     # 분류: 같은 줄 legacy(쓰기 연산이 없을 때만), Legacy*.java, 시험 경로, 주석·문서
-    R("c/Gate1.java", 'Cipher c = Cipher.getInstance("RSA"); // legacy read path', G_RSA=A),
-    R("c/Gate2.java", 'KeyFactory.getInstance("RSA"); // LEGACY', G_RSA=A),
+    R("c/Gate1.java", 'Cipher c = Cipher.getInstance("RSA"); // legacy read path', G_RSA=L),  # 주석의 legacy 는 아니다(X01)
+    R("c/Gate2.java", 'KeyFactory.getInstance("RSA"); // LEGACY', G_RSA=L),
     R("c/Gate3.java", "Key legacy_rsa_key = k;", G_RSA=A),
+    R("c/Gate5.java", 'Cipher legacyRsa = Cipher.getInstance("RSA/ECB/OAEPPadding");', G_RSA=A, G_OAEP_PKCS1=A),
+    R("c/lr.py", "legacy_rsa = serialization.load_pem_public_key(data)", G_RSA=A),
+    R("c/lw.go", "legacyKey, _ := rsa.GenerateKey(rand.Reader, 2048)", G_RSA=L),  # 모든 언어의 새 키 생성은 이름 규칙 밖(X01)
+    R("c/lw.js", "const legacyKeys = crypto.generateKeyPairSync('rsa', {modulusLength: 2048});", G_RSA=L),
+    R("c/ls.py", "legacy_sig = rsa_key.sign(data, padding.PKCS1v15(), h)", G_RSA=L, G_OAEP_PKCS1=L),
     R("c/Gate4.java", "c.init(Cipher.ENCRYPT_MODE, rsaKey); // legacy", G_RSA=L),
     R("c/LegacyReader.java", 'KeyFactory kf = KeyFactory.getInstance("RSA");', G_RSA=A, LW_legacy_write=None),
     R("c/LegacyWriter.java", 'KeyPairGenerator g = KeyPairGenerator.getInstance("RSA");', G_RSA=L, LW_legacy_write=L),
@@ -197,11 +199,17 @@ RESIDUE_CASES = [
     R("c/LegacyW9.java", "Files.copy(a, b);", LW_legacy_write=L),
     R("c/LegacyWNo.java", "c.init(Cipher.DECRYPT_MODE, k);", LW_legacy_write=None),
     R("c/NotLegacy.java", "Files.write(p, b);", LW_legacy_write=None),
+    # 규칙 묶음 2에서 고친 우회(교차 리뷰 X01·X02·X07·X58)
+    R("c/gw.py", "legacy_key = rsa.generate_private_key(public_exponent=65537, key_size=3072)", G_RSA=L),
+    R("src/main/java/com/bank/vendor/PgClient.java", 'KeyPairGenerator g = KeyPairGenerator.getInstance("RSA");', G_RSA=L),
+    R("c/wpqc.js", "const a = crypto.generateKeyPairSync('ml-kem-512');", G_WEAK_PQC=L),
+    R("c/wpqc2.js", "const s = crypto.generateKeyPairSync('ml-dsa-44');", G_WEAK_PQC=L),
+    R("c/wpqc3.py", 'kem = oqs.KeyEncapsulation("Kyber-512")', G_WEAK_PQC=L),
+    R("c/wpqc4.go", 'name := "mldsa44"', G_WEAK_PQC=L),
+    R("c/WqNo3.java", 'String a = "Kyber768";', G_WEAK_PQC=None),
+    R("c/WqNo4.java", 'String a = "Dilithium25519";', G_WEAK_PQC=None),
+    R("c/Kx58.java", 'KeyAgreement ka = KeyAgreement.getInstance("X25519"); // ML-KEM-768 later', G_X25519=L),
     # 알려진 실패(지금 동작)
-    R("c/gw.py", "legacy_key = rsa.generate_private_key(public_exponent=65537, key_size=3072)", gap="X01", G_RSA=A),
-    R("src/main/java/com/bank/vendor/PgClient.java", 'KeyPairGenerator g = KeyPairGenerator.getInstance("RSA");', gap="X02",
-      G_RSA=None, LW_legacy_write=None),
-    R("c/wpqc.js", "const a = crypto.generateKeyPairSync('ml-kem-512');", gap="X07", G_WEAK_PQC=None),
     R("c/kor.js", "const kp = crypto.generateKeyPairSync('ed25519');", gap="X19", G_EDDSA=None),
     R("c/kx.js", "const k = crypto.generateKeyPairSync('x25519');", gap="X19", G_X25519=None),
     R("c/notes.py", '"""Notes.\nThe payload used to be wrapped with RSA-OAEP.\n"""', gap="X22", G_RSA=L, G_OAEP_PKCS1=L),
@@ -209,7 +217,6 @@ RESIDUE_CASES = [
     R("c/style.css", ".badge { color: #EC4899; }", gap="X23", G_EC=L),
     R("web/src/Sealer.test.tsx", "const k = crypto.generateKeyPairSync('rsa', {modulusLength: 2048});", gap="X24", G_RSA=L),
     R("app/tests.py", "key = rsa.generate_private_key(public_exponent=65537, key_size=2048)", gap="X24", G_RSA=L),
-    R("c/Kx58.java", 'KeyAgreement ka = KeyAgreement.getInstance("X25519"); // ML-KEM-768 later', gap="X58", G_X25519=A),
 ]
 # EXPECT: 시험 경로 밖 코드 줄만 센다(주석·문서·시험 경로는 안 센다)
 EXPECT_TREE = {
@@ -305,8 +312,9 @@ class ResidueRules(unittest.TestCase):
                     got = self.status(rid, path)
                     self.assertEqual(got, want, (gap_msg(gap) if gap else f"{path}: {text!r}"))
 
-    def test_known_gap_X04_link_outside_the_tree(self):
-        self.assertFalse([k for k in self.seen if k[1] == "c/One.java"], gap_msg("X04"))
+    def test_link_is_not_followed(self):
+        # 링크는 따라가지 않는다(트리 밖을 읽지 않는다). 대신 prove 의 a-input 이 그 링크를 적고 미판정으로 둔다(X04, Bypasses)
+        self.assertFalse([k for k in self.seen if k[1] == "c/One.java"])
 
     def test_known_gap_X11_level5_names_are_not_counted(self):
         self.assertEqual(self.gaps["expect"], {"E-MLKEM768": 0, "E-MLDSA65": 0}, gap_msg("X11"))
@@ -419,8 +427,12 @@ class AllowRules(unittest.TestCase):
         legacy_file, legacy_line = rules.LEGACY_REASONS
         rows = [
             ("src/LegacyBox.java", 'KeyFactory.getInstance("RSA");', "RSA", legacy_file),
-            ("src/Box.java", 'KeyFactory.getInstance("RSA"); // legacy', "RSA", legacy_line),
+            ("src/Box.java", 'KeyFactory legacyKf = KeyFactory.getInstance("RSA");', "RSA", legacy_line),
+            ("src/Box.java", 'KeyFactory.getInstance("RSA"); // legacy', "RSA", None),  # 주석의 legacy 는 이름 규칙이 아니다(X01)
             ("src/LegacyBox.java", "c.init(Cipher.ENCRYPT_MODE, k);", "RSA", None),
+            ("tools/gw.py", "legacy_key = rsa.generate_private_key(public_exponent=65537, key_size=3072)", "RSA", None),
+            ("tools/gw.py", "legacy_sig = legacy_key.sign(data, padding.PKCS1v15(), hashes.SHA256())", "RSA", None),
+            ("tools/gw.py", "legacy_pub = serialization.load_pem_public_key(blob)", "RSA", legacy_line),
             ("src/Box.java", 'KeyAgreement.getInstance("X25519"); String g = "MLKEM768";', "X25519", "같은 줄 ML-KEM(하이브리드)"),
             ("src/Box.java", 'KeyAgreement.getInstance("X25519"); // ML-KEM-768 later', "X25519", None),  # 주석 속 ML-KEM 은 아니다
             ("src/Box.java", 'Signature.getInstance("SHA256withRSA"); String g = "MLKEM768";', "RSA", None),
@@ -458,26 +470,66 @@ class InputPair(unittest.TestCase):
 
 
 class KnownGapsOutsideResidue(unittest.TestCase):
-    def test_known_gap_X03_build_folder_leaves_the_tree(self):
+    def test_build_folder_under_main_source_stays_in_the_tree(self):
+        # X03: 운영 패키지 이름이 build·target 이어도 트리 목록(트리 해시·약화 검사)에 든다. 트리 맨 위와 빌드 파일 옆 build/ 는 뺀다
         tmp = tempfile.mkdtemp(prefix="pqproof-x03-")
         try:
-            write_tree(tmp, {"src/main/java/demo/build/Http.java": "class Http {}", "src/main/java/demo/http/Http.java": "class Http {}"})
+            write_tree(tmp, {"src/main/java/demo/build/Http.java": "class Http {}", "src/main/java/demo/http/Http.java": "class Http {}",
+                             "build/out/A.java": "class A {}", "svc/pom.xml": "<project/>", "svc/target/B.java": "class B {}"})
             got = sorted(rel for rel, _, _ in rc.tree_files(tmp))
-            self.assertEqual(got, ["src/main/java/demo/http/Http.java"], gap_msg("X03"))
+            self.assertEqual(got, ["src/main/java/demo/build/Http.java", "src/main/java/demo/http/Http.java", "svc/pom.xml"])
+            old = sorted(rel for rel, _, _ in rc.tree_files(tmp, rc.LEGACY))  # 증적 형식 1·2 의 걷기(--verify 가 옛 증적에 쓴다)
+            self.assertEqual(old, ["src/main/java/demo/http/Http.java", "svc/pom.xml"])
         finally:
             shutil.rmtree(tmp, ignore_errors=True)  # 이 시험이 만든 자기 폴더만
 
-    def test_known_gap_X06_korean_word_in_the_note(self):
+    def test_weak_pqc_from_cbom_scan_blocks_and_is_never_allowed(self):
+        # X07: cbom-scan 이 보안레벨 3 미만 PQC 를 '보안레벨 3 미만(PQC)'로 내면 막는 위치다. 이름 규칙·하이브리드로도 허용하지 않는다
+        tmp = tempfile.mkdtemp(prefix="pqproof-x07-")
+        try:
+            write_tree(tmp, {"web/kem.js": "const legacyKem = crypto.generateKeyPairSync('ml-kem-512');"})
+            row = {"위치": "web/kem.js:1", "양자 위협": rules.CBOM_WEAK_PQC, "알고리즘·키 길이": "ml-kem-512", "용도": "키교환",
+                   "근거·비고": "`const legacyKem = crypto.generateKeyPairSync('ml-kem-512');`"}
+            items, counts, _ = rules.merge_cbom([row], [], rules.Lines(tmp), False)
+            self.assertEqual((items[0]["status"], counts["block"]), ("block", 1))
+            items, _, _ = rules.merge_cbom([dict(row, **{"근거·비고": "주석 · `// ml-kem-512`"})], [], rules.Lines(tmp), False)
+            self.assertEqual(items[0]["status"], "comment")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)  # 이 시험이 만든 자기 폴더만
+
+    def test_residue_allow_lines_are_checked_again(self):
+        # X01: residue 가 ALLOW 로 둔 줄도 CBOM 과 같은 규칙으로 다시 본다. 주석의 legacy(파이썬 꼬리 주석)와 아래 줄의 쓰기 경로는
+        # 이름 규칙 허용이 아니라 남은 줄(relisted)이고, 코드의 legacy 로 읽기만 하는 줄은 이름 규칙 몫(name_rule)이다
+        tmp = tempfile.mkdtemp(prefix="pqproof-relist-")
+        try:
+            write_tree(tmp, {"c/a.py": "pub = load_rsa_key(blob)  # legacy\n",
+                             "c/B.java": 'Cipher legacyC = Cipher.getInstance("RSA");\nlegacyC.init(Cipher.ENCRYPT_MODE, k);\n',
+                             "c/C.java": 'KeyFactory legacyKf = KeyFactory.getInstance("RSA");\n'})
+            parsed, _ = residue(tmp)
+            allowed = sorted(f"{x['path']}:{x['line']}" for x in parsed["rules"]["G-RSA"]["lines"] if x["type"] == "ALLOW")
+            self.assertEqual(allowed, ["c/B.java:1", "c/C.java:1", "c/a.py:1"])
+            got = rules.reclass_residue(parsed, rules.Lines(tmp), None)
+            self.assertEqual((got["relisted"], got["name_rule"]), (2, ["c/C.java:1"]))
+            j = {"families": parsed["families"], "listed": got}
+            self.assertEqual(rules.java_left(j), 2)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)  # 이 시험이 만든 자기 폴더만
+
+    def test_korean_word_in_the_note_is_not_a_flag(self):
         tmp = tempfile.mkdtemp(prefix="pqproof-x06-")
         try:
             line = "const kp = crypto.generateKeyPairSync('ed25519'); // 운영·테스트 서버 공통 키 형식"
             write_tree(tmp, {"web/keys.js": line})
             row = {"위치": "web/keys.js:1", "양자 위협": "쇼어로 깨짐", "알고리즘·키 길이": "Ed25519", "용도": "서명"}
+            # X06: 비고의 원본 발췌(백틱 안)에 든 '테스트'·'주석'은 표시가 아니다. 표시는 비고 맨 앞에만 온다
             items, _, _ = rules.merge_cbom([dict(row, **{"근거·비고": f"`{line}`"})], [], rules.Lines(tmp), False)
-            self.assertEqual(items[0]["status"], "comment", gap_msg("X06"))
-            control = line.replace(" // 운영·테스트 서버 공통 키 형식", "")
-            items, _, _ = rules.merge_cbom([dict(row, **{"근거·비고": f"`{control}`"})], [], rules.Lines(tmp), False)
             self.assertEqual(items[0]["status"], "block")
+            for flag in ("주석", "테스트·예제", "주석 · 테스트·예제"):
+                with self.subTest(flag=flag):
+                    items, counts, _ = rules.merge_cbom([dict(row, **{"근거·비고": f"{flag} · `{line}`"})], [], rules.Lines(tmp), False)
+                    self.assertEqual(items[0]["status"], "comment")
+                    self.assertEqual(counts["tests"], int("테스트" in flag))
+            self.assertEqual(rules.cbom_flags("라이브러리 기본값 · 테스트·예제"), set())  # 맨 앞이 아니면 표시가 아니다
         finally:
             shutil.rmtree(tmp, ignore_errors=True)  # 이 시험이 만든 자기 폴더만
 
@@ -491,6 +543,109 @@ class KnownGapsOutsideResidue(unittest.TestCase):
         b = "package a\nvar c = &tls.Config{MinVersion: tls.VersionTLS12}\n"
         a = "package a\nvar c = &tls.Config{MinVersion: tls.VersionTLS12, MaxVersion: tls.VersionTLS12}\n"
         self.assertEqual(verify.weakening({"svc/server.go": (b, a)}), [], gap_msg("X18"))
+
+
+class Bypasses(unittest.TestCase):
+    """규칙 묶음 2에서 막은 우회 중 변이 시험(tests/mutations)에 넣기 어려운 것: 심볼릭 링크(X04), 트리 밖 인증서·호스트 키(X05),
+    인자 한도(X08). 나머지(X01·X02·X03·X06·X07)는 변이 시험 m12~m16 이 golden 과 함께 본다."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.mkdtemp(prefix="pqproof-bypass-")
+        cls.outside = os.path.join(cls.tmp, "outside")
+        shutil.copytree(EXAMPLES / "classic" / "src" / "main" / "java" / "demo" / "sealer", cls.outside)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)  # setUpClass 가 만든 자기 폴더만
+
+    def run_pair(self, name, prep=None, fixed=None, **env):
+        fx = fixed or os.path.join(self.tmp, name)
+        if fixed is None:
+            shutil.copytree(EXAMPLES / "pqc", fx, symlinks=True)
+            prep(fx)
+        e = {"EXPECT": "kem,sig", "ALLOW": "none", "RECON": "none", **env}
+        r, code, _ = prove.run(str(EXAMPLES / "classic"), fx, prove.Params(e), os.path.join(self.tmp, "out-" + name), quiet=True)
+        return r, code, {c["id"]: c for c in r["checks"]}
+
+    def link_out(self, fx):
+        os.symlink(os.path.join(self.outside, "Sealer.java"), os.path.join(fx, "src", "main", "java", "demo", "sealer", "One.java"))
+
+    def test_link_outside_the_tree_is_undecided(self):
+        r, code, st = self.run_pair("link-out", self.link_out)
+        self.assertEqual((r["verdict"], code, st["a-input"]["status"]), ("undecided", 3, "undecided"))
+        self.assertIn("검사 밖을 가리키는 링크 1개", st["a-input"]["actual"])
+        self.assertTrue(any(s.startswith("링크 src/main/java/demo/sealer/One.java -> ") and s.endswith("· 트리 밖")
+                            for s in r["inputs"]["fixed"]["skipped"]), r["inputs"]["fixed"]["skipped"])
+        r, code, st = self.run_pair("link-out-strict", self.link_out, REQUIRE_REVIEW="1")
+        self.assertEqual((r["verdict"], code, st["a-input"]["status"]), ("fail", 1, "fail"))
+
+    def test_link_inside_passes_and_an_outside_note_needs_review(self):
+        def prep(fx):
+            os.symlink("Sealer.java", os.path.join(fx, "src", "main", "java", "demo", "sealer", "Alias.java"))  # 트리 안
+            os.symlink(os.path.join(self.outside, "NOTES.md"), os.path.join(fx, "NOTES.md"))  # 트리 밖, 코드 아님(대상은 없어도 된다)
+        r, code, st = self.run_pair("link-in", prep)
+        self.assertEqual((r["verdict"], code, st["a-input"]["status"]), ("pass", 0, "review"), st["a-input"]["actual"])
+        self.assertNotIn("Alias.java", st["a-input"]["actual"])
+
+    def test_zip_link_is_reported_like_a_folder_link(self):
+        z = os.path.join(self.tmp, "fixed-link.zip")
+        with zipfile.ZipFile(z, "w") as zf:
+            for dirpath, _, names in os.walk(EXAMPLES / "pqc"):
+                for n in names:
+                    full = os.path.join(dirpath, n)
+                    zf.write(full, "app/" + os.path.relpath(full, EXAMPLES / "pqc").replace(os.sep, "/"))
+            info = zipfile.ZipInfo("app/src/main/java/demo/sealer/One.java")
+            info.external_attr = 0o120777 << 16
+            zf.writestr(info, "../../../../../../outside/Sealer.java")
+        r, code, st = self.run_pair("zip-link", fixed=z)
+        self.assertEqual((r["verdict"], code, st["a-input"]["status"]), ("undecided", 3, "undecided"))
+        self.assertIn("링크 src/main/java/demo/sealer/One.java -> ../../../../../../outside/Sealer.java · 트리 밖 · zip 에서 풀지 않음",
+                      r["inputs"]["fixed"]["skipped"])
+
+    def test_certificate_and_host_key_outside_the_tree_are_not_read(self):
+        root = os.path.join(self.tmp, "x05")
+        cert = os.path.join(self.tmp, "x05-host", "server.pem")
+        os.makedirs(os.path.dirname(cert))
+        openssl = prove.default_openssl()
+        subprocess.run([openssl, "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", cert + ".key", "-out", cert,
+                        "-subj", "/CN=x05", "-days", "1"], capture_output=True, check=True)
+        write_tree(root, {"nginx/site.conf": f"server {{\n    listen 443 ssl;\n    ssl_certificate {cert};\n}}\n",
+                          "ssh/sshd_config": f"HostKey {cert}.key\n"})
+        with mock.patch.dict(os.environ, {"HOST_FILES": "1"}):  # prove 는 HOST_FILES 를 cbom-scan 에 넘기지 않는다
+            ok, _, rows = prove.run_cbom_scan(prove.CBOM_SCAN, root, os.path.join(self.tmp, "x05-a"), openssl)
+        self.assertTrue(ok)
+        self.assertFalse([x for x in rows if x["위치"].startswith(cert)], rows)
+        ref = [x for x in rows if x["위치"] == "nginx/site.conf:3"]
+        self.assertEqual([(x["용도"], x["양자 위협"]) for x in ref if "트리 밖" in x["용도"]], [("인증서(트리 밖 참조)", "미확인")])
+        hk = [x for x in rows if x["위치"] == "ssh/sshd_config:1"]
+        self.assertTrue(hk and "이름으로 추정" in hk[0]["근거·비고"], hk)
+        # 단독 실행에서 HOST_FILES=1 이면 읽는다(그 인증서 행이 생긴다)
+        out = os.path.join(self.tmp, "x05-b")
+        r = subprocess.run(["bash", str(prove.CBOM_SCAN), root], capture_output=True, text=True,
+                           env=dict(os.environ, HOST_FILES="1", OUT=out, OPENSSL=openssl))
+        self.assertEqual(r.returncode, 0, r.stderr[-800:])
+        csv_text = prove.slurp(os.path.join(out, next(n for n in os.listdir(out) if n.endswith(".csv"))))
+        self.assertIn(cert, csv_text)
+
+    def test_many_long_paths_stay_under_the_argument_limit(self):
+        root = os.path.join(self.tmp, "x08")
+        seg = "d" * max(20, min(200, (900 - len(root)) // 4))
+        base = os.path.join(root, seg, seg, seg)
+        os.makedirs(base)
+        each = len(base) + 1 + len("f000000_" + "x" * 30 + ".txt")
+        limit = os.sysconf("SC_ARG_MAX") if hasattr(os, "sysconf") else 1 << 21
+        n = limit // each + 100
+        for i in range(n):
+            with open(os.path.join(base, f"f{i:06d}_{'x' * 30}.txt"), "w", encoding="utf-8") as f:
+                f.write("plain\n")
+        write_tree(root, {"K.java": 'KeyFactory kf = KeyFactory.getInstance("RSA");'})
+        self.assertGreater(n * each, limit)
+        code, out = prove.run_residue(prove.GENERIC_RESIDUE, root)
+        parsed = rules.parse_residue(out)
+        self.assertIsNotNone(parsed, out[-800:])
+        self.assertIn(f"INFO 검사 파일 {n + 1}개", out)
+        self.assertEqual(parsed["families"]["G-RSA"]["code"], 1)
 
 
 # ---------------------------------------------------------------------------------------------

@@ -7,7 +7,7 @@ Each run writes a new folder: `OUT=...`, or `./proof-out-YYYYMMDD-HHMMSS` (with 
 | File | For |
 |---|---|
 | `receipt.html` | people: the whole evidence on one self-contained page, dark and light theme |
-| `receipt.json` | programs: the verification evidence ([schema](../schemas/receipt-v2.schema.json)) |
+| `receipt.json` | programs: the verification evidence ([schema](../schemas/receipt-v3.schema.json), format 3) |
 | `tables/report.md` | a document: the check table, the blocking locations after a failure, and what is left after the migration |
 
 ## Everything else
@@ -32,7 +32,7 @@ Re-check with `pqproof --verify <folder>`. It fails on any file that is not list
 
 ## Machine-readable contract
 
-`schemas/receipt-v2.schema.json` (JSON Schema draft 2020-12) describes evidence format 2 and `schemas/unconverted.schema.json` the allowlist. Within one `format_version` these fields keep their name, type and meaning:
+`schemas/receipt-v3.schema.json` (JSON Schema draft 2020-12) describes evidence format 3 (0.2.0 and later), `schemas/receipt-v2.schema.json` format 2 (0.1.x), and `schemas/unconverted.schema.json` the allowlist. Within one `format_version` these fields keep their name, type and meaning:
 
 - `format_version`, `tool_version`, `ruleset_version`, `ruleset_sha256`, `receipt_id`, `verdict`
 - `checks[].id`, `checks[].status` (the values the schema lists; only `pass` counts as passed)

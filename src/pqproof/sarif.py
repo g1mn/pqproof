@@ -413,6 +413,13 @@ class Builder:
                 path, line, end = split_loc(tgt)
                 if path:
                     self.add("r-allow", lv, text, path, line, end, key=f"#{e.get('n')}|{e.get('where')}")
+        if (self.r.get("format_version") or 1) >= 3:  # 형식 3: 이름 규칙으로만 허용한 줄도 r-allow 몫(교차 리뷰 X01)
+            for loc in a.get("legacy") or []:
+                path, line, end = split_loc(loc)
+                if path:
+                    self.add("r-allow", lv, self.t("allowed by the name rule alone (Legacy*.java or legacy in the code): no allowlist "
+                                                   "entry and no human review", "이름 규칙(Legacy*.java·코드의 legacy)으로만 허용: 허용 목록 "
+                                                   "항목·사람 확인 없음"), path, line, end, key=f"legacy|{loc}")
         for wtxt in a.get("warnings", []):
             self.note("r-allow", "warning", str(wtxt)[:500])
 

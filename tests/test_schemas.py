@@ -32,7 +32,8 @@ class Generated(unittest.TestCase):
 class Validate(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.receipt = cls.validator("receipt-v2.schema.json")
+        cls.receipt2 = cls.validator("receipt-v2.schema.json")
+        cls.receipt = cls.validator("receipt-v3.schema.json")  # 지금 판이 쓰는 형식
         cls.allow = cls.validator("unconverted.schema.json")
 
     @staticmethod
@@ -51,9 +52,10 @@ class Validate(unittest.TestCase):
             r = json.loads((d / "receipt.json").read_text(encoding="utf-8"))
             with self.subTest(fixture=d.name):
                 if r.get("format_version") == 2:
-                    self.assertEqual(self.errors(self.receipt, r), [])
+                    self.assertEqual(self.errors(self.receipt2, r), [])
+                    self.assertTrue(self.errors(self.receipt, r))  # 형식 3 스키마에는 맞지 않는다(skip_dirs·note·format_version)
                 else:
-                    self.assertTrue(any("format_version" in m for m in self.errors(self.receipt, r)))
+                    self.assertTrue(any("format_version" in m for m in self.errors(self.receipt2, r)))
 
     def test_a_fresh_run_fits(self):
         tmp = tempfile.mkdtemp(prefix="pqproof-schema-")
@@ -65,18 +67,20 @@ class Validate(unittest.TestCase):
             self.assertEqual(self.errors(self.receipt, r), [])
             on_disk = json.loads(pathlib.Path(out, "receipt.json").read_text(encoding="utf-8"))
             self.assertEqual(self.errors(self.receipt, on_disk), [])
+            self.assertTrue(self.errors(self.receipt2, on_disk))  # 형식 3 증적은 형식 2 스키마에 맞지 않는다
         finally:
             shutil.rmtree(tmp, ignore_errors=True)  # 이 시험이 만든 자기 폴더만
 
     def test_unknown_or_missing_fields_do_not_fit(self):
         r = json.loads((GOLD / "f2-v0.1.0" / "receipt.json").read_text(encoding="utf-8"))
         extra = dict(r, surprise=1)
-        self.assertTrue(self.errors(self.receipt, extra))
+        self.assertTrue(self.errors(self.receipt2, extra))
+        self.assertTrue(self.errors(self.receipt2, dict(r, skip_dirs={"file": "artifacts/skip-dirs", "file_sha256": "0" * 64})))
         missing = {k: v for k, v in r.items() if k != "ruleset_sha256"}
-        self.assertTrue(self.errors(self.receipt, missing))
+        self.assertTrue(self.errors(self.receipt2, missing))
         bad_check = json.loads(json.dumps(r))
         bad_check["checks"][0]["status"] = "ok"
-        self.assertTrue(self.errors(self.receipt, bad_check))
+        self.assertTrue(self.errors(self.receipt2, bad_check))
 
     def test_allowlist_forms(self):
         example = json.loads((PROOF / "examples" / "allowlist" / "unconverted.json").read_text(encoding="utf-8"))

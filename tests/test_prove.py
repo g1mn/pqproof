@@ -90,7 +90,7 @@ class Inputs(unittest.TestCase):
                 z.writestr(info, "/etc/passwd")
             dest = os.path.join(d, "u2")
             os.makedirs(dest)
-            self.assertEqual(prove.unzip_safe(good, dest), ["app/link"])
+            self.assertEqual(prove.unzip_safe(good, dest), [("app/link", "/etc/passwd")])  # 풀지 않고 이름과 대상 글만
             self.assertEqual(prove.unwrap(dest), os.path.join(dest, "app"))
             self.assertFalse(os.path.lexists(os.path.join(dest, "app", "link")))
 
@@ -193,7 +193,8 @@ class Residue(unittest.TestCase):
         self.assertIn("ISTEST = (TP ~ TESTRE)", text)  # 시험 경로는 scan/test-paths.ere 한 곳(cbom-scan.sh 와 같은 목록)
         self.assertIn('match(TP, MAINRE)', text)  # 둘째 줄 본 소스 표시(/src/main/) 앞부분만 본다
         self.assertIn("test-paths.ere", text)
-        self.assertIn("-name vendor -o", text)
+        self.assertIn('SKIP_FILE=${SKIP_DIRS:-$HERE/skip-dirs}', text)  # 건너뛰는 폴더는 scan/skip-dirs 한 곳(X09)
+        self.assertNotIn("-name vendor", text)
 
     def test_parse(self):
         out = ("GEN  G-RSA              LEFT   code=2 allow=1 comment=0 test=1  - RSA\n"

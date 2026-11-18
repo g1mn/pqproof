@@ -34,7 +34,7 @@ MUTANTS = [
     ("m09", "scan/residue.sh", "같은 줄 ML-KEM 이면 하이브리드 허용)@@ML-?KEM|MLKEM", "같은 줄 ML-KEM 이면 하이브리드 허용)@@",
      "G-X25519 같은 줄 ML-KEM 허용 삭제"),
     ("m10", "scan/residue.sh", 'if (b ~ /\\.sql$/) return "sql"', 'if (b ~ /\\.sqlx$/) return "sql"', "SQL 주석(--)을 코드로"),
-    ("m11", "scan/residue.sh", "if (!wr && (ISLEG || s ~ ALLOWLINE))", "if (!wr && ISLEG)", "같은 줄 legacy 허용 삭제"),
+    ("m11", "scan/residue.sh", "if ((ISLEG || CODE ~ ALLOWLINE) && CODE !~ ALLOWWR)", "if (ISLEG && CODE !~ ALLOWWR)", "같은 줄 legacy 허용 삭제"),
     ("m12", "scan/residue.sh", ")(RS|ES|PS)(256|384|512)", ")(RS|ES)(256|384|512)", "G-JWT-ALG 에서 PS 삭제"),
     ("m13", "pqlite/verify.py", '(?:--insecure|-k)', '(?:--insecure)', "curl -k 규칙 삭제"),
     ("m14", "pqlite/verify.py", 'OLD_PROTOCOLS = {"sslv2", "sslv3", "tlsv1", "tlsv1.1"}', 'OLD_PROTOCOLS = {"sslv2", "sslv3", "tlsv1"}',
@@ -47,6 +47,17 @@ MUTANTS = [
     ("m20", "src/pqproof/deps.py", '"/usr/local/opt/openssl@3/bin/openssl", ', "", "doctor 의 OpenSSL 후보에서 한 곳 삭제"),
     ("m21", "pqlite/verify.py", r'r"\bX509(?:Extended)?TrustManager\b|', r'r"\bX509ExtendedTrustManager\b|', "trust-all 규칙이 X509TrustManager 를 놓치게"),
     ("m22", "scan/residue.sh", "if (ISTEST) { add(r, \"TEST\", FNR, s); continue }", "", "시험 경로 줄을 TEST 로 따로 세지 않게"),
+    # 규칙 묶음 2(교차 리뷰 X01·X02·X03·X04·X06·X07·X09)
+    ("m23", "pqlite/rules.py", "ALLOWLINE.search(code_part(text))", "ALLOWLINE.search(text)", "이름 규칙이 주석의 legacy 도 세게(X01)"),
+    ("m24", "scan/residue.sh", "&& CODE !~ ALLOWWR)", ")", "residue 이름 규칙이 모든 언어 쓰기 연산을 안 보게(X01)"),
+    ("m25", "scan/skip-dirs", "main /src/main/\n", "", "운영 소스 표시를 지워 src/main 아래 산출물 이름 폴더도 건너뛰게(X02·X03)"),
+    ("m26", "pqlite/rules.py", 'if threat in ("쇼어로 깨짐", CBOM_WEAK_PQC):', 'if threat == "쇼어로 깨짐":', "cbom-scan 의 보안레벨 3 미만 행을 참고로(X07)"),
+    ("m27", "pqlite/rules.py", "        if part not in CBOM_FLAGS:\n            break", "        if part not in CBOM_FLAGS:\n            continue",
+     "비고 맨 앞이 아닌 '테스트·예제'도 표시로(X06)"),
+    ("m28", "pqlite/rules.py", 'if norm == ".." or norm.startswith("../"):', 'if norm == "..":', "상대 경로로 트리 밖을 가리키는 링크를 놓치게(X04)"),
+    ("m29", "pqlite/rules.py", "                again += 1\n", "                continue\n", "residue 가 허용한 쓰기 경로 줄을 다시 세지 않게(X01)"),
+    ("m30", "pqlite/skipdirs.py", "        if not parent_rel or not self.build_files.isdisjoint(sibling_files):",
+     "        if True:", "산출물 이름 폴더를 어디서나 건너뛰게(X02·X03·X09)"),
 ]
 
 

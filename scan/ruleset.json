@@ -34,9 +34,9 @@
    ]
   },
   "2": {
-   "sha256": "6c464c7bc9e909714cfe613609b92fee9247633e4e5d97c4489cc45a9a2cbc3f",
+   "sha256": "543da370f5d522847aa87d3b9f7c52c0a8c3df0f9e416739388105bd451228d6",
    "since": "0.2.0",
-   "verdict_impact": "no",
+   "verdict_impact": "yes",
    "files": [
     {
      "path": "pqlite/allowlist.py",
@@ -44,11 +44,15 @@
     },
     {
      "path": "pqlite/rules.py",
-     "sha256": "a3efb844632e5fd930dda20b91e71eb224255ac25eef35d152d23788cd6ec7c0"
+     "sha256": "286e462663a93b4489fe035128801ef96f2f371204c1c1836b16f904a76e3b70"
     },
     {
      "path": "pqlite/scan.py",
-     "sha256": "15dbbb1942c729db66559789a2f02ddb13b73336243d3899bd1cd292ea165143"
+     "sha256": "cc293471f39db3b221db0d5dd849b2e8a381af59faf05b9f076c8b3768b267d7"
+    },
+    {
+     "path": "pqlite/skipdirs.py",
+     "sha256": "34041f06c394f88c4a8d63519ec4cbc3c0b6f2fe21326c429984f8fda8e0111a"
     },
     {
      "path": "pqlite/tlsprobe.py",
@@ -60,11 +64,15 @@
     },
     {
      "path": "scan/cbom-scan.sh",
-     "sha256": "607a1fdb9608ee7d0a162d546caeb75bf9203c7500f1b021be7ebb86ab005cdb"
+     "sha256": "4943c2f302bbfc9507c0f27d9a8d9a5d0586ba38e38562f2cb347d8a1e71025e"
     },
     {
      "path": "scan/residue.sh",
-     "sha256": "f132807612a45ab1d1b73f2c747dba395ef70f6b39614c3abd0ed5c86321ebf0"
+     "sha256": "903ef55096171668be1fdfce757af54964ac307278cc8818a4a452f86454a9cf"
+    },
+    {
+     "path": "scan/skip-dirs",
+     "sha256": "21750b9e4d161d0bc01695a2c55602d3c28f6262df958fe7f4ce5e156a38aae9"
     },
     {
      "path": "scan/test-paths.ere",

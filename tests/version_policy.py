@@ -6,6 +6,8 @@
 #   python3 -I tests/version_policy.py --base v0.1.0  앞 태그와도 비교: 판정(golden)이 옮겨 갔으면 PATCH 릴리스가 아니어야 하고
 #                                                     CHANGELOG 의 그 항목([Unreleased] 포함)이 판정 영향 yes 여야 한다.
 #                                                     버전이 그대로면 다음 릴리스가 MINOR 여야 하는지도 알린다
+#                                                     버전을 올렸어도 그 버전이 앞 판과 같은 규칙 묶음으로 나갔고 지금 묶음의
+#                                                     since 가 더 뒤면(다음 릴리스 몫) 버전이 그대로일 때처럼 본다
 # 표준 라이브러리만 쓴다. 저장소는 읽기만 한다(--base 는 git show 로 그 판의 파일을 읽는다).
 # 종료: 0 맞음 · 1 어긋남 · 2 사용법 오류(git 없음, 그 판을 못 읽음)
 """Check the version policy: a release that can move a verdict is never a PATCH release."""
@@ -111,6 +113,8 @@ def check_tree(version, changelog, ruleset_doc):
             sec = e["since"] if e["since"] in sections else ("Unreleased" if since > v else None)
             if sec is None:
                 bad.append(f"ruleset {name}: CHANGELOG.md has no entry for {e['since']}")
+            elif sec not in sections:
+                pass  # 아직 안 낸 묶음인데 [Unreleased] 가 없다: 아래에서 한 번 알린다
             elif impact_of(sections[sec][1]) != "yes":
                 bad.append(f"ruleset {name} has verdict impact yes, but CHANGELOG.md [{sec}] does not say yes")
         if since > v and "Unreleased" not in sections:
@@ -124,9 +128,22 @@ def golden_moves(gold_base, gold_now):
     return sorted(c for c in set(gold_base) & set(gold_now) if strip(gold_base[c]) != strip(gold_now[c]))
 
 
+def shipped_ruleset(doc, version):
+    """version 이 낸 규칙 묶음 이름: since 가 version 이하인 기록 중 since 가 가장 늦은 것(없으면 None)."""
+    v = semver(version)
+    best = None
+    for name, e in (doc.get("versions") or {}).items():
+        s = semver((e or {}).get("since")) if isinstance(e, dict) else None
+        if s is not None and v is not None and s <= v and (best is None or s > best[0]):
+            best = (s, name)
+    return best[1] if best else None
+
+
 def check_release(version, base_version, ruleset_now, ruleset_base, gold_now, gold_base, changelog=None):
     """앞 판(base)과 비교. (어긋난 것, 알림). 판정이 옮겨 갔으면 PATCH 릴리스가 아니어야 하고, CHANGELOG 의 그 항목(버전이 같으면
-    [Unreleased])이 판정 영향 yes 여야 한다. 버전이 같으면 다음 릴리스가 MINOR 여야 하는지 알린다."""
+    [Unreleased])이 판정 영향 yes 여야 한다. 버전이 같으면 다음 릴리스가 MINOR 여야 하는지 알린다.
+    버전은 올렸지만 그 버전이 앞 판과 같은 규칙 묶음으로 나갔고 지금 규칙 묶음이 아직 안 낸 것(since 가 이 버전보다 뒤)이면, 판정 이동은
+    다음 릴리스 몫으로 보고 버전이 같을 때처럼 다룬다(0.1.1 을 올린 뒤 0.2.0 규칙을 고치는 동안)."""
     bad, notes = [], []
     v, b = semver(version), semver(base_version)
     if v is None or b is None:
@@ -138,17 +155,19 @@ def check_release(version, base_version, ruleset_now, ruleset_base, gold_now, go
     needs_minor = bool(moved) or rs_impact == "yes"
     why = ", ".join(([f"golden cases moved: {', '.join(moved)}"] if moved else [])
                     + ([f"ruleset {cur_base} -> {cur_now} with verdict impact yes"] if rs_impact == "yes" else []))
+    pending = v > b and new_rs and shipped_ruleset(ruleset_now, version) == cur_base
     if v < b:
         bad.append(f"version {version} is older than {base_version}")
-    elif v == b:
-        notes.append(f"unreleased changes since {base_version}: " + (f"the next release must be MINOR ({why})" if needs_minor
-                                                                     else "no verdict moved, a PATCH release is allowed"))
+    elif v == b or pending:
+        since = (ruleset_now.get("versions", {}).get(cur_now) or {}).get("since")
+        head = f"unreleased changes since {base_version}" if v == b else f"{version} shipped ruleset {cur_base}; ruleset {cur_now} ships in {since}"
+        notes.append(head + ": " + (f"the next release must be MINOR ({why})" if needs_minor else "no verdict moved, a PATCH release is allowed"))
     elif needs_minor and (v[0], v[1]) == (b[0], b[1]):
         bad.append(f"{version} is a PATCH release after {base_version}, but {why}: bump MINOR (MAJOR from 1.0)")
     elif needs_minor and v[0] >= 1 and v[0] == b[0]:
         bad.append(f"{version} keeps MAJOR {v[0]} after {base_version}, but {why}: from 1.0 a verdict change bumps MAJOR")
     if needs_minor and changelog is not None and v >= b:
-        sec = "Unreleased" if v == b else version
+        sec = "Unreleased" if v == b or pending else version
         if impact_of(changelog_sections(changelog).get(sec, (None, ""))[1]) != "yes":
             bad.append(f"{why}, but CHANGELOG.md [{sec}] does not say verdict impact yes")
     return bad, notes

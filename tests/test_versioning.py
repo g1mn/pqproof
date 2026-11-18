@@ -193,7 +193,13 @@ class FormatTwo(unittest.TestCase):
     def test_old_note_on_format_two_fails(self):
         d = self.copy("oldnote")
         rewrite(d, lambda r: r.update(note=R.NOTE_PUBLIC1))
-        self.assertIn("current note", self.fails(d))
+        self.assertIn(f"must carry the note of format {V.FORMAT_VERSION}", self.fails(d))
+        d = self.copy("v2note")
+        rewrite(d, lambda r: r.update(note=R.NOTE_V2))  # 형식 2 의 NOTE 를 형식 3 증적에
+        self.assertIn(f"must carry the note of format {V.FORMAT_VERSION}", self.fails(d))
+        d = self.copy("noskip")
+        rewrite(d, lambda r: r.pop("skip_dirs"))
+        self.assertIn(f"format_version {V.FORMAT_VERSION} needs skip_dirs", self.fails(d))
 
     def test_version_fields_on_format_one_fail(self):
         d = self.copy("f1fields")
@@ -355,6 +361,25 @@ class VersionPolicy(unittest.TestCase):
                     self.assertIn(w, "\n".join(bad))
                 for w in want_notes:
                     self.assertIn(w, "\n".join(notes))
+
+    def test_a_ruleset_for_the_next_release_after_a_patch_bump(self):
+        # 0.1.1 은 묶음 1로 나갔고(since 0.1.0), 묶음 2(since 0.2.0)는 다음 릴리스 몫이다: 0.1.1 을 PATCH 위반으로 보지 않고
+        # [Unreleased] 가 yes 이길 바란다. 묶음 2 의 since 가 0.1.1 이면(이 버전이 낸 것) 예전처럼 PATCH 위반이다
+        gold = json.loads((PROOF / "tests" / "golden" / "verdicts.json").read_text(encoding="utf-8"))["runs"]
+        base = VP.ruleset_doc(json.dumps(V010))
+        now = copy.deepcopy(base)
+        now["versions"]["2"] = dict(base["versions"]["1"], sha256="2" * 64, since="0.2.0", verdict_impact="yes")
+        now["current"] = "2"
+        log = changelog(("Unreleased", "yes"), ("0.1.1", "none"), ("0.1.0", "yes"))
+        bad, notes = VP.check_release("0.1.1", "0.1.0", now, base, gold, gold, log)
+        self.assertEqual(bad, [])
+        self.assertIn("ruleset 2 ships in 0.2.0: the next release must be MINOR", "\n".join(notes))
+        bad, _ = VP.check_release("0.1.1", "0.1.0", now, base, gold, gold, changelog(("Unreleased", "none"), ("0.1.1", "none"), ("0.1.0", "yes")))
+        self.assertIn("CHANGELOG.md [Unreleased] does not say verdict impact yes", "\n".join(bad))
+        now["versions"]["2"]["since"] = "0.1.1"
+        bad, _ = VP.check_release("0.1.1", "0.1.0", now, base, gold, gold, log)
+        self.assertIn("0.1.1 is a PATCH release after 0.1.0", "\n".join(bad))
+        self.assertEqual(VP.shipped_ruleset(now, "0.1.0"), "1")
 
     def test_moved_verdicts_need_yes_in_the_changelog(self):
         gold = json.loads((PROOF / "tests" / "golden" / "verdicts.json").read_text(encoding="utf-8"))["runs"]

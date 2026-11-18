@@ -8,23 +8,76 @@
 # 분류: code=코드 줄 LEFT / allow=이름 규칙 허용 / comment=주석·문서 줄 / test=시험 경로의 코드 줄(comment·test 는 따로 센다, LEFT 아님).
 # 이름 규칙 허용(ALLOW, LEFT 로 세지 않음. 상세 줄은 사람이 다시 본다):
 #   - Legacy*.java 파일 안(옛 데이터 읽기·검증 전용으로 떼어 낸 파일)
-#   - 같은 줄에 'legacy'(대소문자 무관, 식별자·주석 모두)가 있는 줄
-#   - G-X25519 의 같은 줄 ML-KEM = 하이브리드
-#   단, 쓰기 연산(ENCRYPT_MODE·WRAP_MODE·initSign·KeyPairGenerator·generateKeyPair)이 있는 줄은 허용하지 않는다.
-#   허용 목록(ALLOW=)과 같은 함수 안 하이브리드 결합은 prove.sh 가 이 출력의 LEFT 줄을 다시 읽어 따로 뺀다.
+#   - 주석을 뺀 코드에 'legacy'(대소문자 무관)가 있는 줄. 주석의 legacy 는 세지 않는다(교차 리뷰 X01)
+#   - G-X25519 의 같은 줄 ML-KEM(주석을 뺀 코드에서) = 하이브리드
+#   이름 규칙은 새 키·서명·암호화(RES_ALLOW_WRITEOPS, Java·Python·Go·Node)가 있는 줄을 허용하지 않는다. 같은 줄 ML-KEM 허용은
+#   Java 쓰기 연산(RES_WRITEOPS)이 있는 줄을 허용하지 않는다.
+#   prove.sh 는 이 출력의 ALLOW 줄을 같은 규칙(아래 3줄의 쓰기 경로까지)으로 다시 보고, LEFT 줄에서 허용 목록(ALLOW=)과 같은 함수 안
+#   하이브리드 결합을 따로 뺀다.
 # 시험 경로는 scan/test-paths.ere 한 곳에 두고 cbom-scan.sh 와 같이 쓴다(TEST_PATHS=<파일>로 바꿀 수 있다). 그 경로의 코드 줄은
-#   TEST 로 따로 세고 줄마다 적는다(판정에 안 넣지만 숨기지 않는다). vendor/(받아 둔 남의 라이브러리)는 건너뛴다.
+#   TEST 로 따로 세고 줄마다 적는다(판정에 안 넣지만 숨기지 않는다).
 #   목록 첫 줄은 시험 경로 규칙, 둘째 줄은 본 소스 표시(/src/main/)다. 표시가 있는 경로는 그 앞부분만 첫 줄에 맞춰 본다.
-# 건너뜀: .git·<폴더>/data·<폴더>/target·node_modules·vendor·build, 키·DB·비밀 모양 파일(.pem .key .p12 .jks .der .crt .sqlite3 .env)
-#   내용은 읽지 않고 이름 개수만.
+# 건너뜀: 폴더는 scan/skip-dirs 한 곳(SKIP_DIRS=<파일>로 바꿀 수 있다, cbom-scan.sh·pqlite/skipdirs.py 와 같은 규칙). .git·node_modules
+#   같은 이름은 어느 깊이든, vendor·build·target·dist 는 트리 맨 위나 빌드 파일 옆일 때만이고 src/main 아래는 본다(교차 리뷰 X02·X03·X09).
+#   키·DB·비밀 모양 파일(.pem .key .p12 .jks .der .crt .sqlite3 .env)은 내용은 읽지 않고 이름 개수만.
+# 파일 목록은 임시 파일로 awk 에 넘긴다(파일 수천 개 저장소에서 인자 한도를 넘지 않게, 교차 리뷰 X08).
 # 종료 코드: 0=CLEAN(잔재 0·PQC 흔적 모두 있음) 1=RESIDUE 2=사용법 오류. bash 3.2·BWK awk 호환.
 ROOT=${1:?사용법: bash residue.sh <폴더>}
 ROOT=${ROOT%/}
 [ -d "$ROOT" ] || { echo "폴더 없음: $ROOT" >&2; exit 2; }
-TESTRE_FILE=${TEST_PATHS:-$(cd "$(dirname "$0")" && pwd)/test-paths.ere}
+case "$ROOT" in /*) ;; *) ROOT=$(cd "$ROOT" && pwd) ;; esac  # awk 가 파일 이름을 var=값 대입으로 읽지 않게 절대 경로로
+HERE=$(cd "$(dirname "$0")" && pwd)
+TESTRE_FILE=${TEST_PATHS:-$HERE/test-paths.ere}
+SKIP_FILE=${SKIP_DIRS:-$HERE/skip-dirs}
 RES_TESTRE=$(grep -v -e '^#' -e '^[[:space:]]*$' "$TESTRE_FILE" 2>/dev/null | sed -n 1p)
 RES_MAINRE=$(grep -v -e '^#' -e '^[[:space:]]*$' "$TESTRE_FILE" 2>/dev/null | sed -n 2p)
 [ -n "$RES_TESTRE" ] || { echo "시험 경로 목록 없음: $TESTRE_FILE (TEST_PATHS=<파일>로 준다)" >&2; exit 2; }
+[ -r "$SKIP_FILE" ] || { echo "건너뛰는 폴더 목록 없음: $SKIP_FILE (SKIP_DIRS=<파일>로 준다)" >&2; exit 2; }
+TMPD=$(mktemp -d "${TMPDIR:-/tmp}/residue.XXXXXX") || exit 2
+trap 'rm -f "$TMPD"/* 2>/dev/null; rmdir "$TMPD" 2>/dev/null' EXIT
+# --- 건너뛰는 폴더(scan/skip-dirs). residue.sh 와 cbom-scan.sh 에 같은 글로 있고 pqlite/skipdirs.py 와 같은 규칙이다
+# (tests/test_rule_sync.py 가 세 곳을 대조한다). any 이름은 어느 깊이든, output 이름은 트리 맨 위이거나 같은 폴더에 buildfile 이
+# 있을 때만 건너뛴다. 경로에 main 표시가 있으면 output 규칙을 쓰지 않는다. 건너뛴 폴더 안은 보지 않는다.
+skip_load() { # SKIP_FILE → SK_ANYX·SK_OUTX(find 식), SK_ANYL(이름 목록), SK_BFS(빌드 파일), SK_MAIN
+  local k v n
+  SK_ANYX=""; SK_OUTX=""; SK_ANYL=" "; SK_BFS=""; SK_MAIN=""
+  while read -r k v n; do
+    { [ -n "$v" ] && [ -z "$n" ]; } || { echo "skip-dirs 줄 꼴이 틀림: $k $v $n" >&2; return 2; }
+    case "$k" in
+      any) SK_ANYX="${SK_ANYX:+$SK_ANYX -o }-name $v"; SK_ANYL="$SK_ANYL$v ";;
+      output) SK_OUTX="${SK_OUTX:+$SK_OUTX -o }-name $v";;
+      buildfile) SK_BFS="$SK_BFS $v";;
+      main) SK_MAIN=$v;;
+      *) echo "skip-dirs 모르는 종류: $k" >&2; return 2;;
+    esac
+  done < <(grep -v -e '^#' -e '^[[:space:]]*$' "$SKIP_FILE")
+  SK_ANYX=${SK_ANYX:--name /}; SK_OUTX=${SK_OUTX:--name /}   # 빈 목록: '/' 는 이름에 없어 아무것도 안 맞는다
+}
+skip_dirs() { # $1=ROOT → 건너뛸 폴더의 전체 경로를 한 줄에 하나씩(LC_ALL=C 순)
+  local root=$1 d rel parent b p cut="" hit
+  # shellcheck disable=SC2086  # SK_ANYX·SK_OUTX 는 '-name 이름 -o ...' 식이라 나눠 넘긴다(이름에 공백·글롭 문자가 없다)
+  find "$root" -mindepth 1 -type d \( $SK_ANYX \) -prune -print -o -type d \( $SK_OUTX \) -print 2>/dev/null | LC_ALL=C sort |
+  while IFS= read -r d; do
+    hit=0
+    while IFS= read -r p; do [ -n "$p" ] && case "$d/" in "$p"/*) hit=1;; esac; done <<< "$cut"
+    [ $hit = 1 ] && continue
+    case "$SK_ANYL" in *" ${d##*/} "*) ;; *)
+      rel=${d#"$root"/}; parent=${d%/*}
+      [ -n "$SK_MAIN" ] && case "/$rel/" in *"$SK_MAIN"*) continue;; esac
+      if [ "$parent" != "$root" ]; then
+        hit=0
+        for b in $SK_BFS; do p="$parent/$b"; { [ -L "$p" ] || [ -e "$p" ]; } && [ ! -d "$p" ] && { hit=1; break; }; done
+        [ $hit = 1 ] || continue
+      fi;;
+    esac
+    cut="$cut$d"$'\n'; printf '%s\n' "$d"
+  done
+}
+skip_out() { # $1=skip_dirs 목록 파일. 표준 입력 줄 중 그 폴더 아래 경로로 시작하는 줄을 뺀다
+  LC_ALL=C awk -v L="$1" 'BEGIN { while ((getline l < L) > 0) if (l != "") p[++n] = l "/"; close(L) }
+    { for (i = 1; i <= n; i++) if (index($0, p[i]) == 1) next; print }'
+}
+# --- 건너뛰는 폴더 끝
 
 IFS= read -r -d '' RES_RULES <<'RULES'
 # KIND@@ID@@자산@@파일(SITE=파일 이름, 나머지 *)@@정규식(ERE)@@설명@@규칙별 허용 정규식(선택)
@@ -38,7 +91,7 @@ GEN@@G-EDDSA@@-@@*@@Ed25519|Ed448|EdDSA|Curve25519@@EdDSA 서명
 GEN@@G-X25519@@-@@*@@X25519|X448|XDH|ECDH|KeyAgreement@@X25519/ECDH 단독(같은 줄 ML-KEM 이면 하이브리드 허용)@@ML-?KEM|MLKEM
 GEN@@G-DH-DSA@@-@@*@@DiffieHellman|"DH"|"DHE"|"DSA"|ElGamal|ECIES@@DH·DSA·ElGamal
 GEN@@G-AES128@@-@@*@@AES-?128|AES_128|[Aa]es-?128|\.init\(128\)@@AES-128(보안레벨 1)
-GEN@@G-WEAK-PQC@@-@@*@@ML-KEM-512|MLKEM512|ml_kem_512|ML_KEM_512|ML-DSA-44|MLDSA44|ml_dsa_44|ML_DSA_44|Kyber512|Dilithium2@@보안레벨 3 미만 PQC
+GEN@@G-WEAK-PQC@@-@@*@@[Mm][Ll][-_]?[Kk][Ee][Mm][-_]?512|[Mm][Ll][-_]?[Dd][Ss][Aa][-_]?44|[Kk][Yy][Bb][Ee][Rr][-_]?512|[Dd][Ii][Ll][Ii][Tt][Hh][Ii][Uu][Mm][-_]?2([^0-9]|$)@@보안레벨 3 미만 PQC(대소문자·구분자 무관)
 LWRITE@@LW-legacy-write@@-@@*@@ENCRYPT_MODE|WRAP_MODE|initSign|KeyPairGenerator|generateKeyPair|Files\.(write|writeString|move|copy)@@Legacy*.java 는 읽기·검증 전용이어야 함
 EXPECT@@E-MLKEM768@@-@@*@@ML-KEM-768|MLKEM768|ml_kem_768|ML_KEM_768@@ML-KEM-768 사용
 EXPECT@@E-MLDSA65@@-@@*@@ML-DSA-65|MLDSA65|ml_dsa_65|ML_DSA_65@@ML-DSA-65 사용
@@ -46,7 +99,15 @@ RULES
 export RES_RULES RES_ROOT="$ROOT" RES_TESTRE RES_MAINRE
 export RES_ALLOWLINE='[Ll][Ee][Gg][Aa][Cc][Yy]'
 export RES_WRITEOPS='ENCRYPT_MODE|WRAP_MODE|initSign|KeyPairGenerator|generateKeyPair'
+# 이름 규칙의 쓰기 연산: RES_WRITEOPS 에 Python·Go·Node 의 새 서명·새 암호화·새 키 생성을 보탠다(pqlite/rules.py ALLOW_WRITEOPS 와 같은 뜻의 ERE)
+export RES_ALLOW_WRITEOPS='ENCRYPT_MODE|WRAP_MODE|initSign|KeyPairGenerator|generateKeyPair|\.sign[[:space:]]*\(|(^|[^A-Za-z0-9_])Sign(PKCS1v15|PSS|ASN1)?[[:space:]]*\(|\.encrypt[[:space:]]*\(|(^|[^A-Za-z0-9_])Encrypt(OAEP|PKCS1v15)[[:space:]]*\(|generate_private_key|(^|[^A-Za-z0-9_])GenerateKey[[:space:]]*\(|\.generate[[:space:]]*\(|createSign[[:space:]]*\(|publicEncrypt[[:space:]]*\(|generateKeyPair(Sync)?[[:space:]]*\('
 
+skip_load || exit 2
+skip_dirs "$ROOT" > "$TMPD/skip" || exit 2
+find_files() { # 건너뛰는 폴더를 뺀 일반 파일(이름 순)
+  # shellcheck disable=SC2086  # SK_ANYX 는 '-name 이름 -o ...' 식이라 나눠 넘긴다(이름에 공백·글롭 문자가 없다)
+  find "$ROOT" -mindepth 1 \( -type d \( $SK_ANYX \) \) -prune -o -type f -print | skip_out "$TMPD/skip" | LC_ALL=C sort
+}
 FILES=(); SKIP=0; SKIPN=""
 while IFS= read -r f; do
   b=${f##*/}
@@ -56,15 +117,16 @@ while IFS= read -r f; do
   esac
   grep -Iq . "$f" 2>/dev/null || continue   # 바이너리·빈 파일 제외
   FILES+=("$f")
-done < <(find "$ROOT" \( -name .git -o -path "$ROOT/data" -o -path "$ROOT/target" -o -name node_modules -o -name vendor -o -path "$ROOT/build" -o -name __pycache__ \) -prune -o -type f -print | LC_ALL=C sort)
+done < <(find_files)
 
 echo "== residue $ROOT  ($(date '+%F %T %Z'))"
 echo "INFO 검사 파일 ${#FILES[@]}개 · 건너뛴 키·DB·비밀 모양 파일 ${SKIP}개(내용 미열람)${SKIPN:+:$SKIPN}"
 LC=$(grep -rnE '[Ll]egacy[A-Z][A-Za-z]*\(' "$ROOT/src" 2>/dev/null | grep -v '^Binary' | sed "s#^$ROOT/##" | head -20)
 if [ -n "$LC" ]; then echo "INFO 레거시 호출처(쓰기 경로에서 부르면 안 됨, 사람이 확인):"; echo "$LC" | sed 's/^/      /'; else echo "INFO 레거시 호출처 없음"; fi
 [ ${#FILES[@]} -gt 0 ] || { echo "검사할 파일 없음"; exit 2; }
+printf '%s\n' "${FILES[@]}" > "$TMPD/files"
 
-LC_ALL=C awk '
+LC_ALL=C awk -v RES_LIST="$TMPD/files" '
 function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t\r]+$/, "", s); return s }
 function short(s) { s = trim(s); if (length(s) > 150) s = substr(s, 1, 147) "..."; return s }
 function ftype(b) {
@@ -104,7 +166,9 @@ function add(r, t, ln, txt) {
   if (CNT[r, t] <= 14) LOC[r, t] = LOC[r, t] (LOC[r, t] == "" ? "" : ",") ln
 }
 BEGIN {
-  ROOT = ENVIRON["RES_ROOT"]; ALLOWLINE = ENVIRON["RES_ALLOWLINE"]; WRITEOPS = ENVIRON["RES_WRITEOPS"]; TESTRE = ENVIRON["RES_TESTRE"]; MAINRE = ENVIRON["RES_MAINRE"]; MAXD = 100000
+  while ((getline f < RES_LIST) > 0) ARGV[ARGC++] = f   # 파일 목록은 임시 파일로 받는다(인자 한도, 교차 리뷰 X08)
+  close(RES_LIST)
+  ROOT = ENVIRON["RES_ROOT"]; ALLOWLINE = ENVIRON["RES_ALLOWLINE"]; WRITEOPS = ENVIRON["RES_WRITEOPS"]; ALLOWWR = ENVIRON["RES_ALLOW_WRITEOPS"]; TESTRE = ENVIRON["RES_TESTRE"]; MAINRE = ENVIRON["RES_MAINRE"]; MAXD = 100000
   n = split(ENVIRON["RES_RULES"], LN, "\n"); NRULE = 0
   for (i = 1; i <= n; i++) {
     if (LN[i] == "" || substr(LN[i], 1, 1) == "#") continue
@@ -135,8 +199,8 @@ FNR == 1 {
       if (ISTEST) { add(r, "TEST", FNR, s); continue }
       if (k == "LWRITE") { add(r, "LEFT", FNR, s); continue }
       wr = (CODE ~ WRITEOPS)
-      if (!wr && (ISLEG || s ~ ALLOWLINE)) add(r, "ALLOW", FNR, s)
-      else if (!wr && ALW[r] != "" && s ~ ALW[r]) add(r, "ALLOW", FNR, s)
+      if ((ISLEG || CODE ~ ALLOWLINE) && CODE !~ ALLOWWR) add(r, "ALLOW", FNR, s)
+      else if (!wr && ALW[r] != "" && CODE ~ ALW[r]) add(r, "ALLOW", FNR, s)   # 같은 줄 ML-KEM 도 코드에서만(주석 속 이름은 아님, X58)
       else add(r, "LEFT", FNR, s)
     } else if (COM != "" && COM ~ RE[r]) add(r, "COMMENT", FNR, s)
   }
@@ -179,4 +243,4 @@ END {
   print ""
   printf "SUMMARY files=%d sites=%d LEFT=%d ALLOW=%d GONE=%d | gen_rules=%d LEFT=%d (code=%d allow=%d comment=%d test=%d) | legacy_write=%d | pqc_expect MISSING=%d/%d | VERDICT=%s\n", NFILES, sL + sA + sG, sL, sA, sG, gN, gL, gc, ga, gm, gt, lw, eM, eN, verdict
   exit (verdict == "CLEAN" ? 0 : 1)
-}' "${FILES[@]}"
+}' < /dev/null

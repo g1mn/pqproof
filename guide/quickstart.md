@@ -49,7 +49,7 @@ VERDICT=PASS  receipt_id=78c2995e6ef5…
 The output folder is `proof-out-YYYYMMDD-HHMMSS` (set another with `OUT=`). Open these first:
 
 - `receipt.html`: the whole evidence on one page, for people.
-- `receipt.json`: the same for programs (schema in `schemas/receipt-v2.schema.json`).
+- `receipt.json`: the same for programs (schema in `schemas/receipt-v3.schema.json`).
 - `tables/report.md`: the check table, ready to paste into a document.
 
 [outputs.md](outputs.md) describes every file.

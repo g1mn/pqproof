@@ -5,6 +5,8 @@
 # 찾는 것: 개인키·인증서(PEM·DER·OpenSSH)·키스토어(.jks/.p12) · TLS 설정(nginx·apache·haproxy·openssl.cnf·PostgreSQL·설정 파일 *protocols 키, 업스트림 proxy_ssl_* 포함) · sshd_config
 #          · 소스(Java·Python·Node·Go)와 셸의 암호 API · 약한 암호(MD5·SHA1·DES·3DES·RC4·ECB) · 의존성 버전 · 살아 있는 TLS 엔드포인트
 # 환경변수: OPENSSL(기본 brew → PATH) KEYTOOL STOREPASS(키스토어 비밀번호 후보, 공백 구분) OUT(출력 폴더) TEST_PATHS(시험 경로 목록, 기본 scan/test-paths.ere)
+#          SKIP_DIRS(건너뛰는 폴더 목록, 기본 scan/skip-dirs) HOST_FILES=1(설정이 가리키는 DIR 밖 인증서·호스트 키도 읽는다. 단독 실행용.
+#          prove.sh 는 넘기지 않는다: 판정은 머신과 상관없이 같아야 한다, 교차 리뷰 X05)
 # bash 3.2(macOS)·GNU/BSD 공용: grep -P·연관 배열·sed -i 안 씀. 주석·테스트 경로는 비고에 표시하고 표 아래로 내린다(시험 경로는 test-paths.ere 한 곳, residue.sh 와 같은 목록).
 #   인증서 10개 넘는 묶음(공용 CA 번들)은 한 행 · 읽기 권한 없는 키·sshd_config는 '확인' 행(sudo로 다시) · 고전·PQC 혼재 줄은 고전 쪽으로 판정
 #   못 여는 키스토어도 행(같은 폴더 비밀번호 후보는 이름만) · 같은 공개키 인증서가 있는 개인키는 인증서 서명키(P2)
@@ -21,6 +23,52 @@ TESTRE_FILE=${TEST_PATHS:-$HERE/test-paths.ere}
 TESTRE=$(grep -v -e '^#' -e '^[[:space:]]*$' "$TESTRE_FILE" 2>/dev/null | sed -n 1p)
 MAINRE=$(grep -v -e '^#' -e '^[[:space:]]*$' "$TESTRE_FILE" 2>/dev/null | sed -n 2p)
 [ -n "$TESTRE" ] || { echo "시험 경로 목록 없음: $TESTRE_FILE (TEST_PATHS=<파일>로 준다)" >&2; exit 2; }
+SKIP_FILE=${SKIP_DIRS:-$HERE/skip-dirs}
+[ -r "$SKIP_FILE" ] || { echo "건너뛰는 폴더 목록 없음: $SKIP_FILE (SKIP_DIRS=<파일>로 준다)" >&2; exit 2; }
+# --- 건너뛰는 폴더(scan/skip-dirs). residue.sh 와 cbom-scan.sh 에 같은 글로 있고 pqlite/skipdirs.py 와 같은 규칙이다
+# (tests/test_rule_sync.py 가 세 곳을 대조한다). any 이름은 어느 깊이든, output 이름은 트리 맨 위이거나 같은 폴더에 buildfile 이
+# 있을 때만 건너뛴다. 경로에 main 표시가 있으면 output 규칙을 쓰지 않는다. 건너뛴 폴더 안은 보지 않는다.
+skip_load() { # SKIP_FILE → SK_ANYX·SK_OUTX(find 식), SK_ANYL(이름 목록), SK_BFS(빌드 파일), SK_MAIN
+  local k v n
+  SK_ANYX=""; SK_OUTX=""; SK_ANYL=" "; SK_BFS=""; SK_MAIN=""
+  while read -r k v n; do
+    { [ -n "$v" ] && [ -z "$n" ]; } || { echo "skip-dirs 줄 꼴이 틀림: $k $v $n" >&2; return 2; }
+    case "$k" in
+      any) SK_ANYX="${SK_ANYX:+$SK_ANYX -o }-name $v"; SK_ANYL="$SK_ANYL$v ";;
+      output) SK_OUTX="${SK_OUTX:+$SK_OUTX -o }-name $v";;
+      buildfile) SK_BFS="$SK_BFS $v";;
+      main) SK_MAIN=$v;;
+      *) echo "skip-dirs 모르는 종류: $k" >&2; return 2;;
+    esac
+  done < <(grep -v -e '^#' -e '^[[:space:]]*$' "$SKIP_FILE")
+  SK_ANYX=${SK_ANYX:--name /}; SK_OUTX=${SK_OUTX:--name /}   # 빈 목록: '/' 는 이름에 없어 아무것도 안 맞는다
+}
+skip_dirs() { # $1=ROOT → 건너뛸 폴더의 전체 경로를 한 줄에 하나씩(LC_ALL=C 순)
+  local root=$1 d rel parent b p cut="" hit
+  # shellcheck disable=SC2086  # SK_ANYX·SK_OUTX 는 '-name 이름 -o ...' 식이라 나눠 넘긴다(이름에 공백·글롭 문자가 없다)
+  find "$root" -mindepth 1 -type d \( $SK_ANYX \) -prune -print -o -type d \( $SK_OUTX \) -print 2>/dev/null | LC_ALL=C sort |
+  while IFS= read -r d; do
+    hit=0
+    while IFS= read -r p; do [ -n "$p" ] && case "$d/" in "$p"/*) hit=1;; esac; done <<< "$cut"
+    [ $hit = 1 ] && continue
+    case "$SK_ANYL" in *" ${d##*/} "*) ;; *)
+      rel=${d#"$root"/}; parent=${d%/*}
+      [ -n "$SK_MAIN" ] && case "/$rel/" in *"$SK_MAIN"*) continue;; esac
+      if [ "$parent" != "$root" ]; then
+        hit=0
+        for b in $SK_BFS; do p="$parent/$b"; { [ -L "$p" ] || [ -e "$p" ]; } && [ ! -d "$p" ] && { hit=1; break; }; done
+        [ $hit = 1 ] || continue
+      fi;;
+    esac
+    cut="$cut$d"$'\n'; printf '%s\n' "$d"
+  done
+}
+skip_out() { # $1=skip_dirs 목록 파일. 표준 입력 줄 중 그 폴더 아래 경로로 시작하는 줄을 뺀다
+  LC_ALL=C awk -v L="$1" 'BEGIN { while ((getline l < L) > 0) if (l != "") p[++n] = l "/"; close(L) }
+    { for (i = 1; i <= n; i++) if (index($0, p[i]) == 1) next; print }'
+}
+# --- 건너뛰는 폴더 끝
+skip_load || exit 2
 O=${OPENSSL:-}; KT=${KEYTOOL:-}
 [ -z "$O" ] && for c in /opt/homebrew/bin/openssl /usr/local/opt/openssl/bin/openssl "$(command -v openssl)"; do runs "$c" version && { O=$c; break; }; done
 [ -z "$KT" ] && for c in "$(command -v keytool)" "${JAVA_HOME:-/none}/bin/keytool" /opt/homebrew/opt/openjdk/bin/keytool; do runs "$c" -help && { KT=$c; break; }; done
@@ -32,7 +80,9 @@ TMP=$(mktemp -d "${TMPDIR:-/tmp}/cbom.XXXXXX") || exit 2
 trap 'set +f; rm -f "$TMP"/* 2>/dev/null; rmdir "$TMP" 2>/dev/null' EXIT
 ROWS=$TMP/rows; SEEN=$TMP/seen; : > "$ROWS"; : > "$SEEN"
 
-PRUNE='-mindepth 1 ( -name .git -o -name node_modules -o -name vendor -o -name .venv -o -name venv -o -name __pycache__ -o -name target -o -name build -o -name dist -o -name evidence ) -prune -o'
+# find 가 잘라 낼 any 이름 폴더(scan/skip-dirs). output 이름 폴더(vendor·build·target·dist)는 조건이 있어 결과를 skip_out 으로 거른다
+PRUNE="-mindepth 1 ( -type d ( $SK_ANYX ) ) -prune -o"
+GX=""; for x in $SK_ANYL; do GX="$GX --exclude-dir=$x"; done   # grep -r 이 들어가지 않을 any 이름 폴더
 CODE='--include=*.java --include=*.kt --include=*.scala --include=*.groovy --include=*.py --include=*.js --include=*.mjs --include=*.cjs --include=*.ts --include=*.jsx --include=*.tsx --include=*.go --include=*.rb --include=*.php --include=*.cs --include=*.c --include=*.h --include=*.cc --include=*.cpp --include=*.rs --include=*.swift'
 CFG='--include=*.yml --include=*.yaml --include=*.properties --include=*.toml --include=*.ini --include=*.env --include=.env* --include=*.tf --include=*.tfvars --include=*.xml --include=*.json --include=*.conf --include=*.cfg --include=*.cnf --include=*.sh --include=*.bash --include=Dockerfile* --include=Makefile'
 NOLOCK='--exclude=package-lock.json --exclude=yarn.lock --exclude=pnpm-lock.yaml --exclude=*.min.js --exclude=*.lock'
@@ -46,7 +96,7 @@ TLSRP="X25519MLKEM768 하이브리드(TLS 1.3): $GRPRP"
 DEFRP="그룹 명시($GRPRP): 3.5.0부터 기본 keyshare X25519MLKEM768·X25519(OpenSSL NEWS)"
 PGRP="설정 불가: PG18 ssl_groups 또는 구간 보호(PQC 앞단·터널)"
 SSHKX="mlkem768x25519-sha256(OpenSSH 9.9+) · sntrup761x25519-sha512@openssh.com(9.0+)"
-SSHRP="kex 하이브리드 먼저(서명은 소급 위험 없음) · 호스트키 ssh-mldsa44-ed25519(OpenSSH 10.6+ 기본 활성 · 10.4~10.5는 실험용 …@openssh.com 이름·기본 꺼짐, 그 키는 10.6에서 재생성: OpenSSH 릴리스 노트)"
+SSHRP="kex 하이브리드 먼저(서명은 소급 위험 없음) · 호스트키 ssh-mldsa44-ed25519(OpenSSH 10.6+ 기본 활성 · 10.4~10.5는 실험용 …@openssh.com 이름·기본 꺼짐, 그 키는 10.6에서 재생성: OpenSSH 릴리스 노트) · ML-DSA-44 는 NIST 보안레벨 2라 PQ-Proof c-classic 은 막는다"
 NISTRP="NIST IR 8547 최종(2026-10): RSA·ECDSA·EdDSA·ECDH·DH 2030 이후 비권장·2035 이후 금지"
 
 # ---------- 공통 ----------
@@ -56,13 +106,13 @@ note() { local o="" x; for x in "$@"; do [ -n "$x" ] && o="${o:+$o · }$x"; done
 # 근거 줄 발췌. 키·토큰일 수 있는 긴 base64 덩어리는 가린다(증거 파일이 보고서에 그대로 붙으므로)
 snip() { local s; s=$(trim "$1" | sed -E 's#[A-Za-z0-9+/=]{40,}#<가림>#g'); s=${s//$TAB/ }; [ ${#s} -gt 90 ] && s="${s:0:90}…"; printf '%s' "\`$s\`"; }
 # ROOT 안에서 '.'을 찾는다: GNU grep의 --exclude-dir는 명령줄 디렉터리 이름(예: 루트가 build)에도 걸리기 때문
-G() { ( cd "$ROOT" && grep -rnIE "$@" --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=vendor --exclude-dir=.venv --exclude-dir=venv \
-  --exclude-dir=__pycache__ --exclude-dir=target --exclude-dir=build --exclude-dir=dist --exclude-dir=evidence --exclude=cbom-scan.sh . 2>/dev/null ) |
-  awk -v r="$ROOT" 'substr($0,1,2)=="./" {$0 = r substr($0,2)} {print}'; }
+# shellcheck disable=SC2086  # GX 는 --exclude-dir=이름 목록(이름에 공백·글롭 문자가 없다, set -f)
+G() { ( cd "$ROOT" && grep -rnIE "$@" $GX --exclude=cbom-scan.sh . 2>/dev/null ) |
+  awk -v r="$ROOT" 'substr($0,1,2)=="./" {$0 = r substr($0,2)} {print}' | skip_out "$SKIPL"; }
 seen() { grep -Fxq -- "$1" "$SEEN"; }
 add() { # 위치 용도 알고리즘 위협 우선순위 권장 비고
   local k; case "$5" in P1) k=1;; P2) k=2;; P3) k=3;; 확인) k=4;; *) k=5;; esac
-  case "$7" in *주석*|*테스트*) k=$((k+10));; esac
+  case "$7" in 주석|"주석 · "*|테스트·예제|"테스트·예제 · "*) k=$((k+10));; esac   # flag_of 표시는 비고 맨 앞(원본 발췌의 낱말은 보지 않는다)
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$k" "$1" "$2" "$3" "$4" "$5" "$6" "$7" >> "$ROWS"; printf '%s\n' "$1" >> "$SEEN"
 }
 flag_of() { # $1=상대경로 $2=줄 → FL
@@ -84,11 +134,13 @@ autouse() { case "$(lc "$1")" in
   *) echo 암호화;; esac; }
 
 # 위협·우선순위·권장 판정 → TH PR RP WN. P1=키교환·암호화(HNDL 직접 노출) P2=서명·인증서·고전 취약 P3=그로버 약화
+WEAKPQ='ml[-_]?kem[-_]?512|ml[-_]?dsa[-_]?44|kyber[-_]?512|dilithium[-_]?2([^0-9]|$)'   # NIST 보안레벨 3 미만 PQC(교차 리뷰 X07)
 verdict() {
   local u=$1 a; a=$(lc "$2"); WN=""
+  if [[ $a =~ $WEAKPQ ]]; then TH="보안레벨 3 미만(PQC)"; PR=P2; RP="ML-KEM-768 · ML-DSA-65(NIST 보안레벨 3)"; return; fi
   case "$a" in *mlkem*|*ml-kem*|*ml_kem*|*ml-dsa*|*mldsa*|*slh-dsa*|*sntrup761*|*kyber*|*dilithium*|*falcon*|*sphincs*|*smaug*|*haetae*|*aimer*|*ntru*|*hqc*)
     TH="안전(PQC)"; PR="참고"; RP="유지"; return;; esac
-  case "$a" in *rsa*|*ecdsa*|*ecdh*|*dsa*|*ed25519*|*ed448*|*eddsa*|*x25519*|*x448*|*xdh*|*curve25519*|*secp*|*prime1*|*prime2*|*prime3*|*brainpool*|*p-256*|*p-384*|*p-521*|*p256*|*p384*|*p521*|*nistp*|*diffie*|*ffdhe*|*dhe*|dh|dh[!a-z]*|*[!a-z]dh|*[!a-z]dh[!a-z]*|ec|ec[!a-z]*|ecc*|*[!a-z]ec|*[!a-z]ec[!a-z]*|[rpe]s[0-9][0-9][0-9]*|*[!a-z][rpe]s[0-9][0-9][0-9]*|*elgamal*)
+  case "$a" in *rsa*|*ecdsa*|*ecdh*|*dsa*|*ed25519*|*ed448*|*x25519*|*x448*|*xdh*|*curve25519*|*secp*|*prime1*|*prime2*|*prime3*|*brainpool*|*p-256*|*p-384*|*p-521*|*p256*|*p384*|*p521*|*nistp*|*diffie*|*ffdhe*|*dhe*|dh|dh[!a-z]*|*[!a-z]dh|*[!a-z]dh[!a-z]*|ec|ec[!a-z]*|ecc*|*[!a-z]ec|*[!a-z]ec[!a-z]*|[rpe]s[0-9][0-9][0-9]*|*[!a-z][rpe]s[0-9][0-9][0-9]*|*elgamal*)
     TH="쇼어로 깨짐"; RP=""
     case "$u" in *키교환*|*암호화*) PR=P1;; *) PR=P2;; esac
     case "$u" in *키교환*) RP="ML-KEM-768 하이브리드(TLS X25519MLKEM768 · SSH mlkem768x25519-sha256)";; esac
@@ -98,7 +150,7 @@ verdict() {
     [ -z "$RP" ] && RP="ML-KEM-768(키교환) · ML-DSA-65(서명)"
     case "$a" in *md5*|*sha1*|*sha-1*) WN="약한 해시(MD5/SHA-1) 함께 사용";; esac
     return;; esac
-  case "$a" in *md5*|*sha1*|*sha-1*|*rc4*|*arc4*|*arcfour*|*3des*|*des-ede*|*desede*|*tripledes*|*des-cbc*|*des_cbc*|des|des[!a-z]*|*[!a-z]des|*[!a-z]des[!a-z]*|*rc2*|*blowfish*)
+  case "$a" in *md5*|*sha1*|*sha-1*|*rc4*|*arcfour*|*3des*|*des-ede*|*desede*|*tripledes*|*des-cbc*|*des_cbc*|des|des[!a-z]*|*[!a-z]des|*[!a-z]des[!a-z]*|*rc2*|*blowfish*)
     TH="그로버로 약화(이미 고전 취약)"
     case "$u" in *암호화*|*키교환*) PR=P1;; *) PR=P2;; esac
     case "$a" in *md5*|*sha1*|*sha-1*) RP="SHA-256 이상(SHA-384 권장)";; *) RP="AES-256-GCM";; esac
@@ -328,7 +380,7 @@ tls_line() { # 위치 줄 비고
     ssl_conf_command|sslopensslconfcmd) d=$(lc "${v%%[[:space:]]*}"); v=$(trim "${v#*[[:space:]]}");;
     sslciphersuite) case "$(lc "$v")" in tlsv1.3[[:space:]]*) d=ciphersuites; v=$(trim "${v#*[[:space:]]}");; ssl[[:space:]]*) v=$(trim "${v#*[[:space:]]}");; esac;;
     bind) for k in curves ciphersuites ciphers; do
-        x=$(printf ' %s ' "$v" | sed -n -E "s/.*[[:space:]]$k[[:space:]]+([^[:space:]]+).*/\\1/p")
+        x=$(printf ' %s ' "$v" | sed -n -E "s/.*[[:space:]]${k}[[:space:]]+([^[:space:]]+).*/\\1/p")
         [ -n "$x" ] && tls_kv "$1" "$k" "$x" "$3"; done; return;;
   esac
   tls_kv "$1" "$d" "$v" "$(note "$3" "$up")"
@@ -351,22 +403,30 @@ scan_tls() {
     ln=$(grep -n -i -E "$ON" "$f" | head -1 | cut -d: -f1); r=${f#"$ROOT"/}
     add "$r:$ln" 키교환 "그룹 미지정 → 링크된 OpenSSL 기본값" "미확인(OpenSSL 버전 의존)" P1 "$DEFRP" "TLS 서버인데 그룹 지시어 없음"
   done
-  # DIR 밖에 있는 참조 인증서도 읽을 수 있으면 파싱
+  # DIR 밖 참조 인증서는 열지 않고 '확인' 행만 남긴다(머신마다 판정이 달라지지 않게, 교차 리뷰 X05). HOST_FILES=1 이면 읽는다(단독 실행용)
   G -i -e '^[[:space:]]*(ssl_certificate|sslcertificatefile|ssl_trusted_certificate)[[:space:]]+/' | while IFS= read -r h; do
-    rest=${h#*:}; x=$(trim "${rest#*:}"); x=${x#*[[:space:]]}; x=$(trim "${x%%;*}")
-    case "$x" in "$ROOT"/*) ;; *) [ -r "$x" ] && scan_file "$x" "$x" "참조: ${h%%:*}";; esac
+    f=${h%%:*}; rest=${h#*:}; ln=${rest%%:*}; r=${f#"$ROOT"/}
+    x=$(trim "${rest#*:}"); x=${x#*[[:space:]]}; x=$(trim "${x%%;*}")
+    case "$x" in "$ROOT"/*) continue;; esac
+    if [ "${HOST_FILES:-0}" = 1 ]; then [ -r "$x" ] && scan_file "$x" "$x" "참조: $r:$ln"
+    else flag_of "$r" "${rest#*:}"
+      add "$r:$ln" "인증서(트리 밖 참조)" "$x" 미확인 확인 "실행 중인 서비스에서 확인(TLS_TARGETS 또는 openssl s_client)" "$(note "$FL" "트리 밖 파일은 열지 않음")"
+    fi
   done
 }
 
 # ---------- sshd_config ----------
-hostkey_alg() {
-  local o; if [ -r "$1" ] && [ -n "$SK" ] && o=$("$SK" -l -f "$1" 2>/dev/null </dev/null); then
+hostkey_alg() { # DIR 밖 호스트 키는 HOST_FILES=1 일 때만 연다(아니면 파일 이름으로 추정, 교차 리뷰 X05)
+  local o
+  case "$1" in "$ROOT"/*) ;; *) [ "${HOST_FILES:-0}" = 1 ] || { hostkey_name "$1"; return; };; esac
+  if [ -r "$1" ] && [ -n "$SK" ] && o=$("$SK" -l -f "$1" 2>/dev/null </dev/null); then
     printf '%s' "$o" | awk '{t=$NF; gsub(/[()]/,"",t); print t"-"$1; exit}'; return; fi
   [ -r "$1.pub" ] && o=$(awk '{print $1; exit}' "$1.pub") && [ -n "$o" ] && { echo "$o"; return; }   # 이 ssh-keygen이 모르는 형식
-  case "$(lc "${1##*/}")" in *mldsa*) echo "ML-DSA(파일 이름 추정)";; *ecdsa*) echo ECDSA;; *ed25519*) echo Ed25519;; *rsa*) echo RSA;; *dsa*) echo DSA;; *) echo "미확인($1)";; esac
+  hostkey_name "$1"
 }
+hostkey_name() { case "$(lc "${1##*/}")" in *mldsa*) echo "ML-DSA(파일 이름 추정)";; *ecdsa*) echo ECDSA;; *ed25519*) echo Ed25519;; *rsa*) echo RSA;; *dsa*) echo DSA;; *) echo "미확인($1)";; esac; }
 scan_ssh() {
-  find "$ROOT" $PRUNE -type f \( -name 'sshd_config*' -o -name ssh_config -o -path '*/sshd_config.d/*' -o -path '*/ssh_config.d/*' \) -print 2>/dev/null |
+  find "$ROOT" $PRUNE -type f \( -name 'sshd_config*' -o -name ssh_config -o -path '*/sshd_config.d/*' -o -path '*/ssh_config.d/*' \) -print 2>/dev/null | skip_out "$SKIPL" |
   while IFS= read -r f; do
     local r=${f#"$ROOT"/} dn="" ; case "$r" in */*_config.d/*) dn="드롭인: 먼저 읽힌 값 적용(sshd -T로 실효값 확인)";; esac
     [ -r "$f" ] || { add "$r" "키교환·서명(SSH)" "SSH 설정(읽기 권한 없음)" 미확인 확인 "sudo로 다시 스캔 또는 sudo sshd -T" "RHEL 계열은 sshd_config 0600·sshd_config.d 0700(CentOS Stream 9 openssh.spec)"; continue; }
@@ -374,7 +434,9 @@ scan_ssh() {
     while IFS= read -r h; do
       local ln=${h%%:*} t d v lv a pq="" cl="" x; t=$(trim "${h#*:}"); d=$(lc "${t%%[[:space:]=]*}"); v=$(trim "${t#*[[:space:]=]}"); v=$(trim "${v#=}"); lv=$(lc "$v")
       case "$d" in
-        hostkey) a=$(hostkey_alg "$v"); verdict 서명 "$a"; add "$r:$ln" "서명(SSH 호스트키)" "$a" "$TH" "$PR" "$SSHRP" "$(note "$dn" "$v")";;
+        hostkey) a=$(hostkey_alg "$v"); verdict 서명 "$a"; x=""
+          case "$v" in "$ROOT"/*) ;; *) [ "${HOST_FILES:-0}" = 1 ] || x="트리 밖 파일은 열지 않음(이름으로 추정)";; esac
+          add "$r:$ln" "서명(SSH 호스트키)" "$a" "$TH" "$PR" "$SSHRP" "$(note "$dn" "$x" "$v")";;
         kexalgorithms)
           for x in $(printf '%s' "${lv#[-+^]}" | tr ',' ' '); do case "$x" in *mlkem*|*sntrup*) pq="${pq:+$pq,}$x";; *) cl="${cl:+$cl,}$x";; esac; done
           case "$lv" in -*) add "$r:$ln" "키교환(SSH)" "$v" "미확인(기본값에서 제거)" 확인 "sshd -T로 실효값 확인" "$dn";;
@@ -498,9 +560,9 @@ scan_file() { # 파일 표시경로 [비고]
 }
 scan_keys() {
   { find "$ROOT" $PRUNE -type f \( -name '*.pem' -o -name '*.crt' -o -name '*.cer' -o -name '*.der' -o -name '*.key' -o -name '*.p8' -o -name '*.pk8' \
-      -o -name '*.csr' -o -name '*.pub' -o -name 'id_rsa' -o -name 'id_ecdsa' -o -name 'id_ed25519' -o -name 'id_dsa' -o -name 'authorized_keys' -o -name 'ssh_host_*' \) -print 2>/dev/null
+      -o -name '*.csr' -o -name '*.pub' -o -name 'id_rsa' -o -name 'id_ecdsa' -o -name 'id_ed25519' -o -name 'id_dsa' -o -name 'authorized_keys' -o -name 'ssh_host_*' \) -print 2>/dev/null | skip_out "$SKIPL"
     G -l -e '^[[:space:]]*-----BEGIN '; } | sort -u | while IFS= read -r f; do flag_of "${f#"$ROOT"/}" ""; scan_file "$f" "${f#"$ROOT"/}" "$FL"; done
-  find "$ROOT" $PRUNE -type f \( -name '*.jks' -o -name '*.keystore' -o -name '*.truststore' -o -name '*.p12' -o -name '*.pfx' -o -name '*.jceks' -o -name '*.bks' \) -print 2>/dev/null |
+  find "$ROOT" $PRUNE -type f \( -name '*.jks' -o -name '*.keystore' -o -name '*.truststore' -o -name '*.p12' -o -name '*.pfx' -o -name '*.jceks' -o -name '*.bks' \) -print 2>/dev/null | skip_out "$SKIPL" |
   while IFS= read -r f; do scan_store "$f" "${f#"$ROOT"/}"; done
 }
 passhint() { # 키스토어 폴더의 비밀번호 후보: 파일 이름과 설정 키 이름만 적고 값은 출력하지 않는다
@@ -628,6 +690,7 @@ render() { # md csv 명령줄
 
 scan() { # DIR [host:port|파일 ...]
   ROOT=$(cd "$1" 2>/dev/null && pwd) || { echo "디렉터리 없음: $1" >&2; exit 2; }; shift
+  SKIPL=$TMP/skip; skip_dirs "$ROOT" > "$SKIPL" || exit 2   # 건너뛸 output 폴더(G 와 find 결과를 skip_out 으로 거른다)
   scan_keys; scan_embedded; scan_ssh; scan_tls; scan_code; scan_generic
   local a l; for a in "$@"; do
     if [ -f "$a" ]; then while IFS= read -r l; do l=$(trim "${l%%#*}"); [ -n "$l" ] && probe "$l"; done < "$a"; else probe "$a"; fi; done

@@ -50,9 +50,14 @@ import time
 
 FORMAT = "pqc-proof receipt 1"
 NOTE = ("검증 증적: receipt_id는 receipt_id 칸을 뺀 이 JSON의 RFC 8785 정규형(키 정렬, 공백 없음, UTF-8) SHA-256이고, "
-        "artifacts·tables의 모든 파일과 evidence-fragment.json이 SHA-256과 함께 적혀 있다. `bash prove.sh --verify DIR`이 다시 계산한다. "
-        "해시는 파일이 이 증적이 말하는 그 파일임을 보일 뿐, 누가 만들었는지는 보이지 않는다. "
-        "receipt_id를 믿을 수 있는 곳에서 받은 값과 비교할 것.")
+        "artifacts·tables의 모든 파일과 evidence-fragment.json이 SHA-256과 함께 적혀 있다. `pqproof --verify DIR`(또는 "
+        "`bash prove.sh --verify DIR`)이 다시 계산한다. 해시는 파일이 이 증적이 말하는 그 파일임을 보일 뿐, 누가 만들었는지는 "
+        "보이지 않는다. receipt_id를 믿을 수 있는 곳에서 받은 값과 비교할 것.")
+# 형식 2(0.1.x)와 형식 1 의 둘째 공개본이 쓰던 NOTE. --verify 는 이 글을 계속 받고 receipt.html 을 그 판의 낱말로 다시 그린다
+NOTE_V2 = ("검증 증적: receipt_id는 receipt_id 칸을 뺀 이 JSON의 RFC 8785 정규형(키 정렬, 공백 없음, UTF-8) SHA-256이고, "
+           "artifacts·tables의 모든 파일과 evidence-fragment.json이 SHA-256과 함께 적혀 있다. `bash prove.sh --verify DIR`이 다시 계산한다. "
+           "해시는 파일이 이 증적이 말하는 그 파일임을 보일 뿐, 누가 만들었는지는 보이지 않는다. "
+           "receipt_id를 믿을 수 있는 곳에서 받은 값과 비교할 것.")
 # 형식 1(format_version 칸 없음) 증적이 쓰던 NOTE. 첫 공개본(2026-11-17)은 '영수증'이라고 적었다.
 # --verify 는 이 글을 계속 받고, receipt.html 은 그 판의 낱말로 다시 그린다(LEGACY_WORDS)
 NOTE_PUBLIC1 = ("해시 영수증: receipt_id는 receipt_id 칸을 뺀 이 JSON의 RFC 8785 정규형(키 정렬, 공백 없음, UTF-8) SHA-256이고, "
@@ -64,8 +69,12 @@ MAX_ARTIFACT = 64 << 20
 _SEGMENT = r"(?!\.\.?(?:/|$))[A-Za-z0-9_.-]{1,120}"  # . 이나 .. 은 안 된다: 경로가 증적 폴더 안에 머문다
 ARTIFACT_PATH = re.compile(rf"(?:artifacts|tables)/{_SEGMENT}(?:/{_SEGMENT}){{0,4}}|evidence-fragment\.json")
 STATUS = ["pass", "fail", "undecided", "na", "review", "check"]
-TREE_SKIP_DIRS = {".git", "node_modules", "target", "build", "__pycache__", ".gradle", ".idea", "__MACOSX", ".venv", "venv"}
+# 증적 형식 1·2 의 트리 목록이 건너뛴 폴더(이름이 같으면 어느 깊이든). --verify 가 옛 증적의 in/ 트리를 이 목록으로 다시 잰다.
+# 형식 3부터는 scan/skip-dirs 규칙(pqlite/skipdirs.py, 증적의 skip_dirs 사본)으로 잰다(교차 리뷰 X03·X09)
+LEGACY_TREE_SKIP_DIRS = frozenset({".git", "node_modules", "target", "build", "__pycache__", ".gradle", ".idea", "__MACOSX", ".venv",
+                                   "venv"})
 TREE_SKIP_FILES = {".DS_Store"}
+LEGACY = "legacy"  # tree_files(root, LEGACY): 형식 1·2 의 걷기
 
 # ---------------------------------------------------------------------------------------------
 # validate()가 아는 JSON Schema 부분집합: type, const, enum, pattern, minimum, required, properties,
@@ -135,7 +144,7 @@ _TOP_REQ = ["format", "receipt_id", "note", "verdict", "started_at", "finished_a
 # format_version·tool_version·ruleset_version·ruleset_sha256 은 증적 형식 2(0.1.0)에서 보탰다. 형식 2에서는 꼭 있어야 한다
 # (version_problems). 옛 NOTE 는 형식 1 증적에만 받는다.
 SCHEMA = obj(_TOP_REQ,
-    format={"const": FORMAT}, receipt_id=SHA, note={"enum": [NOTE, NOTE_PUBLIC1]},
+    format={"const": FORMAT}, receipt_id=SHA, note={"enum": [NOTE, NOTE_V2, NOTE_PUBLIC1]},
     verdict={"enum": ["pass", "fail", "undecided"]},
     format_version={"type": "integer", "minimum": 2}, tool_version={"type": "string", "pattern": r"^[0-9][0-9A-Za-z.+-]*$"},
     ruleset_version={"type": "string", "pattern": r"^[0-9A-Za-z][0-9A-Za-z.+-]*$"}, ruleset_sha256=SHA,
@@ -161,7 +170,10 @@ SCHEMA = obj(_TOP_REQ,
     extra={"type": "array", "items": strict(source=STR, path=PATH, path_sha256=SHA)},
     artifacts={"type": "array", "minItems": 1, "items": strict(path=PATH, bytes=INT, sha256=SHA)},
     allowlist=ALLOWLIST, excluded=EXCLUDED, deck_meta=DECK_META, test_paths=strict(file=PATH, file_sha256=SHA),
+    skip_dirs=strict(file=PATH, file_sha256=SHA),
 )
+# 형식마다 꼭 있어야 하는 칸과 있으면 안 되는 칸(스키마는 모든 형식을 한 번에 읽는다). skip_dirs 는 형식 3에서 보탰다
+FORMAT_ONLY = {"skip_dirs": 3}
 
 TYPES = {"string": str, "integer": int, "number": (int, float), "boolean": bool, "array": list, "object": dict,
          "null": type(None)}
@@ -395,14 +407,43 @@ class Artifacts:
 
 
 # ---------------------------------------------------------------------------------------------
-def tree_files(root):
-    """root 아래 파일 목록 [(상대 경로, sha256 또는 'symlink:<대상>', 바이트)]. TREE_SKIP_DIRS는 건너뛴다(빌드 산출물·.git)."""
+def tree_files(root, rules=None, skipped=None):
+    """root 아래 파일 목록 [(상대 경로, sha256 또는 'symlink:<대상>', 바이트)]. 링크는 따라가지 않는다.
+    rules: pqlite/skipdirs.Rules(증적 형식 3, 비우면 scan/skip-dirs). LEGACY 면 형식 1·2 의 걷기(LEGACY_TREE_SKIP_DIRS 이름은 어느
+    깊이든 건너뜀). skipped: 리스트를 주면 건너뛴 폴더 (상대 경로, 종류)를 채운다(형식 3 걷기만)."""
+    if rules == LEGACY:
+        return _tree_files_legacy(root)
+    sk = _skipdirs_module()
+    entries, skips = sk.walk(root, rules or sk.load())
+    if skipped is not None:
+        skipped.extend(skips)
+    out = []
+    for rel, full, kind in entries:
+        if kind == "link":
+            out.append((rel, "symlink:" + os.readlink(full), 0))
+        elif kind == "file":
+            st = os.lstat(full)
+            if stat.S_ISREG(st.st_mode):
+                out.append((rel, _sha256_path(full), st.st_size))
+    return sorted(out)
+
+
+def _sha256_path(full):
+    h = hashlib.sha256()
+    with open(full, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _tree_files_legacy(root):
+    """증적 형식 1·2 의 트리 목록: LEGACY_TREE_SKIP_DIRS 이름 폴더는 어느 깊이든 건너뛴다."""
     out = []
     for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
         keep = []
         for d in sorted(dirnames):
             full = os.path.join(dirpath, d)
-            if d in TREE_SKIP_DIRS:
+            if d in LEGACY_TREE_SKIP_DIRS:
                 continue
             if os.path.islink(full):
                 out.append((os.path.relpath(full, root).replace(os.sep, "/"), "symlink:" + os.readlink(full), 0))
@@ -418,11 +459,7 @@ def tree_files(root):
             if stat.S_ISLNK(st.st_mode):
                 out.append((rel, "symlink:" + os.readlink(full), 0))
             elif stat.S_ISREG(st.st_mode):
-                h = hashlib.sha256()
-                with open(full, "rb") as f:
-                    for chunk in iter(lambda: f.read(1 << 20), b""):
-                        h.update(chunk)
-                out.append((rel, h.hexdigest(), st.st_size))
+                out.append((rel, _sha256_path(full), st.st_size))
     return sorted(out)
 
 
@@ -500,7 +537,8 @@ def consistency(r):
         out.append("c-classic is na, but params.scope is not kex")
     if "c-classic" in by and jf is not None and by["c-classic"] not in ("undecided", "na"):
         lst = jf.get("listed") or {}
-        left = sum(v["code"] for k, v in jf["families"].items()) - lst.get("allowed", 0) - lst.get("hybrid", 0) - lst.get("review", 0)
+        left = (sum(v["code"] for k, v in jf["families"].items()) + lst.get("relisted", 0) - lst.get("allowed", 0) - lst.get("hybrid", 0)
+                - lst.get("review", 0))
         sites = lst.get("sites_left", jf["sites_left"])
         if (by["c-classic"] in ("pass", "review")) != (left == 0 and jf["weak_pqc"] == 0 and jf["legacy_write"] == 0
                                                        and not sites):
@@ -522,12 +560,14 @@ def consistency(r):
             out.append(f"allowlist.unreviewed is {a['unreviewed']}, but {n} allowing entries have no reviewed_by and reviewed_at")
         unused = [e for e in a["entries"] if _counts_unused(e)]
         u = len(unused) if "unused" in a else 0  # 안 쓰인 항목 칸이 없는 옛 증적은 예전 식 그대로
-        want = ("fail" if strict_ else "review") if (n or u) else ("pass" if live else "na")
+        nm = len(a.get("legacy") or []) if format_version(r) >= 3 else 0  # 형식 3: 이름 규칙으로만 허용한 곳도 r-allow 가 본다
+        want = ("fail" if strict_ else "review") if (n or u or nm) else ("pass" if live else "na")
         if "r-allow" not in by:
             out.append("allowlist.unreviewed is recorded, but there is no r-allow check")
         elif by["r-allow"] != want:
             out.append(f"r-allow is {by['r-allow']}, but {n} of {len(live)} allowing entries are not reviewed"
-                       + (f" and {u} entries are unused" if u else "") + (" and require_review is on" if strict_ else ""))
+                       + (f" and {u} entries are unused" if u else "") + (f" and {nm} lines pass on the name rule alone" if nm else "")
+                       + (" and require_review is on" if strict_ else ""))
         out += _coverage_problems(a, unused)
     if a and _new_format(r):  # 새 형식인데 결함 D1 뒤 칸이 없다: 칸을 지워 옛 증적처럼 보이게 한 것으로 본다
         missing = [k for k in NEW_ALLOW_KEYS if k not in a]
@@ -597,6 +637,19 @@ def _allowlist_module():
     return mod
 
 
+def _skipdirs_module():
+    """pqlite/skipdirs.py(건너뛰는 폴더 규칙과 트리 걷기). 스크립트로 돌 때는 파일로 읽는다."""
+    if __package__:
+        from . import skipdirs
+        return skipdirs
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("pqlite_skipdirs", os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                                                  "skipdirs.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
 def _version_module():
     """pqlite/version.py(스크립트로 돌 때도 sys.path 를 건드리지 않게 파일로 읽는다)."""
     if __package__:
@@ -608,6 +661,13 @@ def _version_module():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
+
+
+def _tree_rules(root, r):
+    """in/ 트리를 다시 잴 걷기 규칙: 형식 3은 증적에 남긴 skip-dirs 사본, 그 전 형식은 LEGACY."""
+    if format_version(r) < 3:
+        return LEGACY
+    return _skipdirs_module().parse(_read_nofollow(root, r["skip_dirs"]["file"]).decode("utf-8"), r["skip_dirs"]["file"])
 
 
 def format_version(r):
@@ -622,13 +682,19 @@ def version_problems(r):
     fv = format_version(r)
     keys = ("tool_version", "ruleset_version", "ruleset_sha256")
     if fv == 1:
-        extra = [k for k in keys if k in r]
+        extra = [k for k in keys + tuple(FORMAT_ONLY) if k in r]
         return [f"{', '.join(extra)} without format_version: a format 1 receipt does not carry version fields"] if extra else []
     out = [f"format_version {fv} needs {k}" for k in keys if k not in r]
     if out:
         return out
-    if r["note"] != NOTE:
-        out.append("a format 2 receipt must carry the current note, not the note of an older version")
+    want_note = NOTE_V2 if fv == 2 else NOTE
+    if r["note"] != want_note:
+        out.append(f"a format {fv} receipt must carry the note of format {fv}, not the note of another version")
+    for key, since in FORMAT_ONLY.items():
+        if fv >= since and key not in r:
+            out.append(f"format_version {fv} needs {key}")
+        elif fv < since and key in r:
+            out.append(f"{key} is a field of format {since}, but format_version is {fv}")
     got = v.ruleset_from_tools(r["tools"], r["ruleset_version"])  # 그 묶음의 파일 목록으로(묶음 1은 여섯, 2부터 여덟)
     if r["ruleset_sha256"] != got:
         out.append(f"ruleset_sha256 is {r['ruleset_sha256']}, but the rule files listed in tools[] hash to {got}")
@@ -765,7 +831,12 @@ def verify(root):
             if not inp["root"].startswith("in/") or not os.path.isdir(tree) or os.path.islink(tree):
                 out.append((False, f"inputs.{side}: unpacked tree {inp['root']} is missing"))
                 continue
-            got = tree_sha256(tree_files(tree))
+            try:
+                rules = _tree_rules(root, receipt)
+            except (OSError, ValueError) as e:
+                out.append((False, f"inputs.{side}: the skip-dirs copy cannot be read ({e})"))
+                continue
+            got = tree_sha256(tree_files(tree, rules))
             out.append((got == inp["tree_sha256"], f"inputs.{side}: tree {inp['root']} sha256 {got}"
                         if got == inp["tree_sha256"] else f"inputs.{side}: tree hashes to {got}, receipt says {inp['tree_sha256']}"))
     problems = consistency(receipt)
@@ -839,16 +910,19 @@ def pending_note(r, en=False):
     a = r.get("allowlist") or {}
     n, w, u = a.get("unreviewed") or 0, a.get("write_review") or 0, a.get("unused") or 0
     v = len((r.get("weakening") or {}).get("review") or []) if format_version(r) >= 2 else 0
-    if r["verdict"] != "pass" or not (v or n or w or u):
+    m = len(a.get("legacy") or []) if format_version(r) >= 3 else 0  # 이름 규칙으로만 허용한 곳(형식 3부터)
+    if r["verdict"] != "pass" or not (v or n or w or u or m):
         return ""
     if en:
         parts = ([f"{v} removed {'verification needs' if v == 1 else 'verifications need'} review"] if v else []) \
             + ([f"{n} allowed {'entry' if n == 1 else 'entries'} not yet reviewed by a person"] if n else []) \
             + ([f"{w} write {'path' if w == 1 else 'paths'} in allowed ranges {'needs' if w == 1 else 'need'} review"] if w else []) \
-            + ([f"{u} allowlist {'entry' if u == 1 else 'entries'} unused in the fixed tree"] if u else [])
+            + ([f"{u} allowlist {'entry' if u == 1 else 'entries'} unused in the fixed tree"] if u else []) \
+            + ([f"{m} {'line' if m == 1 else 'lines'} allowed by the name rule alone"] if m else [])
         return "; ".join(parts)
     parts = ([f"검증 호출 제거 {v}건 검토 필요"] if v else []) + ([f"허용 {n}건 사람 확인 전"] if n else []) \
-        + ([f"허용 범위 쓰기 경로 {w}곳 검토 필요"] if w else []) + ([f"안 쓰인 항목 {u}건"] if u else [])
+        + ([f"허용 범위 쓰기 경로 {w}곳 검토 필요"] if w else []) + ([f"안 쓰인 항목 {u}건"] if u else []) \
+        + ([f"이름 규칙으로만 허용 {m}곳"] if m else [])
     return " · ".join(parts)
 
 
@@ -961,8 +1035,13 @@ def allow_sections(r):
         tail = (f"<p>하이브리드 결합 허용 {_num(len(hyb))}줄(같은 함수 안 주석이 아닌 ML-KEM 코드와 묶인 키 교환 고전 성분): "
                 f"<code>{_e(_few(hyb, 8))}</code></p>" if hyb else "")
         leg = a.get("legacy") or []
-        tail += (f"<p>이름 규칙 허용 {_num(len(leg))}곳(허용 목록 밖, Legacy*.java 파일이거나 같은 줄에 legacy, 그 줄에 쓰기 연산 없음. "
-                 f"{_words(r)['legacy_rule']}): <code>{_e(_few(leg, 8))}</code></p>" if leg else "")
+        if format_version(r) >= 3:
+            tail += (f'<p class="s-review">이름 규칙으로만 허용 {_num(len(leg))}곳(허용 목록 항목 없음, Legacy*.java 파일이거나 코드에 legacy, '
+                     "그 줄과 아래 3줄에 새 키·서명·암호화 없음). 사람이 확인하지 않은 허용이라 r-allow 가 검토 필요로 본다"
+                     f"(REQUIRE_REVIEW=1 이면 실패): <code>{_e(_few(leg, 8))}</code></p>" if leg else "")
+        else:
+            tail += (f"<p>이름 규칙 허용 {_num(len(leg))}곳(허용 목록 밖, Legacy*.java 파일이거나 같은 줄에 legacy, 그 줄에 쓰기 연산 없음. "
+                     f"{_words(r)['legacy_rule']}): <code>{_e(_few(leg, 8))}</code></p>" if leg else "")
         tail += "".join(f'<p class="s-review">{_e(w)}</p>' for w in a["warnings"])
         parts.append("<h2>허용 목록(남긴 고전과 사유)</h2><section>" + head
                      + _table(["#", "위치", "종류", "사유", "판정", "걸린 고전 줄"] + (["원본에서 덮는 줄"] if cov else [])
@@ -1050,14 +1129,15 @@ def body_sections(r):
 
 
 # 형식 1 증적을 다시 그릴 때 쓰는 그 판의 낱말(옛 receipt.html 이 바이트까지 그대로 맞게). 고르는 기준은 증적의 note 다
-WORDS = {"title": "PQC 전환 검증 증적", "h1": "PQC 전환 검증 증적", "verify": "bash prove.sh --verify 이_폴더",
+WORDS = {"title": "PQC 전환 검증 증적", "h1": "PQC 전환 검증 증적", "verify": "pqproof --verify 이_폴더",
          "app": "앱 계층 서명·래핑이 실제로 도는지는 앱 기능 시험이 따로 본다.", "legacy_rule": "오래된 이름 규칙"}
-LEGACY_WORDS = {"public-1": dict(WORDS, title="PQC 전환 영수증", h1="PQC 전환 검증 영수증")}
+WORDS_V2 = dict(WORDS, verify="bash prove.sh --verify 이_폴더")  # 형식 2 와 형식 1 둘째 공개본(NOTE_V2)의 낱말
+LEGACY_WORDS = {"public-1": dict(WORDS_V2, title="PQC 전환 영수증", h1="PQC 전환 검증 영수증"), "v2": WORDS_V2}
 
 
 def _words(r):
     """증적의 note 로 그 판의 낱말을 고른다(형식 1 의 첫 공개본은 LEGACY_WORDS, 나머지는 지금 낱말)."""
-    return LEGACY_WORDS.get(LEGACY_NOTES.get(r["note"]), WORDS)
+    return LEGACY_WORDS.get(LEGACY_NOTES.get(r["note"]) or ("v2" if r["note"] == NOTE_V2 else None), WORDS)
 
 
 def render_html(r):

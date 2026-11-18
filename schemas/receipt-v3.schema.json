@@ -1,0 +1,1332 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/g1mn/pqproof/blob/main/schemas/receipt-v3.schema.json",
+  "title": "PQ-Proof receipt.json, evidence format 3",
+  "description": "Shape of receipt.json written by pqproof 0.2.0 and later (format_version 3). Format 3 adds skip_dirs, the copy of scan/skip-dirs that the tree hash and the scanners used, and counts lines allowed by the name rule alone under r-allow. Generated from pqlite/receipt.py SCHEMA by tests/make_schemas.py. Fields named in guide/outputs.md as stable keep their meaning within a format_version. Text fields (checks[].title, expected, actual, note, warnings) are for people and can change in any release. pqproof --verify checks more than this schema: the receipt_id, every file hash and the consistency of the numbers.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "allowlist",
+    "artifacts",
+    "cbom",
+    "changed",
+    "checks",
+    "deck_meta",
+    "excluded",
+    "extra",
+    "finished_at",
+    "format",
+    "format_version",
+    "inputs",
+    "java",
+    "note",
+    "params",
+    "receipt_id",
+    "ruleset_sha256",
+    "ruleset_version",
+    "skip_dirs",
+    "started_at",
+    "test_paths",
+    "timeline",
+    "tls",
+    "tool_version",
+    "tools",
+    "verdict",
+    "weakening"
+  ],
+  "properties": {
+    "format": {
+      "const": "pqc-proof receipt 1"
+    },
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "note": {
+      "const": "검증 증적: receipt_id는 receipt_id 칸을 뺀 이 JSON의 RFC 8785 정규형(키 정렬, 공백 없음, UTF-8) SHA-256이고, artifacts·tables의 모든 파일과 evidence-fragment.json이 SHA-256과 함께 적혀 있다. `pqproof --verify DIR`(또는 `bash prove.sh --verify DIR`)이 다시 계산한다. 해시는 파일이 이 증적이 말하는 그 파일임을 보일 뿐, 누가 만들었는지는 보이지 않는다. receipt_id를 믿을 수 있는 곳에서 받은 값과 비교할 것."
+    },
+    "verdict": {
+      "enum": [
+        "pass",
+        "fail",
+        "undecided"
+      ]
+    },
+    "format_version": {
+      "const": 3
+    },
+    "tool_version": {
+      "type": "string",
+      "pattern": "^[0-9][0-9A-Za-z.+-]*$"
+    },
+    "ruleset_version": {
+      "type": "string",
+      "pattern": "^[0-9A-Za-z][0-9A-Za-z.+-]*$"
+    },
+    "ruleset_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "started_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+    },
+    "finished_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fixed",
+        "orig"
+      ],
+      "properties": {
+        "orig": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "files",
+            "kind",
+            "path",
+            "root",
+            "skipped",
+            "tree_sha256",
+            "zip_sha256"
+          ],
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "kind": {
+              "enum": [
+                "dir",
+                "zip"
+              ]
+            },
+            "zip_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "root": {
+              "type": "string"
+            },
+            "files": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "tree_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "skipped": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "fixed": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "files",
+            "kind",
+            "path",
+            "root",
+            "skipped",
+            "tree_sha256",
+            "zip_sha256"
+          ],
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "kind": {
+              "enum": [
+                "dir",
+                "zip"
+              ]
+            },
+            "zip_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "root": {
+              "type": "string"
+            },
+            "files": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "tree_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "skipped": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "tools": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "path",
+          "sha256",
+          "version"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "params": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "classic",
+        "expect",
+        "residue",
+        "tls_targets",
+        "tls_targets_orig",
+        "tls_via"
+      ],
+      "properties": {
+        "classic": {
+          "enum": [
+            "allow",
+            "deny"
+          ]
+        },
+        "expect": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "scope": {
+          "enum": [
+            "all",
+            "kex"
+          ]
+        },
+        "tls_via": {
+          "type": "string"
+        },
+        "tls_targets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tls_targets_orig": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "residue": {
+          "type": "string"
+        },
+        "allow": {
+          "type": "string"
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "recon": {
+          "type": "string"
+        },
+        "require_review": {
+          "type": "boolean"
+        }
+      }
+    },
+    "changed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "added",
+        "file",
+        "file_sha256",
+        "modified",
+        "removed"
+      ],
+      "properties": {
+        "added": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "removed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "modified": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "file": {
+          "type": "string",
+          "pattern": "^(?:(?:artifacts|tables)/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}(?:/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}){0,4}|evidence-fragment\\.json)$"
+        },
+        "file_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "cbom": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fixed",
+        "orig"
+      ],
+      "properties": {
+        "orig": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "allowed",
+            "blocking",
+            "cbom_scan_ok",
+            "check",
+            "comment_or_test",
+            "csv",
+            "csv_sha256",
+            "info",
+            "locations",
+            "rows"
+          ],
+          "properties": {
+            "rows": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "locations": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "blocking": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "allowed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "comment_or_test": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "check": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "info": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "out_of_scope": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "review": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "tests": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cbom_scan_ok": {
+              "type": "boolean"
+            },
+            "csv": {
+              "type": "string",
+              "pattern": "^(?:(?:artifacts|tables)/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}(?:/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}){0,4}|evidence-fragment\\.json)$"
+            },
+            "csv_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "fixed": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "allowed",
+            "blocking",
+            "cbom_scan_ok",
+            "check",
+            "comment_or_test",
+            "csv",
+            "csv_sha256",
+            "info",
+            "locations",
+            "rows"
+          ],
+          "properties": {
+            "rows": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "locations": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "blocking": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "allowed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "comment_or_test": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "check": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "info": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "out_of_scope": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "review": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "tests": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cbom_scan_ok": {
+              "type": "boolean"
+            },
+            "csv": {
+              "type": "string",
+              "pattern": "^(?:(?:artifacts|tables)/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}(?:/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}){0,4}|evidence-fragment\\.json)$"
+            },
+            "csv_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "java": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fixed",
+        "orig",
+        "ref",
+        "ref_digest",
+        "residue_kind",
+        "script",
+        "script_sha256",
+        "usage",
+        "usage_sha256"
+      ],
+      "properties": {
+        "residue_kind": {
+          "enum": [
+            "custom",
+            "generic",
+            "none"
+          ]
+        },
+        "script": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^(?:(?:artifacts|tables)/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}(?:/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}){0,4}|evidence-fragment\\.json)$"
+        },
+        "script_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ref_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "orig": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "families",
+            "expect",
+            "weak_pqc",
+            "legacy_write",
+            "sites_left",
+            "verdict",
+            "output",
+            "output_sha256"
+          ],
+          "properties": {
+            "families": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "allow",
+                  "code",
+                  "comment"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "allow": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "comment": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "test": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            },
+            "expect": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "weak_pqc": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "legacy_write": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "sites_left": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "verdict": {
+              "type": "string"
+            },
+            "output": {
+              "type": "string",
+              "pattern": "^(?:(?:artifacts|tables)/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}(?:/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}){0,4}|evidence-fragment\\.json)$"
+            },
+            "output_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "listed": {
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "tests": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "count",
+                "lines"
+              ],
+              "properties": {
+                "count": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "lines": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "fixed": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "families",
+            "expect",
+            "weak_pqc",
+            "legacy_write",
+            "sites_left",
+            "verdict",
+            "output",
+            "output_sha256"
+          ],
+          "properties": {
+            "families": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "allow",
+                  "code",
+                  "comment"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "allow": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "comment": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "test": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            },
+            "expect": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "weak_pqc": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "legacy_write": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "sites_left": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "verdict": {
+              "type": "string"
+            },
+            "output": {
+              "type": "string",
+              "pattern": "^(?:(?:artifacts|tables)/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}(?:/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}){0,4}|evidence-fragment\\.json)$"
+            },
+            "output_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "listed": {
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "tests": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "count",
+                "lines"
+              ],
+              "properties": {
+                "count": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "lines": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "usage": {
+          "type": "string",
+          "pattern": "^(?:(?:artifacts|tables)/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}(?:/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}){0,4}|evidence-fragment\\.json)$"
+        },
+        "usage_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "tls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applicable",
+        "baseline",
+        "client_signals",
+        "control_problem",
+        "controls",
+        "log",
+        "log_sha256",
+        "signals",
+        "targets",
+        "via"
+      ],
+      "properties": {
+        "signals": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "client_signals": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "applicable": {
+          "type": "boolean"
+        },
+        "via": {
+          "type": "string"
+        },
+        "controls": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "control_problem": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "targets": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "baseline": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "log": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^(?:(?:artifacts|tables)/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}(?:/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}){0,4}|evidence-fragment\\.json)$"
+        },
+        "log_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "weakening": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deny",
+        "file",
+        "file_sha256",
+        "review"
+      ],
+      "properties": {
+        "deny": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "review": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "after",
+              "before",
+              "detail",
+              "path",
+              "reason",
+              "rule"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "rule": {
+                "type": "string"
+              },
+              "before": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "after": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "detail": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "file": {
+          "type": "string",
+          "pattern": "^(?:(?:artifacts|tables)/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}(?:/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}){0,4}|evidence-fragment\\.json)$"
+        },
+        "file_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "actual",
+          "expected",
+          "id",
+          "status",
+          "title"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pass",
+              "fail",
+              "undecided",
+              "na",
+              "review",
+              "check"
+            ]
+          },
+          "expected": {
+            "type": "string"
+          },
+          "actual": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "timeline": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ended_at",
+          "name",
+          "started_at"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+          },
+          "ended_at": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+          }
+        }
+      }
+    },
+    "extra": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "path_sha256",
+          "source"
+        ],
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^(?:(?:artifacts|tables)/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}(?:/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}){0,4}|evidence-fragment\\.json)$"
+          },
+          "path_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "bytes",
+          "path",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(?:(?:artifacts|tables)/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}(?:/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}){0,4}|evidence-fragment\\.json)$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "allowlist": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "auto",
+        "entries",
+        "file",
+        "file_sha256",
+        "hybrid",
+        "imports",
+        "legacy",
+        "source",
+        "warnings"
+      ],
+      "properties": {
+        "source": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "auto": {
+          "type": "boolean"
+        },
+        "file": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^(?:(?:artifacts|tables)/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}(?:/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}){0,4}|evidence-fragment\\.json)$"
+        },
+        "file_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "allowed",
+              "kind",
+              "n",
+              "note",
+              "review",
+              "status",
+              "targets",
+              "what",
+              "where",
+              "why"
+            ],
+            "properties": {
+              "n": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "where": {
+                "type": "string"
+              },
+              "what": {
+                "type": "string"
+              },
+              "why": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "targets": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "status": {
+                "enum": [
+                  "allowed",
+                  "review",
+                  "unused",
+                  "invalid",
+                  "excluded",
+                  "outside"
+                ]
+              },
+              "note": {
+                "type": "string"
+              },
+              "allowed": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "review": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "reviewed_by": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reviewed_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}"
+              },
+              "reviewed_via": {
+                "enum": [
+                  "entry",
+                  "top",
+                  null
+                ]
+              },
+              "digest": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[0-9a-f]{16}$"
+              },
+              "lines_fixed": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "lines_orig": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "orig": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "unreviewed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "top_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{16}$"
+        },
+        "hybrid": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "legacy": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "imports": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "unused": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unused_orig_lines": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "write_review": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "excluded": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "app_roots",
+        "count_fixed",
+        "count_orig",
+        "files_fixed",
+        "files_orig",
+        "items",
+        "notes",
+        "recon_digest",
+        "recon_file"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "from",
+              "pattern",
+              "why"
+            ],
+            "properties": {
+              "pattern": {
+                "type": "string"
+              },
+              "from": {
+                "type": "string"
+              },
+              "why": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "app_roots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "recon_file": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "recon_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "count_orig": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "count_fixed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "files_orig": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "files_fixed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "deck_meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ev",
+        "receipt_file",
+        "verify_cmd"
+      ],
+      "properties": {
+        "receipt_file": {
+          "type": "string"
+        },
+        "verify_cmd": {
+          "type": "string"
+        },
+        "ev": {
+          "type": "string"
+        }
+      }
+    },
+    "test_paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file",
+        "file_sha256"
+      ],
+      "properties": {
+        "file": {
+          "type": "string",
+          "pattern": "^(?:(?:artifacts|tables)/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}(?:/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}){0,4}|evidence-fragment\\.json)$"
+        },
+        "file_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "skip_dirs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file",
+        "file_sha256"
+      ],
+      "properties": {
+        "file": {
+          "type": "string",
+          "pattern": "^(?:(?:artifacts|tables)/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}(?:/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}){0,4}|evidence-fragment\\.json)$"
+        },
+        "file_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}

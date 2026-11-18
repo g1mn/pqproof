@@ -6,6 +6,7 @@
 # 판정식 derive_verdict(실패 > 미판정 > 통과)는 증적 형식의 정의라 pqlite/receipt.py 에 둔다(--verify 가 같은 식으로 맞춰 본다).
 """Verdict rules of PQ-Proof: classical families, allow rules, hybrid window, residue reading and the checks."""
 import os
+import posixpath
 import re
 import stat
 
@@ -170,15 +171,38 @@ def code_part(text):
 
 
 LEGACY_REASONS = ("Legacy*.java(옛 데이터 읽기·검증 전용)", "같은 줄 legacy(옛 데이터 읽기·검증)")
+# cbom-scan.sh flag_of 가 비고 맨 앞에 붙이는 표시(note() 가 ' · ' 로 잇는다). 원본 줄 발췌나 뒤 문장의 낱말은 표시가 아니다(교차 리뷰 X06)
+CBOM_FLAGS = ("주석", "테스트·예제")
+# cbom-scan.sh verdict() 가 NIST 보안레벨 3 미만 PQC(ML-KEM-512·ML-DSA-44·Kyber512·Dilithium2)에 다는 위협(교차 리뷰 X07). 허용하지 않는다
+CBOM_WEAK_PQC = "보안레벨 3 미만(PQC)"
 
 
-def allow_reason(path, text, alg):
-    if text is None or WRITEOPS.search(text):
+def cbom_flags(note):
+    """cbom-scan 비고 맨 앞의 주석·시험 표시 집합({'주석', '테스트·예제'} 의 부분집합)."""
+    out = set()
+    for part in (note or "").split(" · "):
+        if part not in CBOM_FLAGS:
+            break
+        out.add(part)
+    return out
+
+
+def name_rule(path, text):
+    """이름 규칙이 걸리는 줄인가: Legacy*.java 파일이거나 주석을 뺀 코드에 legacy 가 있다. 주석의 legacy 는 세지 않는다(교차 리뷰 X01:
+    '# legacy' 한 단어로 고전 키 생성이 허용됐다)."""
+    return bool(LEGACY_FILE.search(path) or (text is not None and ALLOWLINE.search(code_part(text))))
+
+
+def allow_reason(path, text, alg, lines=None, line=None):
+    """허용 규칙(이름 규칙·같은 줄 ML-KEM)의 사유, 아니면 None. 이름 규칙은 쓰기 경로가 아닐 때만 쓴다: 그 줄(주석 뺀 코드)에 새 키·서명·
+    암호화가 있으면 안 되고(ALLOW_WRITEOPS, 모든 언어), lines·line 을 주면 아래 3줄도 본다(write_near, 허용 목록과 같은 창)."""
+    if text is None:
         return None
-    if LEGACY_FILE.search(path):
-        return LEGACY_REASONS[0]
-    if ALLOWLINE.search(text):
-        return LEGACY_REASONS[1]
+    if name_rule(path, text) and not ALLOW_WRITEOPS.search(code_part(text)) \
+            and not (lines is not None and line and write_near(lines, path, line, text)):
+        return LEGACY_REASONS[0] if LEGACY_FILE.search(path) else LEGACY_REASONS[1]
+    if WRITEOPS.search(text):
+        return None
     # 하이브리드는 코드 부분에 ML-KEM이 있어야 한다. 반박 검증에서 'ECDH ... // ML-KEM-768 전환 전 임시',
     # 'ssl_ecdh_curve X25519:prime256v1; # X25519MLKEM768은 3.5부터'처럼 주석에만 있는 줄이 '하이브리드' 허용으로 빠졌다
     code = code_part(text)
@@ -342,11 +366,13 @@ def merge_cbom(cbom_rows, scan_rows, lines, terminator, scope="all", allow=None)
         path, line = split_loc(loc)
         threat, note, alg = r.get("양자 위협", ""), r.get("근거·비고", ""), r.get("알고리즘·키 길이", "")
         reason = None
-        if threat == "쇼어로 깨짐":
-            if "주석" in note or "테스트" in note:
+        if threat in ("쇼어로 깨짐", CBOM_WEAK_PQC):
+            if cbom_flags(note):
                 status = "comment"
+            elif threat == CBOM_WEAK_PQC:  # 보안레벨 3 미만 PQC 는 허용 규칙을 쓰지 않는다
+                status = "block"
             else:
-                reason = allow_reason(path, lines.get(path, line) if line else None, alg)
+                reason = allow_reason(path, lines.get(path, line) if line else None, alg, lines, line)
                 status = "allow" if reason else "block"
         elif threat == "미확인":
             status = "check"
@@ -361,7 +387,7 @@ def merge_cbom(cbom_rows, scan_rows, lines, terminator, scope="all", allow=None)
             status = "block" if terminator else "check"
             reason = "" if terminator else "시스템 OpenSSL로 TLS를 받는 곳(nginx 등)이 없어 참고만"
         elif r.threat == scanmod.SHOR:
-            reason = allow_reason(r.path, lines.get(r.path, r.line), r.algorithm)
+            reason = allow_reason(r.path, lines.get(r.path, r.line), r.algorithm, lines, r.line)
             status = "allow" if reason else "block"
         elif r.threat == scanmod.WEAK_PQC:
             status = "block"
@@ -378,7 +404,7 @@ def merge_cbom(cbom_rows, scan_rows, lines, terminator, scope="all", allow=None)
         # 이름 규칙(legacy)으로 이미 허용된 줄도 허용 목록이 덮으면 그 항목의 사유로 센다(LEGACY_ 로 시작하는 상수 이름 때문에 먼저
         # 허용된 줄이 있으면 그 줄을 가리킨 허용 목록 항목이 '고전 줄 없음'으로 보였다). 쓰기 경로면 검토 필요로 올린다
         legacy = it["status"] == "allow" and it["reason"] in LEGACY_REASONS
-        if not legacy and (it["status"] != "block" or it["threat"] == scanmod.WEAK_PQC):  # 보안레벨 3 미만 PQC는 허용하지 않는다
+        if not legacy and (it["status"] != "block" or it["threat"] in (scanmod.WEAK_PQC, CBOM_WEAK_PQC)):  # 보안레벨 3 미만 PQC는 허용하지 않는다
             continue
         path, line = split_loc(it["loc"])
         text = lines.get(path, line) if line else None
@@ -436,7 +462,8 @@ def merge_cbom(cbom_rows, scan_rows, lines, terminator, scope="all", allow=None)
             worst[it["loc"]] = it["status"]
     counts = {k: sum(1 for v in worst.values() if v == k) for k in RANK}
     # 주석·테스트 중 시험·예제 경로(scan/test-paths.ere) 위치: 판정에 안 넣지만 따로 세어 보인다
-    counts["tests"] = len({it["loc"] for it in items if it["status"] == "comment" and "테스트" in it["note"] and worst[it["loc"]] == "comment"})
+    counts["tests"] = len({it["loc"] for it in items if it["status"] == "comment" and "테스트·예제" in cbom_flags(it["note"])
+                           and worst[it["loc"]] == "comment"})
     return items, counts, len(worst)
 
 
@@ -482,23 +509,33 @@ def parse_residue(text):
 
 def reclass_residue(parsed, lines, allow):
     """고친 판 residue의 LEFT 줄 중 하이브리드 결합·허용 목록 줄을 다시 센다(허용 규칙). residue가 낸 code 수는 그대로 두고 뺄 몫만 낸다.
-    공개키 9계열(GEN)과 서비스별 SITE(RESIDUE로 준 판에 있을 때)만 본다. 줄 목록이 MAXD로 잘린 residue면 목록에 나온 줄만 뺀다(나머지는 남은 것으로 센다)."""
+    공개키 9계열(GEN)과 서비스별 SITE(RESIDUE로 준 판에 있을 때)만 본다. 줄 목록이 MAXD로 잘린 residue면 목록에 나온 줄만 뺀다(나머지는 남은 것으로 센다).
+    residue 가 ALLOW 로 둔 줄(이름 규칙·같은 줄 ML-KEM)도 CBOM 과 같은 allow_reason 으로 다시 본다(교차 리뷰 X01): 이 규칙으로 허용이
+    아니면(쓰기 경로, 주석에만 legacy·ML-KEM) LEFT 처럼 다루고 relisted 로 센다. 이름 규칙으로만 남은 줄은 name_rule(위치)에 적는다."""
     if not parsed:
         return None
     by = {"allowed": {}, "hybrid": {}, "review": {}}
-    rows, left = [], []
+    rows, left, named = [], [], []
+    relisted = 0
     sites = [r for r in parsed["rules"].values() if r["kind"] == "SITE"]
     sites_left = 0 if sites else None
     for rid, rule in sorted(parsed["rules"].items()):
         if not (rule["kind"] == "SITE" or (rule["kind"] == "GEN" and rid in FAMILIES)):
             continue
-        moved = 0
+        moved = again = 0
         for ln in rule["lines"]:
-            if ln["type"] != "LEFT":
+            if ln["type"] not in ("LEFT", "ALLOW"):
                 continue
             loc = f"{ln['path']}:{ln['line']}"
             text = lines.get(ln["path"], ln["line"])
             text = ln["text"] if text is None else text
+            if ln["type"] == "ALLOW":
+                why = allow_reason(ln["path"], text, "", lines, ln["line"])
+                if why is not None:
+                    if why in LEGACY_REASONS and (allow is None or allow.match(ln["path"], ln["line"]) is None):
+                        named.append(loc)
+                    continue
+                again += 1
             kind, entry, via = None, None, "line"
             if hybrid_ok(lines, ln["path"], ln["line"], text):
                 kind = "hybrid"
@@ -520,26 +557,57 @@ def reclass_residue(parsed, lines, allow):
             if rule["kind"] == "GEN":
                 by[kind][rid] = by[kind].get(rid, 0) + 1
             rows.append({"rule": rid, "loc": loc, "as": kind, "entry": entry["n"] if entry else None, "via": via})
-        if rule["kind"] == "SITE" and rule["code"] - moved > 0:
+        if rule["kind"] == "GEN":
+            relisted += again
+        if rule["kind"] == "SITE" and rule["code"] + again - moved > 0:
             sites_left += 1
     tot = {k: sum(v.values()) for k, v in by.items()}
-    return {"allowed": tot["allowed"], "hybrid": tot["hybrid"], "review": tot["review"], "by_family": by,
-            "sites_left": sites_left, "lines": rows[:400], "left": left[:60]}
+    return {"allowed": tot["allowed"], "hybrid": tot["hybrid"], "review": tot["review"], "relisted": relisted, "by_family": by,
+            "sites_left": sites_left, "lines": rows[:400], "left": left[:60], "name_rule": sorted(set(named), key=al._loc_key)[:400]}
 
 
 def java_left(j):
-    """공개키 9계열 code 합에서 허용 목록·하이브리드·검토 필요 몫을 뺀 남은 줄(None이면 None)."""
+    """공개키 9계열 code 합에 residue ALLOW 에서 다시 센 줄(relisted)을 더하고 허용 목록·하이브리드·검토 필요 몫을 뺀 남은 줄(None이면 None)."""
     if not j:
         return None
     raw = sum(v["code"] for v in j["families"].values())
     lst = j.get("listed") or {}
-    return raw - lst.get("allowed", 0) - lst.get("hybrid", 0) - lst.get("review", 0)
+    return raw + lst.get("relisted", 0) - lst.get("allowed", 0) - lst.get("hybrid", 0) - lst.get("review", 0)
+
+
+# 심볼릭 링크(교차 리뷰 X04). 이 도구는 링크를 따라가지 않는다. 빌드 도구는 따라가므로, 검사 밖(트리 밖이거나 건너뛴 폴더)을 가리키는
+# 링크는 a-input 에 적는다. 이름이나 대상이 코드·설정·빌드 파일이거나 확장자가 없으면(폴더일 수 있다) 미판정, 그 밖은 검토 필요.
+# 대상 파일은 열지 않고 글만 본다(머신마다 같은 판정).
+def link_info(rel, target, skipped=()):
+    """트리 안 링크 rel → 대상 글 target 의 판단: {path, target, outside, why, code, zip}."""
+    t = target.replace("\\", "/")
+    if t.startswith("/") or re.match(r"^[A-Za-z]:", t):
+        why = "트리 밖"
+    else:
+        norm = posixpath.normpath(posixpath.join(posixpath.dirname(rel), t))
+        if norm == ".." or norm.startswith("../"):
+            why = "트리 밖"
+        elif any(norm == s or norm.startswith(s + "/") for s in skipped):
+            why = "건너뛴 폴더"
+        else:
+            why = ""
+    base = rel.rsplit("/", 1)[-1]
+    code = bool(al.KEEP_FILE.search(rel) or al.KEEP_FILE.search(t) or "." not in base.lstrip("."))
+    return {"path": rel, "target": target, "outside": bool(why), "why": why, "code": code, "zip": False}
+
+
+def link_text(x):
+    """inputs.*.skipped 에 적는 한 줄."""
+    return (f"링크 {x['path']} -> {x['target'][:200]}" + (f" · {x['why']}" if x["why"] else "")
+            + (" · zip 에서 풀지 않음" if x.get("zip") else ""))
 
 # ---------------------------------------------------------------------------------------------
 # 검사 판정식: 단계마다 모은 결과로 검사 여덟 줄과 판정을 낸다. prove.run 이 부른다.
 def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o, sig_f, tls, problem, deny, changed, review,
-          allow, allow_path, derive_verdict):
-    """(checks, verdict, pending, unused, live). derive_verdict 는 pqlite/receipt.py 의 것(증적 형식의 판정식)을 받는다."""
+          allow, allow_path, derive_verdict, inputs_extra=None):
+    """(checks, verdict, pending, unused, live, name_only). derive_verdict 는 pqlite/receipt.py 의 것(증적 형식의 판정식)을 받는다.
+    inputs_extra: prove.prepare_input 의 입력 정보 {"orig"|"fixed": {links, skipped_output}}(고친 판만 본다).
+    name_only: 이름 규칙(Legacy*.java·코드의 legacy)으로만 허용하고 허용 목록 항목이 없는 위치(CBOM, SCOPE=all 이면 residue 도)."""
     # 검사
     checks = []
 
@@ -573,8 +641,28 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
                    + (" 외" if len(vanished) > 4 else "") + "(기능을 지워서 0이 된 것이 아닌지 확인)")
     else:
         in_st = "pass"
+    # 고친 판의 링크와 건너뛴 폴더(교차 리뷰 X02·X03·X04·X09): 검사 밖을 가리키는 코드·폴더 링크는 미판정(REQUIRE_REVIEW=1 이면 실패),
+    # 그 밖 검사 밖 링크와 코드 파일이 든 건너뛴 산출물 폴더는 검토 필요. 판정은 앞의 조건이 더 무겁다
+    fx = (inputs_extra or {}).get("fixed") or {"links": [], "skipped_output": []}
+    out_links = [x for x in fx["links"] if x["outside"]]
+    code_links = [x for x in out_links if x["code"]]
+    skip_code = [x for x in fx["skipped_output"] if x["code"]]
+    if out_links:
+        in_act += (f" · 검사 밖을 가리키는 링크 {len(out_links)}개(이 도구는 따라가지 않고 빌드 도구는 따라간다): "
+                   + ", ".join(f"{x['path']} -> {x['target'][:60]}({x['why']})" for x in out_links[:4]) + (" 외" if len(out_links) > 4 else ""))
+    if skip_code:
+        in_act += (f" · 건너뛴 폴더 {len(skip_code)}곳에 코드 파일 {sum(x['code'] for x in skip_code)}개(빌드 산출물·받아 둔 의존성으로 보고 "
+                   "검사하지 않음, scan/skip-dirs): " + ", ".join(f"{x['path']}/ {x['code']}개" for x in skip_code[:4])
+                   + (" 외" if len(skip_code) > 4 else ""))
+    if in_st == "pass" or (in_st == "review" and code_links):
+        if code_links:
+            in_st = "fail" if params.require_review else "undecided"
+            in_act += " · 코드·폴더 링크는 내용을 보지 못해 판정할 수 없다(대상을 트리에 넣거나 링크를 지운다)"
+        elif out_links or skip_code:
+            in_st = "review"
     check("a-input", "입력 확인(같은 서비스의 전·후, 원본에서 전환 대상을 찾음)", in_st,
-          f"공통 파일 {int(MIN_COMMON * 100)}% 이상, 원본 막는 위치·공개키 code·TLS 실측 중 하나 이상", in_act)
+          f"공통 파일 {int(MIN_COMMON * 100)}% 이상, 원본 막는 위치·공개키 code·TLS 실측 중 하나 이상, "
+          "검사 밖을 가리키는 링크와 코드 파일이 든 건너뛴 폴더 없음", in_act)
     block_locs = sorted({it["loc"] for it in cbom_items["fixed"] if it["status"] == "block"})
     what = "남은 고전 키 교환" if kex else "막는 위치"
     check("a-cbom", "고친 판에 남은 고전 키 교환 0(SCOPE=kex)" if kex else "고친 판 CBOM에 막는 위치 0", a_status,
@@ -679,24 +767,32 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
     # 고친 판에서 안 쓰인 항목(unused)도 여기서 본다: 목록은 어느 트리에 대든 걸리므로 그 항목은 원본 같은 다른 트리의 고전 줄을 가린다
     # (결함 D1). 판정은 그대로 두고 검토 필요로, REQUIRE_REVIEW=1 이면 실패로 막는다. 고친 판에서 지운 파일처럼
     # 고친 판에서는 무효·제외·트리 밖인데 원본 고전 줄을 덮는 항목도 안 쓰인 항목으로 센다(allowlist.counts_unused, 독립 검토에서 찾음)
+    # 이름 규칙(Legacy*.java·코드의 legacy)으로만 허용한 줄도 여기서 본다(교차 리뷰 X01): 허용 목록 항목도 사람 확인도 없이 판정에서
+    # 빠지므로 검토 필요, REQUIRE_REVIEW=1 이면 실패다. 꼭 남길 줄이면 허용 목록에 사유와 함께 적고 사람이 확인한다
     live = [e for e in allow.entries if e["status"] in al.IN_EFFECT]
     pending = allow.unreviewed()
     unused = allow.unused()
-    need = "허용 항목마다 reviewed_by·reviewed_at(목록 맨 위 칸은 reviewed_digest 도), 고친 판에서 안 쓰인 항목 0" + (
+    jfx = java_rec["fixed"] or {}
+    name_only = sorted({it["loc"] for it in cbom_items["fixed"] if it["status"] == "allow" and it["reason"] in LEGACY_REASONS}
+                       | (set((jfx.get("listed") or {}).get("name_rule") or []) if not kex else set()), key=al._loc_key)
+    need = "허용 항목마다 reviewed_by·reviewed_at(목록 맨 위 칸은 reviewed_digest 도), 고친 판에서 안 쓰인 항목 0, 이름 규칙으로만 허용한 줄 0" + (
         "(REQUIRE_REVIEW=1: 아니면 실패)" if params.require_review else "(아니면 검토 필요, 실패 아님)")
     title = "허용 항목 사람 확인(검토 등급, REQUIRE_REVIEW=1이면 실패)"
     dead_ko = {"invalid": " (고친 판에서 무효)", "excluded": " (고친 판에서 제외 파일)", "outside": " (고친 판에서 트리 밖)"}
     unused_txt = (f"고친 판에서 안 쓰인 항목 {len(unused)}건(원본 고전 {sum(len(e['orig']) for e in unused)}줄을 덮음, 사람 확인 전): "
                   + ", ".join(f"#{e['n']} {al.CONTROL.sub(' ', e['where'])[:48]}{dead_ko.get(e['status'], '')}" for e in unused[:4])
                   + (" 외" if len(unused) > 4 else "") if unused else "")
-    if not live and not unused:
+    name_txt = (f"이름 규칙(legacy)으로만 허용한 곳 {len(name_only)}곳(허용 목록 항목·사람 확인 없음): " + ", ".join(name_only[:4])
+                + (" 외" if len(name_only) > 4 else "") if name_only else "")
+    if not live and not unused and not name_only:
         check("r-allow", title, "na", need, "줄을 허용한 항목 0" if allow_path else "허용 목록 없음")
-    elif not pending and not unused:
+    elif not pending and not unused and not name_only:
         check("r-allow", title, "pass", need, f"허용 항목 {len(live)}건 모두 사람 확인")
     else:
         head = (f"허용 항목 {len(live)}건 중 사람 확인 전 {len(pending)}건: "
                 + ", ".join(f"#{e['n']} {al.CONTROL.sub(' ', e['where'])[:48]}" for e in pending[:4]) + (" 외" if len(pending) > 4 else "")
                 if pending else (f"허용 항목 {len(live)}건 모두 사람 확인" if live else ""))
-        check("r-allow", title, "fail" if params.require_review else "review", need, " · ".join(x for x in (head, unused_txt) if x))
+        check("r-allow", title, "fail" if params.require_review else "review", need,
+              " · ".join(x for x in (head, unused_txt, name_txt) if x))
     verdict = derive_verdict(checks)
-    return checks, verdict, pending, unused, live
+    return checks, verdict, pending, unused, live, name_only

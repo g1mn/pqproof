@@ -6,7 +6,7 @@
 # 판정 고정 기록: 변이 시험의 트리 항목(예제 대조군 포함)은 tests/golden/verdicts.json 과 판정·검사 칸·숫자가 같아야 한다.
 # 버전 정책: 판정이 바뀌는 변경은 PATCH 로 낼 수 없다. version-policy 작업이 tests/version_policy.py 로 ruleset.json·CHANGELOG 와
 # 마지막 릴리스 태그를 대조한다(버전이 그대로면 다음 릴리스가 MINOR 여야 하는지 알림만).
-# 린트: ruff(오류 계열 F·E9·B), shellcheck(규칙 파일 cbom-scan.sh 는 ruleset 2 에서), zizmor(워크플로·액션 보안 점검). 도구는
+# 린트: ruff(오류 계열 F·E9·B), shellcheck(셸 파일 넷, 규칙 파일 포함), zizmor(워크플로·액션 보안 점검). 도구는
 # .github/requirements/lint.txt 에 해시로 고정한다. Windows 칸은 bash 없이 증적 재검증만 돈다.
 # 릴리스 워크플로(release.yml)가 이 파일을 workflow_call 로 그대로 부른다: 릴리스도 이 칸 전부를 통과해야 나간다.
 # 액션은 모두 커밋 SHA 로 고정한다(주석은 그 SHA 의 태그). Dependabot 이 갱신 PR 을 연다(.github/dependabot.yml).
@@ -230,10 +230,10 @@ jobs:
       - name: ruff (F, E9, B; settings in pyproject.toml)
         run: ruff check --no-cache .
 
-      - name: shellcheck (scan/cbom-scan.sh waits for ruleset 2, see CONTRIBUTING.md)
+      - name: shellcheck
         run: |
           shellcheck --version | head -2
-          shellcheck -S warning prove.sh build-probe.sh scan/residue.sh
+          shellcheck -S warning prove.sh build-probe.sh scan/residue.sh scan/cbom-scan.sh
 
       - name: zizmor (workflows, the action and the example workflow)
         run: zizmor --offline --min-severity medium .github/workflows/ action.yml examples/github-actions/pqproof-sarif.yml

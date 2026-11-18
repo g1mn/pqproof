@@ -295,21 +295,34 @@ class EndToEnd(unittest.TestCase):
         self.assertEqual(r["excluded"]["count_fixed"], 2)
 
     def test_legacy_name_line_counts_for_entry_and_is_listed(self):
-        # 이름 규칙(같은 줄 legacy)으로 먼저 허용된 줄도 허용 목록이 덮으면 그 항목 몫
+        # 이름 규칙(코드의 legacy)으로 먼저 허용된 줄도 허용 목록이 덮으면 그 항목 몫
         leg = FIXED_BOX.replace('    Cipher c = Cipher.getInstance("RSA/ECB/OAEPPadding");\n',
-                                '    Cipher c = Cipher.getInstance("RSA/ECB/OAEPPadding"); // legacy records\n')
+                                '    Cipher c = Cipher.getInstance("RSA/ECB/OAEPPadding"); String mode = "legacy records";\n')
         self.assertNotEqual(leg, FIXED_BOX)
         fx = self.tree("legacy", {BOX: leg % ""})
         r, code, _, out = self.run_("legacy", fx, ALLOW=self.allow(OK_LIST))
         self.assertEqual((r["verdict"], code), ("pass", 0), [c for c in r["checks"] if c["status"] != "pass"])
         self.assertIn(f"{BOX}:12", r["allowlist"]["entries"][0]["allowed"])
         self.assertNotIn(f"{BOX}:12", r["allowlist"]["legacy"])
-        # 목록이 없으면 그 줄은 이름 규칙 몫으로 따로 남고 덱 allowed 에도 legacy-name 으로 나온다
-        r, _, _, out = self.run_("legacy-nolist", fx)
+        # 목록이 없으면 그 줄은 이름 규칙 몫으로 따로 남고 덱 allowed 에도 legacy-name 으로 나온다. 사람 확인이 없는 허용이라
+        # r-allow 는 검토 필요(판정은 통과), REQUIRE_REVIEW=1 이면 실패다(형식 3, 교차 리뷰 X01)
+        r, code, lines, out = self.run_("legacy-nolist", fx)
         self.assertIn(f"{BOX}:12", r["allowlist"]["legacy"])
+        st = {c["id"]: c for c in r["checks"]}
+        self.assertEqual(st["r-allow"]["status"], "review")  # 판정은 13줄(OAEP 매개변수)과 그 import 때문에 실패다
+        self.assertIn("이름 규칙(legacy)으로만 허용한 곳", st["r-allow"]["actual"])
         deck = json.loads(prove.slurp(os.path.join(out, "deck.json")))
         self.assertTrue(any(a["kind"] == "legacy-name" and a["where"] == "Box.java:12" for a in deck["allowed"]), deck["allowed"])
-        self.assertIn("이름 규칙 허용", prove.slurp(os.path.join(out, "receipt.html")))
+        self.assertIn("이름 규칙으로만 허용", prove.slurp(os.path.join(out, "receipt.html")))
+        r, code, _, _ = self.run_("legacy-strict", fx, REQUIRE_REVIEW="1")
+        self.assertEqual({c["id"]: c["status"] for c in r["checks"]}["r-allow"], "fail")
+        # 주석의 legacy 는 이름 규칙이 아니다: 같은 줄을 주석 낱말로만 표시하면 막는 위치다
+        com = FIXED_BOX.replace('    Cipher c = Cipher.getInstance("RSA/ECB/OAEPPadding");\n',
+                                '    Cipher c = Cipher.getInstance("RSA/ECB/OAEPPadding"); // legacy records\n')
+        r, code, _, _ = self.run_("legacy-comment", self.tree("legacy-comment", {BOX: com % ""}))
+        self.assertNotIn(f"{BOX}:12", r["allowlist"]["legacy"])
+        table = prove.slurp(os.path.join(self.tmp.name, "out-legacy-comment", "tables", "cbom-fixed.csv")).split("\n")
+        self.assertTrue(any(x.startswith(f"{BOX}:12,") and ",막음," in x for x in table), table[:6])
 
     def test_exclude_duplicate_of_recon_note(self):
         w = os.path.join(self.tmp.name, "W2")

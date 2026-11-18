@@ -12,14 +12,42 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 ## [Unreleased]
 
-Planned as 0.2.0: ruleset 2 (new name and hash), evidence format 2.
+Planned as 0.2.0: ruleset 2 (new name and hash), evidence format 3. Bypasses from the November review (X01 to X10) are closed. `--verify` still reads evidence formats 1 and 2 (ruleset 1).
 
-**Verdict impact (판정 영향): none.** So far ruleset 2 only moves the verdict code: the 14 golden tree cases give the same verdicts, check statuses and counts as under ruleset 1.
+**Verdict impact (판정 영향): yes.** The 14 golden tree cases of 0.1.1 give the same verdicts, check statuses and counts. Eight new golden cases plant one bypass each; 0.1.1 passed every one of them (exit 0). Trees that used one of these bypasses get a different verdict, and a tree hash changes when the tree holds a folder that the skip rules now treat differently.
+
+| Change | 0.1.1 (ruleset 1) | Now (ruleset 2) |
+|---|---|---|
+| X01: a `legacy` comment or name on lines that create a new key or signature in Python, Go or Node (`m12`) | pass | fail (`a-cbom`, `c-classic`) |
+| X01: lines allowed by the name rule alone, read only (`m12c`, `m12b`) | `r-allow` not applicable | `r-allow` needs review, fails under `REQUIRE_REVIEW=1` |
+| X02: RSA code in a production package named `vendor` under `src/main/` (`m13`) | pass | fail (`a-cbom`, `c-classic`) |
+| X02, X09: a top-level `vendor/` with code (`m13b`) | `a-input` pass | `a-input` needs review, folder listed with its counts |
+| X03: trust-all TrustManager in a production package named `build` (`m16`) | pass | fail (`b-weakening`) |
+| X06: a Korean trailing comment with 테스트 (test) on a key line (`m14`) | pass | fail (`a-cbom`) |
+| X07: Node `ml-kem-512`, `ml-dsa-44` (`m15`) | pass | fail (`a-cbom`, `c-classic`) |
+| X04: a symbolic link in the fixed tree to code outside the tree | pass | `a-input` undecided (exit 3), fails under `REQUIRE_REVIEW=1` |
+| X05: an nginx or Apache certificate path, or an SSH host key, outside the tree | read when the file was on the host, so the verdict depended on the machine | never read: a "check" row, or the host key named from its file name |
+| X08: a tree whose file paths exceed the argument limit | `c-classic` undecided | judged |
+| X09: `build`, `target` and `vendor` under `src/main/`; `.hg`, `.svn`, `.tox`, `.terraform`; `dist` next to a build file; top-level `data/` | judged by some scanners only, or outside the tree hash | one rule for the tree hash and all scanners (see DESIGN, Skipped folders) |
+| X58 (found again here): ML-KEM named only in a comment on an X25519 line | `c-classic` allowed it as hybrid | counted |
+
+### Added
+
+- `scan/skip-dirs` and `pqlite/skipdirs.py`: one list of skipped folders for the tree hash, `pqlite/scan.py`, `residue.sh` and `cbom-scan.sh`, with a sync test that runs the three walks on one tree. Each run copies the list to `artifacts/skip-dirs`.
+- `pqlite/rules.py`: the verdict rules that lived in `prove.py` (the nine classical families, the name rule, the write paths, the hybrid window, the 50% input threshold, how residue output is read, and each check's status), moved value for value. A test fails when a new pattern constant appears in `prove.py`.
+- Evidence format 3 (`schemas/receipt-v3.schema.json`): `skip_dirs` (the copied list), tree hashes taken with the skip rules, `r-allow` and the verdict line count lines allowed by the name rule alone, and the note says `pqproof --verify`. SARIF reports those lines under `r-allow`.
+- Eight mutation cases with golden entries (`m12` to `m16`), behaviour tests for links, out-of-tree files and the argument limit, a format 2 fixture from 0.1.1 (`tests/golden/evidence/f2-v0.1.1`), and eight more code mutants (30 in all).
+- `HOST_FILES=1` for `cbom-scan.sh` run on its own: read the certificates and host keys a setting points to outside the tree. `prove.sh` never passes it.
 
 ### Changed
 
-- The verdict rules that lived in `prove.py` (the nine classical families, the name rule, the write paths, the hybrid window, the 50% input threshold, how residue output is read, and each check's status) moved, value for value, to `pqlite/rules.py`. That file and `pqlite/tlsprobe.py` (the TLS target verdict) are now in the ruleset hash, so a change to any of them needs a new ruleset name. Before, `prove.py` could change a verdict while `ruleset_sha256` stayed the same. A test fails when a new pattern constant appears in `prove.py`.
-- `scan/ruleset.json` keeps a file list per ruleset, and `--verify` recomputes a receipt's `ruleset_sha256` from the files of the ruleset that receipt names. Evidence from ruleset 1 (six files) still verifies.
+- Ruleset 2 hashes ten files: the six of ruleset 1 plus `pqlite/rules.py`, `pqlite/tlsprobe.py` (the TLS target verdict), `pqlite/skipdirs.py` and `scan/skip-dirs`. Before, `prove.py` could change a verdict while `ruleset_sha256` stayed the same (X10). `scan/ruleset.json` keeps a file list per ruleset, and `--verify` recomputes a receipt's hash from the files of the ruleset it names.
+- Name rule (X01): only `legacy` in code counts, not in a comment, and a line is allowed only when neither it nor the three lines below it creates a key, a signature or ciphertext in Java, Python, Go or Node. `prove.py` reads the lines that `residue.sh` allowed again with the same rule.
+- Skipped folders (X02, X03, X09): `build`, `target`, `dist` and `vendor` are skipped only at the top of the tree or next to a build file, never under `src/main/`. `inputs.*.skipped` lists every skipped folder with its file and code-file counts, and code in a skipped folder of the fixed tree makes `a-input` need review.
+- Symbolic links (X04): links in the fixed tree that point outside the tree or into a skipped folder are listed in `inputs.*.skipped` and in `a-input`, for folders and zips alike.
+- `cbom-scan.sh` never opens files outside the tree it scans (X05). `G-WEAK-PQC` and the scanner match ML-KEM-512, ML-DSA-44, Kyber512 and Dilithium2 in any case and separator (X07). The comment and test flags are read only at the start of a CBOM note (X06). `residue.sh` passes its file list in a temporary file (X08).
+- `cbom-scan.sh` is in the CI shellcheck job; three warnings in it are gone without a change in behaviour.
+- `tests/version_policy.py --base`: when the version was bumped but shipped the base's ruleset, and the current ruleset's `since` is a later release, the verdict change counts toward that later release and `[Unreleased]` has to say yes. Before, every commit after the 0.1.1 bump that changed a rule failed the check against `v0.1.0`.
 
 ## [0.1.1] - 2026-11-19
 

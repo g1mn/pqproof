@@ -574,6 +574,251 @@
      "a-cbom": "error"
     }
    }
+  },
+  {
+   "id": "m12-x01-legacy-write",
+   "title": "X01: a legacy name or comment on lines that make a new RSA key and sign with it",
+   "title_ko": "X01: 새 RSA 키를 만들고 서명하는 줄에 legacy 이름·주석만 단 것",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "tools/gateway_keys.py",
+     "text_file": "files/legacy_write.py"
+    }
+   ],
+   "expect": {
+    "exit": 1,
+    "verdict": "fail",
+    "checks": {
+     "a-cbom": "fail",
+     "c-classic": "fail"
+    }
+   },
+   "sarif": {
+    "rules": {
+     "a-cbom": "error",
+     "c-classic": "error"
+    }
+   }
+  },
+  {
+   "id": "m12b-x01-legacy-read-strict",
+   "title": "X01 under REQUIRE_REVIEW=1: lines allowed by the name rule alone fail r-allow",
+   "title_ko": "X01, REQUIRE_REVIEW=1: 이름 규칙으로만 허용한 줄은 r-allow 실패",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "tools/legacy_reader.py",
+     "text_file": "files/legacy_read.py"
+    }
+   ],
+   "env": {
+    "REQUIRE_REVIEW": "1"
+   },
+   "expect": {
+    "exit": 1,
+    "verdict": "fail",
+    "checks": {
+     "r-allow": "fail",
+     "c-classic": "pass"
+    }
+   },
+   "sarif": {
+    "rules": {
+     "r-allow": "error"
+    }
+   }
+  },
+  {
+   "id": "m12c-x01-legacy-read",
+   "title": "X01 control: a read-only legacy reader passes, and r-allow asks for a review",
+   "title_ko": "X01 대조군: 읽기 전용 legacy 줄은 통과, r-allow 는 검토 필요",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "tools/legacy_reader.py",
+     "text_file": "files/legacy_read.py"
+    }
+   ],
+   "expect": {
+    "exit": 0,
+    "verdict": "pass",
+    "checks": {
+     "r-allow": "review",
+     "c-classic": "pass"
+    },
+    "contains": {
+     "checks[r-allow].actual": "이름 규칙"
+    },
+    "stdout_contains": [
+     "allowed by the name rule alone"
+    ]
+   },
+   "sarif": {
+    "rules": {
+     "r-allow": "warning"
+    }
+   }
+  },
+  {
+   "id": "m13-x02-vendor-in-main",
+   "title": "X02: RSA code in a production package named vendor under src/main",
+   "title_ko": "X02: src/main 아래 vendor 패키지의 RSA 코드",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "src/main/java/com/bank/vendor/PgClient.java",
+     "text_file": "files/PgClient.java"
+    }
+   ],
+   "expect": {
+    "exit": 1,
+    "verdict": "fail",
+    "checks": {
+     "a-cbom": "fail",
+     "c-classic": "fail"
+    }
+   },
+   "sarif": {
+    "rules": {
+     "a-cbom": "error",
+     "c-classic": "error"
+    }
+   }
+  },
+  {
+   "id": "m13b-x02-vendor-at-top",
+   "title": "X02 control: a top-level vendor/ folder is skipped, recorded, and a-input asks for a review",
+   "title_ko": "X02 대조군: 트리 맨 위 vendor/ 는 건너뛰고 기록하며 a-input 은 검토 필요",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "vendor/github.com/acme/legacy/key.go",
+     "text_file": "files/vendored_dep.go"
+    }
+   ],
+   "expect": {
+    "exit": 0,
+    "verdict": "pass",
+    "checks": {
+     "a-input": "review",
+     "a-cbom": "pass",
+     "c-classic": "pass"
+    },
+    "contains": {
+     "inputs.fixed.skipped": "vendor/ 파일 1 · 코드 1"
+    }
+   },
+   "sarif": {
+    "absent": [
+     "a-cbom",
+     "c-classic"
+    ]
+   }
+  },
+  {
+   "id": "m14-x06-korean-comment",
+   "title": "X06: a Korean trailing comment with the words for test and comment does not hide a key",
+   "title_ko": "X06: '테스트'가 든 한국어 꼬리 주석이 키 생성을 가리지 않음",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "web/keys.js",
+     "text_file": "files/korean_comment.js"
+    }
+   ],
+   "expect": {
+    "exit": 1,
+    "verdict": "fail",
+    "checks": {
+     "a-cbom": "fail"
+    }
+   },
+   "sarif": {
+    "rules": {
+     "a-cbom": "error"
+    }
+   }
+  },
+  {
+   "id": "m15-x07-weak-pqc-lowercase",
+   "title": "X07: Node lowercase ml-kem-512 and ml-dsa-44 are below security level 3",
+   "title_ko": "X07: Node 소문자 ml-kem-512·ml-dsa-44 는 보안레벨 3 미만",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "web/kem.js",
+     "text_file": "files/weak_pqc.js"
+    }
+   ],
+   "expect": {
+    "exit": 1,
+    "verdict": "fail",
+    "checks": {
+     "a-cbom": "fail",
+     "c-classic": "fail"
+    },
+    "min": {
+     "java.fixed.weak_pqc": 2
+    }
+   },
+   "sarif": {
+    "rules": {
+     "a-cbom": "error",
+     "c-classic": "error"
+    }
+   }
+  },
+  {
+   "id": "m16-x03-build-package",
+   "title": "X03: trust-all TrustManager in a production package named build",
+   "title_ko": "X03: build 이름 운영 패키지의 모든 인증서를 믿는 TrustManager",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "src/main/java/demo/build/Http.java",
+     "text_file": "files/BuildHttp.java"
+    }
+   ],
+   "expect": {
+    "exit": 1,
+    "verdict": "fail",
+    "checks": {
+     "b-weakening": "fail"
+    },
+    "contains": {
+     "weakening.deny": "TrustManager"
+    }
+   },
+   "sarif": {
+    "rules": {
+     "b-weakening": "error"
+    }
+   }
   }
  ],
  "golden": "tests/golden/verdicts.json holds the verdict, check statuses and counts of every tree case. run_mutations.py --golden compares them; a rule change that moves any of them fails CI until the golden file and CHANGELOG.md are updated together."

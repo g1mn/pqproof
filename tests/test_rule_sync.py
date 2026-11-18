@@ -3,12 +3,14 @@
 residue.sh 의 규칙 표와 쓰기 연산·legacy·Legacy*.java 규칙을 prove.py(공개키 9계열, 허용 규칙)와 sarif.py(결과로 내는 규칙)에
 맞춰 보고, prove.py 와 deps.py 가 OpenSSL 을 같은 순서로 고르는지 가짜 openssl 로 돌려 본다. 한 곳만 고치면 residue 는 LEFT 로
 세는데 prove.py 는 허용으로 빼거나 SARIF 수가 증적과 어긋난다. 0.2.0 에서 파이썬 쪽 값을 한 모듈에서 읽게 되면 그 부분은
-import 로 바뀐다. 건너뛰는 폴더 목록 넷(residue.sh·cbom-scan.sh·scan.py·receipt.py)은 지금 서로 다르고 0.2.0 에서 하나로 모은다(알려진 실패 X09, 지금 값 그대로 고정).
+import 로 바뀐다. 건너뛰는 폴더는 scan/skip-dirs 한 곳이고, 그 규칙을 쓰는 세 곳(pqlite/skipdirs.py, residue.sh·cbom-scan.sh 의
+skip_dirs 셸 함수)이 같은 트리에서 같은 파일을 보는지 돌려서 맞춘다(교차 리뷰 X09).
 """
 import os
 import pathlib
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -25,10 +27,12 @@ from pqlite import rules  # noqa: E402
 import rulesrc  # noqa: E402
 from pqlite import receipt as rc  # noqa: E402
 from pqlite import scan as scanmod  # noqa: E402
+from pqlite import skipdirs  # noqa: E402
 from pqproof import deps, sarif  # noqa: E402
 
-# 알려진 실패: 지금 동작 그대로 고정했다. 고친 판에서는 그 시험이 실패하니 기대값을 뒤집고 여기서 지운다(tests/run_unit.py 가 센다)
-KNOWN_GAPS = {"X09": "건너뛰는 폴더 목록이 residue.sh·cbom-scan.sh·scan.py·receipt.py 네 곳에 따로 있고 서로 다르다"}
+# 알려진 실패: 지금 동작 그대로 고정했다. 고친 판에서는 그 시험이 실패하니 기대값을 뒤집고 여기서 지운다(tests/run_unit.py 가 센다).
+# 규칙 묶음 2에서 X09(건너뛰는 폴더 목록 넷)를 고쳐 비었다
+KNOWN_GAPS = {}
 
 
 def ids(kind):
@@ -46,6 +50,17 @@ class ResidueAndProve(unittest.TestCase):
     def test_weak_pqc_rule_is_the_one_prove_counts(self):
         self.assertIn("G-WEAK-PQC", ids("GEN"))
         self.assertIn('rules.get("G-WEAK-PQC"', (PROOF / "pqlite" / "rules.py").read_text(encoding="utf-8"))
+
+    def test_name_rule_write_operations(self):
+        # residue.sh 이름 규칙의 쓰기 연산(ERE)과 pqlite/rules.py ALLOW_WRITEOPS 가 같은 줄을 잡는다(교차 리뷰 X01)
+        ere = rulesrc.residue_export("RES_ALLOW_WRITEOPS")
+        self.assertTrue(ere and ere.startswith(rulesrc.residue_export("RES_WRITEOPS") + "|"))
+        as_py = re.compile(ere.replace("[[:space:]]", r"\s"))
+        import test_rules  # noqa: E402  같은 표(WRITES·NOT_WRITES)를 쓴다
+        rows = test_rules.AllowRules.WRITES + test_rules.AllowRules.NOT_WRITES + ["xSign(k)", "doEncryptOAEP(x)", "mygenerate_private_key"]
+        for line in rows:
+            with self.subTest(line=line):
+                self.assertEqual(bool(as_py.search(line)), bool(rules.ALLOW_WRITEOPS.search(line)))
 
     def test_write_operations(self):
         res = rulesrc.residue_export("RES_WRITEOPS")
@@ -160,21 +175,82 @@ class OpenSSLChoice(unittest.TestCase):
 
 
 class SkipDirs(unittest.TestCase):
-    def test_known_gap_X09_four_skip_lists(self):
-        names, top = rulesrc.residue_skips()
-        cbom = (PROOF / "scan" / "cbom-scan.sh").read_text(encoding="utf-8")
-        prune = re.search(r"^PRUNE='-mindepth 1 \( (.*?) \) -prune -o'$", cbom, re.M)
-        got = {
-            "residue.sh -name": sorted(names), "residue.sh top": sorted(top), "cbom-scan.sh": sorted(re.findall(r"-name (\S+)", prune[1])),
-            "scan.py": sorted(scanmod.SKIP_DIRS), "receipt.py": sorted(rc.TREE_SKIP_DIRS),
-        }
-        now = {
-            "residue.sh -name": [".git", "__pycache__", "node_modules", "vendor"], "residue.sh top": ["build", "data", "target"],
-            "cbom-scan.sh": [".git", ".venv", "__pycache__", "build", "dist", "evidence", "node_modules", "target", "vendor", "venv"],
-            "scan.py": [".git", ".gradle", "__pycache__", "build", "node_modules", "target", "vendor"],
-            "receipt.py": [".git", ".gradle", ".idea", ".venv", "__MACOSX", "__pycache__", "build", "node_modules", "target", "venv"],
-        }
-        self.assertEqual(got, now, "알려진 실패 X09 가 바뀌었다: 목록을 하나로 모았다면 이 시험을 동기 시험으로 바꾸고 KNOWN_GAPS 에서 지운다")
+    """건너뛰는 폴더(scan/skip-dirs): 트리 목록(pqlite/skipdirs.py)과 두 셸 스캐너가 같은 트리에서 같은 파일을 본다(교차 리뷰 X02·X03·X09)."""
+
+    # 폴더마다 고전 키 한 줄짜리 K.java. 빌드 파일: 트리 맨 위 go.mod, svc-a/pom.xml, web/package.json, src/main/webapp/package.json
+    DIRS = ["", "src/main/java/com/bank/vendor", "src/main/java/demo/build", "src/main/java/demo/target", "vendor/x", "build/gen",
+            "dist", "svc-a/target/gen", "svc-a/src/main/java/a", "svc-b/target", "web/dist", "web/node_modules/y", "lib/vendor",
+            "node_modules/z", ".venv/lib", "pkg/.terraform", "src/main/java/demo/vendor/build", "tools/out", ".svn/pristine",
+            "src/main/webapp/dist"]
+    WANT = ["K.java", "lib/vendor/K.java", "src/main/java/com/bank/vendor/K.java", "src/main/java/demo/build/K.java",
+            "src/main/java/demo/target/K.java", "src/main/java/demo/vendor/build/K.java", "src/main/webapp/dist/K.java",
+            "svc-a/src/main/java/a/K.java",
+            "svc-b/target/K.java", "tools/out/K.java"]
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.mkdtemp(prefix="pqproof-skip-")
+        cls.root = os.path.join(cls.tmp, "t")
+        for d in cls.DIRS:
+            p = os.path.join(cls.root, *d.split("/")) if d else cls.root
+            os.makedirs(p, exist_ok=True)
+            pathlib.Path(p, "K.java").write_text('KeyFactory kf = KeyFactory.getInstance("RSA");\n', encoding="utf-8")
+        for f in ("go.mod", "svc-a/pom.xml", "web/package.json", "src/main/webapp/package.json"):  # webapp/dist 는 운영 소스 아래라 본다
+            pathlib.Path(cls.root, *f.split("/")).write_text("x\n", encoding="utf-8")
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)  # setUpClass 가 만든 자기 폴더만
+
+    def test_tree_list(self):
+        got = sorted(r for r, _, _ in rc.tree_files(self.root) if r.endswith("K.java"))
+        self.assertEqual(got, self.WANT)
+        skipped = [r for r, _ in skipdirs.walk(self.root, skipdirs.load())[1]]
+        self.assertEqual(skipped, [".svn", ".venv", "build", "dist", "node_modules", "pkg/.terraform", "svc-a/target", "vendor",
+                                   "web/dist", "web/node_modules"])
+
+    def test_residue_sees_the_same_files(self):
+        parsed = rules.parse_residue(prove.run_residue(prove.GENERIC_RESIDUE, self.root)[1])
+        got = sorted(x["path"] for x in parsed["rules"]["G-RSA"]["lines"])
+        self.assertEqual(got, self.WANT)
+
+    def test_cbom_scan_sees_the_same_files(self):
+        out = os.path.join(self.tmp, "cbom")
+        ok, _, rows = prove.run_cbom_scan(prove.CBOM_SCAN, self.root, out, prove.default_openssl())
+        self.assertTrue(ok, prove.slurp(os.path.join(out, "run.log"))[-1500:])
+        got = sorted({r["위치"].rsplit(":", 1)[0] for r in rows if r["위치"].endswith("K.java:1")})
+        self.assertEqual(got, self.WANT)
+
+    def test_scan_py_walks_the_same_files(self):
+        got = sorted(r for r, _ in scanmod._files(self.root) if r.endswith("K.java"))
+        self.assertEqual(got, self.WANT)
+
+    def test_one_list_left(self):
+        # 옛 목록이 남아 있지 않다: 넷 모두 scan/skip-dirs 를 읽는다(형식 1·2 를 다시 재는 receipt.LEGACY_TREE_SKIP_DIRS 만 남는다)
+        for name in ("residue.sh", "cbom-scan.sh"):
+            text = (PROOF / "scan" / name).read_text(encoding="utf-8")
+            self.assertIn("skip-dirs", text)
+            self.assertNotIn("-name vendor", text)
+            self.assertNotIn("--exclude-dir=vendor", text)
+        self.assertFalse(hasattr(scanmod, "SKIP_DIRS"))
+        self.assertFalse(hasattr(rc, "TREE_SKIP_DIRS"))
+        self.assertEqual(rc.LEGACY_TREE_SKIP_DIRS, {".git", "node_modules", "target", "build", "__pycache__", ".gradle", ".idea",
+                                                    "__MACOSX", ".venv", "venv"})
+        # 두 셸 스캐너의 skip_dirs 함수는 같은 글이다
+        part = re.compile(r"(?s)# --- 건너뛰는 폴더\(scan/skip-dirs\).*?# --- 건너뛰는 폴더 끝")
+        texts = [part.search((PROOF / "scan" / n).read_text(encoding="utf-8")) for n in ("residue.sh", "cbom-scan.sh")]
+        self.assertTrue(all(texts))
+        self.assertEqual(texts[0][0], texts[1][0])
+
+    def test_bad_list_is_a_usage_error(self):
+        bad = os.path.join(self.tmp, "bad-skip")
+        pathlib.Path(bad).write_text("skip build\n", encoding="utf-8")
+        with self.assertRaises(ValueError):
+            skipdirs.load(bad)
+        for script in ("residue.sh", "cbom-scan.sh"):
+            r = subprocess.run(["bash", str(PROOF / "scan" / script), self.root], capture_output=True, text=True,
+                               env=dict(os.environ, SKIP_DIRS=bad, OUT=os.path.join(self.tmp, "o-" + script)))
+            self.assertEqual(r.returncode, 2, (script, r.stdout[-500:], r.stderr[-500:]))
 
 
 if __name__ == "__main__":

@@ -36,7 +36,7 @@ class LegacyEvidence(unittest.TestCase):
         notes = {json.loads((GOLD / fx["name"] / "receipt.json").read_text(encoding="utf-8"))["note"]
                  for fx in MANIFEST["fixtures"]}
         self.assertIn(R.NOTE_PUBLIC1, notes)  # 첫 공개본
-        self.assertIn(R.NOTE, notes)          # 사람 확인 칸 이후
+        self.assertIn(R.NOTE_V2, notes)       # 사람 확인 칸 이후(형식 2 와 그 전 둘째 공개본의 NOTE)
         self.assertIn(2, {fx["format_version"] for fx in MANIFEST["fixtures"]}, "no format 2 fixture yet")
 
     def test_old_page_keeps_its_words(self):

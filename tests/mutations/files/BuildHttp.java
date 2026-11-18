@@ -1,0 +1,11 @@
+package demo.build;
+
+/** HTTP client in a production package named build. */
+public class Http {
+    static javax.net.ssl.TrustManager[] trustAll() {
+        return new javax.net.ssl.TrustManager[] { new javax.net.ssl.X509TrustManager() {
+            public void checkServerTrusted(java.security.cert.X509Certificate[] c, String a) {}
+            public void checkClientTrusted(java.security.cert.X509Certificate[] c, String a) {}
+            public java.security.cert.X509Certificate[] getAcceptedIssuers() { return null; } } };
+    }
+}

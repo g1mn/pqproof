@@ -37,6 +37,7 @@ if HERE not in sys.path:
 from pqlite import allowlist as al  # noqa: E402
 from pqlite import receipt as rc  # noqa: E402
 from pqlite import rules  # noqa: E402
+from pqlite import skipdirs  # noqa: E402
 from pqlite import scan as scanmod  # noqa: E402
 from pqlite import tlsprobe, verify  # noqa: E402
 from pqlite import version as ver  # noqa: E402
@@ -233,7 +234,7 @@ def zip_names_problem(names):
 
 
 def unzip_safe(path, dest):
-    """zip을 dest에 푼다. 절대 경로·..·역슬래시 이름은 거부, 심볼릭 링크는 풀지 않고 이름만 남긴다. 같은 이름·대소문자만 다른 이름·
+    """zip을 dest에 푼다. 절대 경로·..·역슬래시 이름은 거부, 심볼릭 링크는 풀지 않고 [(이름, 대상)]으로 돌려준다. 같은 이름·대소문자만 다른 이름·
     제어 문자·항목 수 상한과 풀 수 없는 꼴(파일 아래 파일)은 입력 오류(종료 2)다."""
     try:
         with zipfile.ZipFile(path) as z:
@@ -254,8 +255,8 @@ def _unzip_entries(z, infos, dest):
         parts = name.rstrip("/").split("/")
         if name.startswith("/") or "\\" in name or ".." in parts or re.match(r"^[A-Za-z]:", name):
             raise UsageError(f"zip 안 위험한 경로: {name!r}")
-        if stat.S_ISLNK(info.external_attr >> 16):
-            links.append(name)
+        if stat.S_ISLNK(info.external_attr >> 16):  # 링크는 풀지 않고 이름과 대상 글만 남긴다(대상은 zip 안 데이터)
+            links.append((name.rstrip("/"), z.read(info)[:1024].decode("utf-8", errors="replace")))
             continue
         target = os.path.join(dest, *[p for p in parts if p])
         try:
@@ -281,35 +282,59 @@ def unwrap(dest):
     return dest
 
 
-def skipped_dirs(root):
-    found = set()
-    for _, dirnames, _ in os.walk(root, followlinks=False):
-        for d in list(dirnames):
-            if d in rc.TREE_SKIP_DIRS:
-                found.add(d)
-        dirnames[:] = [d for d in dirnames if d not in rc.TREE_SKIP_DIRS]
-    return sorted(found)
+def count_files(top):
+    """폴더 안 일반 파일 수와 그중 코드 파일 수(링크는 따라가지 않는다)."""
+    n = c = 0
+    for dirpath, _, filenames in os.walk(top, followlinks=False):
+        for name in filenames:
+            if stat.S_ISREG(os.lstat(os.path.join(dirpath, name)).st_mode):
+                n += 1
+                c += bool(al.CODE_FILE.search(name))
+    return n, c
 
 
-def prepare_input(path, out, side):
-    """(receipt 입력 칸, 트리 루트 경로, 파일 목록, 풀지 않은 링크)"""
+MAX_SKIPPED = 100  # inputs.*.skipped 에 하나씩 적는 건너뛴 폴더·링크 수(넘으면 '외 n곳')
+
+
+def prepare_input(path, out, side, skip_rules=None):
+    """(receipt 입력 칸, 트리 루트 경로, 파일 목록, 입력 정보 {links, skipped_output}). 건너뛰는 폴더는 scan/skip-dirs(skip_rules).
+    links: 트리의 심볼릭 링크와 zip 안 링크(풀지 않음)마다 rules.link_info. skipped_output: 건너뛴 산출물 폴더마다 파일·코드 파일 수."""
     path = os.path.abspath(path)
-    links = []
+    skip_rules = skip_rules or skipdirs.load()
+    zlinks = []
     if os.path.isfile(path) and zipfile.is_zipfile(path):
         dest = os.path.join(out, "in", side)
         os.makedirs(dest)
-        links = unzip_safe(path, dest)
+        zlinks = unzip_safe(path, dest)
         root = unwrap(dest)
         rel = os.path.relpath(root, out).replace(os.sep, "/")
         kind, zsha = "zip", sha256_file(path)
+        top = os.path.relpath(root, dest).replace(os.sep, "/")
+        top = "" if top == "." else top + "/"
+        zlinks = [(n[len(top):], tgt) for n, tgt in zlinks if n.startswith(top) and n != top.rstrip("/")]
     elif os.path.isdir(path):
         root, rel, kind, zsha = path, path, "dir", None
     else:
         raise UsageError(f"폴더나 zip이 아님: {path}")
-    files = rc.tree_files(root)
-    info = {"path": path, "kind": kind, "zip_sha256": zsha, "root": rel, "files": len(files),
-            "tree_sha256": rc.tree_sha256(files), "skipped": skipped_dirs(root) + [f"zip 링크 {n}" for n in links]}
-    return info, root, files
+    skips = []
+    files = rc.tree_files(root, skip_rules, skips)
+    skipped_rel = [r for r, _ in skips]
+    skip_out = []
+    for r, k in skips:
+        if k == "output":
+            n, c = count_files(os.path.join(root, *r.split("/")))
+            skip_out.append({"path": r, "files": n, "code": c})
+    links = [rules.link_info(r, d[len("symlink:"):], skipped_rel) for r, d, _ in files if d.startswith("symlink:")]
+    for n, tgt in zlinks:
+        parts = n.split("/")
+        if any(x in skip_rules.any for x in parts[:-1]) or any(n.startswith(s + "/") for s in skipped_rel):
+            continue  # 건너뛴 폴더 안 링크는 폴더 입력과 같이 보지 않는다
+        links.append(dict(rules.link_info(n, tgt, skipped_rel), zip=True))
+    shown = [f"{x['path']}/ 파일 {x['files']} · 코드 {x['code']}" for x in skip_out] + [rules.link_text(x) for x in links]
+    info = {"path": path, "kind": kind, "zip_sha256": zsha, "root": rel, "files": len(files), "tree_sha256": rc.tree_sha256(files),
+            "skipped": sorted({r.rsplit("/", 1)[-1] for r, k in skips if k == "any"}) + shown[:MAX_SKIPPED]
+            + ([f"외 {len(shown) - MAX_SKIPPED}곳"] if len(shown) > MAX_SKIPPED else [])}
+    return info, root, files, {"links": links, "skipped_output": skip_out}
 
 
 def changed_files(o_files, f_files):
@@ -320,17 +345,21 @@ def changed_files(o_files, f_files):
 
 # ---------------------------------------------------------------------------------------------
 # (a) CBOM: 스캐너 실행과 표(판정은 rules.merge_cbom)
-def run_cbom_scan(script, root, outdir, openssl, cache=None, tree=None, test_paths=None):
+def run_cbom_scan(script, root, outdir, openssl, cache=None, tree=None, test_paths=None, skip_dirs=None):
     """cbom-scan.sh를 돌려 (ok, csv 경로, 행 목록). cache는 셀프 시험에서 같은 트리를 두 번 안 재려고 쓴다.
-    test_paths: 시험 경로 목록 파일(증적에 남긴 사본). residue.sh 와 같은 파일을 준다."""
+    test_paths·skip_dirs: 시험 경로 목록·건너뛰는 폴더 목록 파일(증적에 남긴 사본). residue.sh 와 같은 파일을 준다.
+    HOST_FILES(트리 밖 인증서·호스트 키를 읽는 단독 실행용 설정)는 넘기지 않는다: 판정은 머신과 상관없이 같아야 한다(교차 리뷰 X05)."""
     os.makedirs(outdir)
     if cache is not None and tree in cache:
         for name in os.listdir(cache[tree]):
             shutil.copy2(os.path.join(cache[tree], name), os.path.join(outdir, name))
     else:
         env = dict(os.environ, OUT=outdir)
+        env.pop("HOST_FILES", None)
         if test_paths:
             env["TEST_PATHS"] = test_paths
+        if skip_dirs:
+            env["SKIP_DIRS"] = skip_dirs
         if openssl:
             env["OPENSSL"] = openssl
         try:
@@ -402,9 +431,13 @@ def cbom_csv(items):
 
 # ---------------------------------------------------------------------------------------------
 # (c) residue 실행(해석은 rules.parse_residue·reclass_residue)
-def run_residue(script, root, test_paths=None):
+def run_residue(script, root, test_paths=None, skip_dirs=None):
     try:
-        env = dict(os.environ, TEST_PATHS=test_paths) if test_paths else None  # cbom-scan.sh 와 같은 시험 경로 목록
+        env = dict(os.environ)  # cbom-scan.sh 와 같은 시험 경로·건너뛰는 폴더 목록
+        if test_paths:
+            env["TEST_PATHS"] = test_paths
+        if skip_dirs:
+            env["SKIP_DIRS"] = skip_dirs
         r = subprocess.run(["bash", script, root], capture_output=True, text=True, errors="replace", timeout=600, stdin=subprocess.DEVNULL,
                            env=env)
         return r.returncode, f"$ bash {script} {root}\n{r.stdout}{r.stderr}\n# exit={r.returncode}\n"
@@ -682,12 +715,13 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
     # 준비
     t0 = now()
     say(f"[1/{len(steps)}] 준비: 입력 읽기·트리 해시")
-    in_o, root_o, files_o = prepare_input(orig, out, "orig")
-    in_f, root_f, files_f = prepare_input(fixed, out, "fixed")
+    skip_rules = skipdirs.load()  # 건너뛰는 폴더(scan/skip-dirs): 트리 해시·세 스캐너·a-input 이 같은 규칙을 쓴다
+    in_o, root_o, files_o, extra_o = prepare_input(orig, out, "orig", skip_rules)
+    in_f, root_f, files_f, extra_f = prepare_input(fixed, out, "fixed", skip_rules)
     say(f"  원본 파일 {len(files_o):,} · 고친 판 파일 {len(files_f):,}")
     for side, files in (("원본", files_o), ("고친 판", files_f)):
         if not files:  # 빈 폴더·빈 zip이면 도구가 아무것도 못 찾고 0으로 끝난다(반박 검증에서 찾음)
-            raise UsageError(f"{side}에 읽을 파일이 0개다(빈 폴더·빈 zip이거나 build·target 같은 건너뛰는 폴더뿐): "
+            raise UsageError(f"{side}에 읽을 파일이 0개다(빈 폴더·빈 zip이거나 .git·node_modules 같은 건너뛰는 폴더뿐, scan/skip-dirs): "
                              f"{(in_o if side == '원본' else in_f)['path']}")
     added, removed, modified = changed_files(files_o, files_f)
     ch_path, ch_sha = art.add_json("artifacts/changed-files.json", {"added": added, "removed": removed, "modified": modified})
@@ -757,6 +791,9 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
     # 시험·예제 경로 목록(scan/test-paths.ere) 사본을 증적에 두고 cbom-scan.sh·residue.sh 에 같은 파일을 준다(scan.py 는 같은 원본을 읽는다)
     tp_art, tp_sha = art.add("artifacts/test-paths.ere", slurp(scanmod.TEST_PATHS_FILE))
     tp_file = os.path.join(out, *tp_art.split("/"))
+    # 건너뛰는 폴더 목록(scan/skip-dirs) 사본도 같이 둔다. 두 셸 스캐너가 이 사본을 읽고, --verify 가 in/ 트리 해시를 이 사본으로 다시 잰다
+    sd_art, sd_sha = art.add("artifacts/skip-dirs", slurp(skipdirs.SKIP_FILE))
+    sd_file = os.path.join(out, *sd_art.split("/"))
     scan_o, scan_f = scanmod.scan(root_so), scanmod.scan(root_sf)
     art.add_json("artifacts/scan-orig.json", [r.to_json() for r in scan_o])
     art.add_json("artifacts/scan-fixed.json", [r.to_json() for r in scan_f])
@@ -770,7 +807,7 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
         d = os.path.join(out, "artifacts", f"cbom-{side}")
         t1 = now()
         say(f"[2/{len(steps)}] (a) CBOM: cbom-scan.sh {'원본' if side == 'orig' else '고친 판'} (큰 저장소는 몇 분 걸린다)")
-        ok, _, crow = run_cbom_scan(params.cbom_scan, root, d, params.openssl, cache, tree, tp_file)
+        ok, _, crow = run_cbom_scan(params.cbom_scan, root, d, params.openssl, cache, tree, tp_file, sd_file)
         say(f"  cbom-scan.sh {'원본' if side == 'orig' else '고친 판'} {now() - t1:.1f}초")
         art.register_dir(f"artifacts/cbom-{side}")
         items, counts, nloc = merge_cbom(crow, rows, lns, sig[2], params.scope, allow if side == "fixed" else None)
@@ -812,7 +849,7 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
         if not res_script:
             java[side] = None
             continue
-        rcode, text = run_residue(res_script, root, tp_file)
+        rcode, text = run_residue(res_script, root, tp_file, sd_file)
         p, s = art.add(f"artifacts/residue-{side}.txt", text)
         parsed = parse_residue(text)
         res_parsed[side] = parsed
@@ -890,9 +927,9 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
     phase("(b) TLS 탐침", t0)
 
     # 검사(판정식은 pqlite/rules.py)
-    checks, verdict, pending, unused, live = rules.judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results,
-                                                         sig_o, sig_f, tls, problem, deny, changed, review, allow, allow_path,
-                                                         rc.derive_verdict)
+    checks, verdict, pending, unused, live, name_only = rules.judge(
+        params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o, sig_f, tls, problem, deny, changed, review, allow,
+        allow_path, rc.derive_verdict, {"orig": extra_o, "fixed": extra_f})
     jf = java_rec["fixed"]
 
     # 표·조각
@@ -941,14 +978,15 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
                               "tls_group": hyb_groups[0] if hyb_groups else None, "ev": [ev_name]},
         "proof": {"verdict": verdict, "verdict_text": rc.verdict_text({
                       "verdict": verdict, "format_version": ver.FORMAT_VERSION, "weakening": {"review": review}, "allowlist": {
-                      "unreviewed": len(pending), "unused": len(unused), "write_review": len(allow.write_review())}}),
+                      "unreviewed": len(pending), "unused": len(unused), "write_review": len(allow.write_review()),
+                      "legacy": name_only}}),
                   "allow_unreviewed": len(pending), "checks": {c["id"]: c["status"] for c in checks}},
     })
 
     tools = [tool("cbom-scan.sh", params.cbom_scan), tool("residue", res_script, res_kind),
-             tool("test-paths.ere", scanmod.TEST_PATHS_FILE)]
+             tool("test-paths.ere", scanmod.TEST_PATHS_FILE), tool("skip-dirs", skipdirs.SKIP_FILE)]
     pyfiles = ["prove.py", "prove.sh", "pqlite/scan.py", "pqlite/verify.py", "pqlite/tlsprobe.py", "pqlite/receipt.py",
-               "pqlite/allowlist.py", "pqlite/version.py", "pqlite/rules.py"]
+               "pqlite/allowlist.py", "pqlite/version.py", "pqlite/rules.py", "pqlite/skipdirs.py"]
     tools += [tool(p, os.path.join(HERE, p)) for p in pyfiles]
     probe = probe_tool()
     if probe:
@@ -977,9 +1015,9 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
     hyb_locs = sorted({it["loc"] for it in cbom_items["fixed"] if it["status"] == "allow" and it["reason"] == HYBRID_REASON}
                       | {x["loc"] for x in ((jf or {}).get("listed") or {}).get("lines", []) if x["as"] == "hybrid"},
                       key=al._loc_key)
-    # 이름 규칙(Legacy*.java·같은 줄 legacy, 쓰기 연산 없음)으로만 허용된 위치. 허용 목록에 없어도 판정에서 빠지므로 증적·덱에 따로 남긴다
-    legacy_locs = sorted({it["loc"] for it in cbom_items["fixed"] if it["status"] == "allow" and it["reason"] in LEGACY_REASONS},
-                         key=al._loc_key)
+    # 이름 규칙(Legacy*.java·코드의 legacy, 쓰기 경로 아님)으로만 허용된 위치(CBOM, SCOPE=all 이면 residue 도). 허용 목록에 없어도
+    # 판정에서 빠지므로 증적·덱에 따로 남기고 r-allow 가 검토 필요로 본다(형식 3, 교차 리뷰 X01)
+    legacy_locs = name_only
     r["allowlist"] = {"source": allow_path, "auto": allow_auto, "file": allow_art, "file_sha256": allow_sha,
                       "entries": allow.record(), "warnings": allow.warnings, "unreviewed": len(pending),
                       "top_digest": allow.top_digest,
@@ -991,6 +1029,7 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
                                         | {it["loc"] for it in cbom_items["fixed"] if it["status"] in ("allow", "review")
                                            and "쓰는 import" in it["reason"]}, key=al._loc_key)}
     r["test_paths"] = {"file": tp_art, "file_sha256": tp_sha}
+    r["skip_dirs"] = {"file": sd_art, "file_sha256": sd_sha}
     r["excluded"] = {"items": excl.items, "notes": ex_notes, "app_roots": app_roots, "recon_file": recon_path,
                      "recon_digest": recon_digest, "count_orig": len(ex_o), "count_fixed": len(ex_f),
                      "files_orig": ex_o[:200], "files_fixed": ex_f[:200]}
@@ -1039,7 +1078,7 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
     if hyb_locs:
         lines.append(f"하이브리드 결합 허용 {len(hyb_locs)}줄: {', '.join(hyb_locs[:4])}{' 외' if len(hyb_locs) > 4 else ''}")
     if legacy_locs:
-        lines.append(f"이름 규칙(legacy) 허용 {len(legacy_locs)}곳(허용 목록 밖, 쓰기 연산 없음): {', '.join(legacy_locs[:4])}"
+        lines.append(f"이름 규칙(legacy)으로만 허용 {len(legacy_locs)}곳(허용 목록 밖, 쓰기 경로 아님, 사람 확인 전): {', '.join(legacy_locs[:4])}"
                      f"{' 외' if len(legacy_locs) > 4 else ''}")
     for c in checks:
         lines.append(f"[{c['id']}] {STATUS_KO[c['status']]}  {c['actual']}")

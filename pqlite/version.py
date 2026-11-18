@@ -1,7 +1,7 @@
 # version.py: 버전 세 가지를 한곳에서 읽는다(표준 라이브러리만).
 #   도구 버전(tool_version)   : src/pqproof/__init__.py 의 __version__ 한 곳(pyproject 는 동적으로 읽고, prove.sh --version 도 여기서 읽는다)
 #   규칙 묶음(ruleset)        : 판정을 정하는 규칙 파일(RULESET_FILES)의 해시 묶음. 버전 이름과 해시·파일 목록의 짝은 scan/ruleset.json 에 적는다.
-#                              규칙 묶음마다 파일 목록이 다를 수 있다(1은 여섯, 2부터 pqlite/rules.py·pqlite/tlsprobe.py 를 더함).
+#                              규칙 묶음마다 파일 목록이 다를 수 있다(1은 여섯, 2는 rules.py·tlsprobe.py·skipdirs.py·skip-dirs 를 더해 열).
 #                              --verify 는 증적에 적힌 묶음 이름의 파일 목록으로 해시를 다시 계산한다
 #   증적 형식(format_version) : receipt.json 의 꼴. 이 칸이 없는 옛 증적은 형식 1로 읽는다(pqlite/receipt.py 가 계속 읽는다)
 # 규칙 파일을 고치면 해시가 바뀐다. 그때는 scan/ruleset.json 에 새 버전 이름과 기록(sha256·since·verdict_impact·files)을 더하고
@@ -18,8 +18,8 @@ import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 저장소 루트, 또는 설치본의 pqproof/_tool
-FORMAT_VERSION = 2   # 이 도구가 쓰는 증적 형식
-FORMAT_READS = (1, 2)  # 이 도구가 --verify 로 읽는 형식(1 = format_version 칸이 없는 0.1.0 이전 공개본 증적)
+FORMAT_VERSION = 3   # 이 도구가 쓰는 증적 형식(3: skip_dirs 사본, scan/skip-dirs 로 잰 트리 해시, 이름 규칙 허용이 r-allow 에 듦)
+FORMAT_READS = (1, 2, 3)  # 이 도구가 --verify 로 읽는 형식(1 = format_version 칸이 없는 0.1.0 이전 공개본 증적)
 # 규칙 파일 경로 → receipt.json tools[] 의 name. 옛 규칙 묶음에만 든 파일도 지우지 않는다(옛 증적의 묶음 해시를 다시 계산한다)
 TOOL_NAMES = {
     "scan/cbom-scan.sh": "cbom-scan.sh",
@@ -30,12 +30,15 @@ TOOL_NAMES = {
     "pqlite/allowlist.py": "pqlite/allowlist.py",
     "pqlite/rules.py": "pqlite/rules.py",
     "pqlite/tlsprobe.py": "pqlite/tlsprobe.py",
+    "pqlite/skipdirs.py": "pqlite/skipdirs.py",
+    "scan/skip-dirs": "skip-dirs",
 }
 # 지금 규칙 묶음에 드는 파일: (저장소 경로, receipt.json tools[] 의 name). 탐지 패턴, 시험 경로, 허용 규칙, TLS 약화 규칙,
-# 판정 상수와 검사 판정식(pqlite/rules.py), TLS 대상 판정(pqlite/tlsprobe.py)이 이 안에 있다
+# 판정 상수와 검사 판정식(pqlite/rules.py), TLS 대상 판정(pqlite/tlsprobe.py), 건너뛰는 폴더 목록과 걷기(scan/skip-dirs,
+# pqlite/skipdirs.py)가 이 안에 있다
 RULESET_FILES = tuple((p, TOOL_NAMES[p]) for p in (
     "scan/cbom-scan.sh", "scan/residue.sh", "scan/test-paths.ere", "pqlite/scan.py", "pqlite/verify.py", "pqlite/allowlist.py",
-    "pqlite/rules.py", "pqlite/tlsprobe.py"))
+    "pqlite/rules.py", "pqlite/tlsprobe.py", "pqlite/skipdirs.py", "scan/skip-dirs"))
 RULESET_JSON = os.path.join(ROOT, "scan", "ruleset.json")
 _VERSION_RE = re.compile(r'^__version__\s*=\s*"([^"]+)"', re.M)
 
