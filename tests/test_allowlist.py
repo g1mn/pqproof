@@ -17,6 +17,7 @@ from unittest import mock
 PROOF = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROOF))
 import prove  # noqa: E402
+from pqlite import rules  # noqa: E402
 from pqlite import allowlist as al  # noqa: E402
 from pqlite import receipt as rc  # noqa: E402
 
@@ -148,13 +149,13 @@ class Parse(unittest.TestCase):
         self.assertTrue(any("밖" in n for n in notes))
 
     def test_imported_names(self):
-        self.assertEqual(prove.imported_names("A.java", "import java.security.spec.MGF1ParameterSpec;"), ["MGF1ParameterSpec"])
-        self.assertIsNone(prove.imported_names("A.java", "import java.security.*;"))
-        self.assertEqual(prove.imported_names("a.py", "from cryptography.hazmat.primitives.asymmetric import ec, rsa as r"), ["ec", "r"])
-        self.assertEqual(prove.imported_names("a.ts", "import { generateKeyPairSync, createSign as cs } from 'crypto';"),
+        self.assertEqual(rules.imported_names("A.java", "import java.security.spec.MGF1ParameterSpec;"), ["MGF1ParameterSpec"])
+        self.assertIsNone(rules.imported_names("A.java", "import java.security.*;"))
+        self.assertEqual(rules.imported_names("a.py", "from cryptography.hazmat.primitives.asymmetric import ec, rsa as r"), ["ec", "r"])
+        self.assertEqual(rules.imported_names("a.ts", "import { generateKeyPairSync, createSign as cs } from 'crypto';"),
                          ["generateKeyPairSync", "cs"])
-        self.assertEqual(prove.imported_names("a.go", 'import "crypto/ecdsa"'), ["ecdsa"])
-        self.assertIsNone(prove.imported_names("a.go", '"crypto/ecdsa"'))  # import 블록 밖 글자열은 import 가 아니다
+        self.assertEqual(rules.imported_names("a.go", 'import "crypto/ecdsa"'), ["ecdsa"])
+        self.assertIsNone(rules.imported_names("a.go", '"crypto/ecdsa"'))  # import 블록 밖 글자열은 import 가 아니다
 
 
 class EndToEnd(unittest.TestCase):

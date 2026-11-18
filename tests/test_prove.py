@@ -13,6 +13,7 @@ import zipfile
 PROOF = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROOF))
 import prove  # noqa: E402
+from pqlite import rules  # noqa: E402
 
 ORIG_JAVA = {
     "src/main/java/x/Crypto.java": """package x;
@@ -186,7 +187,7 @@ class Residue(unittest.TestCase):
     def test_generic_residue_file(self):
         text = prove.slurp(prove.GENERIC_RESIDUE)
         self.assertNotIn("\nSITE@@", text)  # 서비스별 자리 규칙은 일반판에 없다(RESIDUE= 로 준 판에만)
-        for rule in prove.FAMILIES + ["G-WEAK-PQC", "LW-legacy-write", "E-MLKEM768", "E-MLDSA65"]:
+        for rule in rules.FAMILIES + ["G-WEAK-PQC", "LW-legacy-write", "E-MLKEM768", "E-MLDSA65"]:
             self.assertIn(f"@@{rule}@@", text)
         self.assertIn("MAXD = 100000", text)
         self.assertIn("ISTEST = (TP ~ TESTRE)", text)  # 시험 경로는 scan/test-paths.ere 한 곳(cbom-scan.sh 와 같은 목록)
@@ -204,29 +205,29 @@ class Residue(unittest.TestCase):
                "EXPECT E-MLKEM768       PRESENT  n=3  L1,2,3  - k\n"
                "EXPECT E-MLDSA65        MISSING  n=0  L-  - s\n"
                "SUMMARY files=3 sites=0 LEFT=0 | VERDICT=RESIDUE\n")
-        p = prove.parse_residue(out)
+        p = rules.parse_residue(out)
         self.assertEqual(p["families"]["G-RSA"], {"code": 2, "allow": 1, "comment": 0, "test": 1})
         self.assertEqual(p["families"]["G-EC"], {"code": 0, "allow": 0, "comment": 0, "test": 0})
         self.assertEqual(p["tests"], {"count": 1, "lines": ["src/test/java/ATest.java:9"]})  # 시험 경로 줄은 따로 센다
         self.assertEqual(p["expect"], {"E-MLKEM768": 3, "E-MLDSA65": 0})
         self.assertEqual((p["weak_pqc"], p["legacy_write"], p["sites_left"], p["verdict"]), (0, 0, None, "RESIDUE"))
         self.assertEqual(len(p["rules"]["G-RSA"]["lines"]), 3)
-        self.assertIsNone(prove.parse_residue("no summary\n"))
+        self.assertIsNone(rules.parse_residue("no summary\n"))
 
 
 class Allow(unittest.TestCase):
     def test_rules(self):
-        self.assertIsNotNone(prove.allow_reason("src/LegacyBox.java", 'Signature.getInstance("SHA256withECDSA")', "ECDSA"))
-        self.assertIsNone(prove.allow_reason("src/LegacyBox.java", "c.init(Cipher.ENCRYPT_MODE, k)", "RSA"))
-        self.assertIsNotNone(prove.allow_reason("src/A.java", "verifyLegacy(sig) // ECDSA", "ECDSA"))
-        self.assertIsNotNone(prove.allow_reason("src/A.java", 'KEM.getInstance("X25519MLKEM768")', "X25519"))
-        self.assertIsNone(prove.allow_reason("src/A.java", 'KeyAgreement.getInstance("X25519")', "X25519"))
+        self.assertIsNotNone(rules.allow_reason("src/LegacyBox.java", 'Signature.getInstance("SHA256withECDSA")', "ECDSA"))
+        self.assertIsNone(rules.allow_reason("src/LegacyBox.java", "c.init(Cipher.ENCRYPT_MODE, k)", "RSA"))
+        self.assertIsNotNone(rules.allow_reason("src/A.java", "verifyLegacy(sig) // ECDSA", "ECDSA"))
+        self.assertIsNotNone(rules.allow_reason("src/A.java", 'KEM.getInstance("X25519MLKEM768")', "X25519"))
+        self.assertIsNone(rules.allow_reason("src/A.java", 'KeyAgreement.getInstance("X25519")', "X25519"))
         # ML-KEM이 주석에만 있으면 하이브리드가 아니다
-        self.assertIsNone(prove.allow_reason("src/A.java", 'KeyAgreement.getInstance("ECDH"); // ML-KEM-768 전환 전 임시', "ECDH"))
-        self.assertIsNone(prove.allow_reason("src/A.java", 'KeyAgreement.getInstance("ECDH"); /* MLKEM */', "ECDH"))
-        self.assertIsNone(prove.allow_reason("nginx/nginx.conf", "ssl_ecdh_curve X25519:prime256v1; # X25519MLKEM768", "X25519"))
-        self.assertIsNotNone(prove.allow_reason("nginx/nginx.conf", "ssl_ecdh_curve X25519MLKEM768:X25519:prime256v1;", "X25519"))
-        self.assertIsNotNone(prove.allow_reason("a.go", 'g := "X25519MLKEM768,X25519" // https://go.dev/doc', "X25519"))
+        self.assertIsNone(rules.allow_reason("src/A.java", 'KeyAgreement.getInstance("ECDH"); // ML-KEM-768 전환 전 임시', "ECDH"))
+        self.assertIsNone(rules.allow_reason("src/A.java", 'KeyAgreement.getInstance("ECDH"); /* MLKEM */', "ECDH"))
+        self.assertIsNone(rules.allow_reason("nginx/nginx.conf", "ssl_ecdh_curve X25519:prime256v1; # X25519MLKEM768", "X25519"))
+        self.assertIsNotNone(rules.allow_reason("nginx/nginx.conf", "ssl_ecdh_curve X25519MLKEM768:X25519:prime256v1;", "X25519"))
+        self.assertIsNotNone(rules.allow_reason("a.go", 'g := "X25519MLKEM768,X25519" // https://go.dev/doc', "X25519"))
 
 
 class EndToEnd(unittest.TestCase):

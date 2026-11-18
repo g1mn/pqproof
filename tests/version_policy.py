@@ -70,10 +70,14 @@ def check_ruleset(doc):
         if e.get("verdict_impact") not in ("yes", "no"):
             bad.append(f"{where}: verdict_impact must be yes or no")
         files = e.get("files")
-        if not isinstance(files, list) or sorted(str(f.get("path")) for f in files if isinstance(f, dict)) != want_paths:
-            bad.append(f"{where}: files must list the six rule files {want_paths}")
-        elif V.ruleset_digest({f["path"]: f.get("sha256") for f in files}) != e.get("sha256"):
-            bad.append(f"{where}: the hashes in files give {V.ruleset_digest({f['path']: f.get('sha256') for f in files})}, not sha256")
+        paths = sorted(str(f.get("path")) for f in files if isinstance(f, dict)) if isinstance(files, list) else None
+        if name == doc["current"] and paths != want_paths:
+            bad.append(f"{where}: the current ruleset must list the rule files {want_paths}")
+        elif not paths or any(p not in V.TOOL_NAMES for p in paths) or len(set(paths)) != len(paths):
+            bad.append(f"{where}: files must list rule files that pqlite/version.py TOOL_NAMES knows, once each")
+        elif V.ruleset_digest({f["path"]: f.get("sha256") for f in files}, paths) != e.get("sha256"):
+            got = V.ruleset_digest({f["path"]: f.get("sha256") for f in files}, paths)
+            bad.append(f"{where}: the hashes in files give {got}, not sha256")
     if len({e.get("sha256") for e in versions.values() if isinstance(e, dict)}) != len(versions):
         bad.append("scan/ruleset.json: two ruleset names share a hash")
     return bad

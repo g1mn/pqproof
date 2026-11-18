@@ -18,8 +18,8 @@ ruff check . && shellcheck -S warning prove.sh build-probe.sh scan/residue.sh &&
 
 | Path | What |
 |---|---|
-| `prove.sh`, `prove.py` | entry point and the checks |
-| `pqlite/` | code scanner, TLS-weakening rules, probe output parser, evidence writer and verifier, allowlist, versions |
+| `prove.sh`, `prove.py` | entry point, run order, tables and evidence |
+| `pqlite/` | verdict rules and checks (`rules.py`), code scanner, TLS-weakening rules, probe output parser, evidence writer and verifier, allowlist, versions |
 | `scan/` | `cbom-scan.sh` (CBOM scanner, bash and OpenSSL), `residue.sh` (classical-line counter), `test-paths.ere` (the test-path list), `ruleset.json` (ruleset names, hashes, first version and verdict impact) |
 | `src/pqproof/` | the `pqproof` command, the SARIF converter and the external-program check |
 | `schemas/` | JSON Schemas of `receipt.json` and the allowlist, written by `tests/make_schemas.py` |
@@ -34,11 +34,11 @@ Code comments and tool output are in Korean; documentation is in English, with a
 
 ## Changing a rule
 
-The ruleset is six files: `scan/cbom-scan.sh`, `scan/residue.sh`, `scan/test-paths.ere`, `pqlite/scan.py`, `pqlite/verify.py` and `pqlite/allowlist.py`. Changing any byte of them, a comment included, changes the ruleset hash, and a run with a changed file is named `<current>+modified` until the change has its own ruleset name. That is why lint warnings in these files wait for the next ruleset.
+The ruleset is the files in `RULESET_FILES` of `pqlite/version.py`: `scan/cbom-scan.sh`, `scan/residue.sh`, `scan/test-paths.ere`, `pqlite/scan.py`, `pqlite/verify.py`, `pqlite/allowlist.py`, `pqlite/rules.py` and `pqlite/tlsprobe.py`. A verdict constant or pattern belongs in `pqlite/rules.py`, not in `prove.py`; a test fails when `prove.py` gets a new pattern constant. Changing any byte of them, a comment included, changes the ruleset hash, and a run with a changed file is named `<current>+modified` until the change has its own ruleset name. That is why lint warnings in these files wait for the next ruleset.
 
 A rule ID or a value can live in more than one file. For a new or changed rule:
 
-1. Change the rule file, and the copies that `tests/test_rule_sync.py` checks: `FAMILIES`, `WRITEOPS`, `ALLOWLINE` and `LEGACY_FILE` in `prove.py`, `COUNTED_GEN`, `FAMILY_EN` and `RULES` in `src/pqproof/sarif.py`.
+1. Change the rule file, and the copies that `tests/test_rule_sync.py` checks: `FAMILIES`, `WRITEOPS`, `ALLOWLINE` and `LEGACY_FILE` in `pqlite/rules.py`, `COUNTED_GEN`, `FAMILY_EN` and `RULES` in `src/pqproof/sarif.py`.
 2. Add a row that the rule catches and a near miss it must not catch to `tests/test_rules.py`. A rule or a pattern alternative without a row fails that test. If the change fixes a known gap, flip its test and remove the number from `KNOWN_GAPS`. Update the search strings in `tests/code_mutants.py` if the code they point to moved.
 3. Run `python3 -I tests/mutations/run_mutations.py --strict --golden tests/golden/verdicts.json --diff-golden /tmp/moved.md`. If verdicts, check statuses or counts moved and that is intended, rewrite the golden file with `--write-golden`.
 4. Add a ruleset entry to `scan/ruleset.json` (`python3 -I -B pqlite/version.py --ruleset-json` prints the hashes): a new name, `since` (the release that ships it), `verdict_impact` and `files`, and make it `current`.

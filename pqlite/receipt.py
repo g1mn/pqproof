@@ -629,7 +629,7 @@ def version_problems(r):
         return out
     if r["note"] != NOTE:
         out.append("a format 2 receipt must carry the current note, not the note of an older version")
-    got = v.ruleset_from_tools(r["tools"])
+    got = v.ruleset_from_tools(r["tools"], r["ruleset_version"])  # 그 묶음의 파일 목록으로(묶음 1은 여섯, 2부터 여덟)
     if r["ruleset_sha256"] != got:
         out.append(f"ruleset_sha256 is {r['ruleset_sha256']}, but the rule files listed in tools[] hash to {got}")
     current, history = v.ruleset_history()

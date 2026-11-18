@@ -21,6 +21,7 @@ try:
 except ImportError:
     sys.path.insert(0, str(PROOF / "src"))  # 저장소 체크아웃
 import prove  # noqa: E402
+from pqlite import rules  # noqa: E402
 import rulesrc  # noqa: E402
 from pqlite import receipt as rc  # noqa: E402
 from pqlite import scan as scanmod  # noqa: E402
@@ -37,19 +38,19 @@ def ids(kind):
 class ResidueAndProve(unittest.TestCase):
     def test_families_are_the_first_nine_gen_rules(self):
         # residue.sh 머리 주석: 앞의 아홉 줄(G-RSA ~ G-DH-DSA)이 prove.sh 가 세는 '공개키 9계열'이다
-        self.assertEqual(ids("GEN")[:9], prove.FAMILIES)
+        self.assertEqual(ids("GEN")[:9], rules.FAMILIES)
 
     def test_expect_rule_ids(self):
-        self.assertEqual(set(ids("EXPECT")), set(prove.EXPECT_IDS.values()))
+        self.assertEqual(set(ids("EXPECT")), set(rules.EXPECT_IDS.values()))
 
     def test_weak_pqc_rule_is_the_one_prove_counts(self):
         self.assertIn("G-WEAK-PQC", ids("GEN"))
-        self.assertIn('rules.get("G-WEAK-PQC"', (PROOF / "prove.py").read_text(encoding="utf-8"))
+        self.assertIn('rules.get("G-WEAK-PQC"', (PROOF / "pqlite" / "rules.py").read_text(encoding="utf-8"))
 
     def test_write_operations(self):
         res = rulesrc.residue_export("RES_WRITEOPS")
-        self.assertEqual(res, prove.WRITEOPS.pattern)
-        self.assertTrue(prove.ALLOW_WRITEOPS.pattern.startswith(res + "|"), "ALLOW_WRITEOPS must extend WRITEOPS")
+        self.assertEqual(res, rules.WRITEOPS.pattern)
+        self.assertTrue(rules.ALLOW_WRITEOPS.pattern.startswith(res + "|"), "ALLOW_WRITEOPS must extend WRITEOPS")
         lwrite = [r["re"] for r in rulesrc.residue_rules() if r["kind"] == "LWRITE"]
         self.assertEqual(len(lwrite), 1)
         self.assertTrue(lwrite[0].startswith(res + "|"), "the LWRITE rule must start with RES_WRITEOPS")
@@ -59,26 +60,49 @@ class ResidueAndProve(unittest.TestCase):
         pairs = re.findall(r"\[(\w)(\w)\]", res)
         self.assertEqual("".join(f"[{a}{b}]" for a, b in pairs), res, "RES_ALLOWLINE is no longer one [Xx] class per letter")
         self.assertTrue(all(a.upper() == a and b == a.lower() for a, b in pairs))
-        self.assertEqual("".join(b for _, b in pairs), prove.ALLOWLINE.pattern)
-        self.assertTrue(prove.ALLOWLINE.flags & re.I)
+        self.assertEqual("".join(b for _, b in pairs), rules.ALLOWLINE.pattern)
+        self.assertTrue(rules.ALLOWLINE.flags & re.I)
 
     def test_legacy_file_name(self):
         awk = rulesrc.residue_legacy_file()
         self.assertTrue(awk and awk.startswith("^"))
-        self.assertEqual(prove.LEGACY_FILE.pattern, "(?:^|/)" + awk[1:])
+        self.assertEqual(rules.LEGACY_FILE.pattern, "(?:^|/)" + awk[1:])
 
     def test_same_line_ml_kem_forms_differ_as_recorded(self):
         # 같은 줄 ML-KEM 인정 꼴이 두 곳에서 다르다: residue.sh 는 대소문자를 가리고 밑줄을 안 받는다(ml_kem_768 X25519 는 LEFT),
         # prove.py 는 둘 다 받는다. 지금 값을 적어 두어 한쪽만 바뀌면 여기서 알린다(바꿀 때는 판정 영향을 따진다)
         allow = {r["id"]: r["allow"] for r in rulesrc.residue_rules()}
         self.assertEqual(allow["G-X25519"], "ML-?KEM|MLKEM")
-        self.assertEqual((prove.HYBRID_LINE.pattern, bool(prove.HYBRID_LINE.flags & re.I)), ("ML[-_]?KEM", True))
+        self.assertEqual((rules.HYBRID_LINE.pattern, bool(rules.HYBRID_LINE.flags & re.I)), ("ML[-_]?KEM", True))
+
+
+class RulesInOnePlace(unittest.TestCase):
+    """판정 규칙은 pqlite/rules.py 한 곳에 두고 그 파일이 규칙 묶음 해시에 든다(교차 리뷰 X10)."""
+
+    # prove.py 에 남아도 되는 정규식: 입력 꼴 검사(TLS 대상, zip 이름)뿐. 판정에 쓰는 정규식이 생기면 pqlite/rules.py 로 옮긴다
+    PROVE_PATTERNS = {"TARGET", "ZIP_CONTROL"}
+
+    def test_rules_file_is_in_the_ruleset(self):
+        from pqlite import version as V
+        paths = [p for p, _ in V.RULESET_FILES]
+        self.assertIn("pqlite/rules.py", paths)
+        self.assertIn("pqlite/tlsprobe.py", paths)  # TLS 대상 판정(target_verdict)과 대조 서버 판정
+
+    def test_prove_has_no_rule_patterns(self):
+        got = {k for k, v in vars(prove).items() if isinstance(v, re.Pattern) and getattr(rules, k, None) is not v}
+        self.assertEqual(got, self.PROVE_PATTERNS, "prove.py 에 판정용 정규식 상수가 생겼다: pqlite/rules.py 로 옮기고 규칙 묶음을 올린다")
+        src = (PROOF / "prove.py").read_text(encoding="utf-8")
+        self.assertEqual(re.findall(r"(?m)^([A-Z][A-Z0-9_]*) = re\.compile", src), sorted(self.PROVE_PATTERNS, key=src.index))
+
+    def test_prove_uses_the_rules_module(self):
+        for name in ("FAMILIES", "merge_cbom", "parse_residue", "reclass_residue", "hybrid_ok", "Lines", "read_text"):
+            self.assertIs(getattr(prove, name), getattr(rules, name), name)
 
 
 class SarifRules(unittest.TestCase):
     def test_counted_gen_rules(self):
         # c-classic 이 세는 GEN 규칙: 공개키 9계열과 보안레벨 3 미만 PQC. G-AES128 은 표에만 나온다
-        self.assertEqual(sarif.COUNTED_GEN, set(prove.FAMILIES) | {"G-WEAK-PQC"})
+        self.assertEqual(sarif.COUNTED_GEN, set(rules.FAMILIES) | {"G-WEAK-PQC"})
         self.assertEqual(sarif.COUNTED_GEN, set(ids("GEN")) - {"G-AES128"})
 
     def test_every_counted_rule_has_an_english_name(self):

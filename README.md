@@ -63,7 +63,7 @@ The GitHub Action judges a pull request against its base commit and uploads SARI
 | blocking location | a quantum-breakable public-key use in the converted tree with no recorded reason |
 | allowlist | the classical lines a migration keeps on purpose, each with a reason and a reviewer |
 | evidence (검증 증적), evidence hash | the output folder, and `receipt_id`, the SHA-256 of `receipt.json` in RFC 8785 form |
-| ruleset | the six rule files; their hash is in every receipt |
+| ruleset | the rule files (`pqlite/version.py`); their hash is in every receipt |
 
 ## Documentation
 

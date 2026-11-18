@@ -21,6 +21,7 @@ import unittest
 PROOF = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROOF))
 import prove  # noqa: E402
+from pqlite import rules  # noqa: E402
 import rulesrc  # noqa: E402
 from pqlite import receipt as rc  # noqa: E402
 from pqlite import verify  # noqa: E402
@@ -257,7 +258,7 @@ def write_tree(root, files):
 
 def residue(root):
     code, out = prove.run_residue(prove.GENERIC_RESIDUE, root)
-    parsed = prove.parse_residue(out)
+    parsed = rules.parse_residue(out)
     if parsed is None:
         raise AssertionError(f"residue.sh gave no SUMMARY (exit {code}):\n{out[-2000:]}")
     return parsed, out
@@ -350,7 +351,7 @@ class AllowRules(unittest.TestCase):
     def lines(self, name, rows):
         root = os.path.join(self.tmp, name)
         write_tree(root, {"A.java": "\n".join(rows)})
-        return prove.Lines(root)
+        return rules.Lines(root)
 
     KX = 'KeyAgreement ka = KeyAgreement.getInstance("X25519");'
 
@@ -361,10 +362,10 @@ class AllowRules(unittest.TestCase):
         rows = ["int top = 0;"] * 3 + rows + ["int end = 0;"] * 20
         lines = self.lines(name, rows)
         line = rows.index(self.KX) + 1
-        return prove.hybrid_ok(lines, "A.java", line, self.KX)
+        return rules.hybrid_ok(lines, "A.java", line, self.KX)
 
     def test_hybrid_window_is_twelve_lines(self):
-        self.assertEqual(prove.HYB_WINDOW, 12)
+        self.assertEqual(rules.HYB_WINDOW, 12)
         self.assertTrue(self.hybrid("h12", 12))
         self.assertFalse(self.hybrid("h13", 13))
         self.assertTrue(self.hybrid("hm12", -12))
@@ -372,26 +373,26 @@ class AllowRules(unittest.TestCase):
 
     def test_hybrid_window_stops_at_a_function_head_and_skips_comments(self):
         rows = [self.KX, "int a = 1;", "void other() {", 'String k = "ML-KEM-768";']
-        self.assertFalse(prove.hybrid_ok(self.lines("hf", rows), "A.java", 1, self.KX))
+        self.assertFalse(rules.hybrid_ok(self.lines("hf", rows), "A.java", 1, self.KX))
         rows = [self.KX, "// ML-KEM-768", "int b = 2; // ML-KEM-768"]
-        self.assertFalse(prove.hybrid_ok(self.lines("hc", rows), "A.java", 1, self.KX))
+        self.assertFalse(rules.hybrid_ok(self.lines("hc", rows), "A.java", 1, self.KX))
         sig = 'Signature s = Signature.getInstance("SHA256withECDSA");'
-        self.assertFalse(prove.hybrid_ok(self.lines("hs", [sig, 'String k = "ML-KEM-768";']), "A.java", 1, sig))  # 서명은 결합이 아니다
+        self.assertFalse(rules.hybrid_ok(self.lines("hs", [sig, 'String k = "ML-KEM-768";']), "A.java", 1, sig))  # 서명은 결합이 아니다
 
     def write(self, name, at, op="c.publicEncrypt(k, b);"):
         rows = ['Cipher c = Cipher.getInstance("RSA");'] + [f"int a{i} = {i};" for i in range(at - 1)] + [op] + ["int end = 0;"] * 5
         if at == 0:
             rows = [f'Cipher c = Cipher.getInstance("RSA"); {op}', "int end = 0;"]
-        return prove.write_near(self.lines(name, rows), "A.java", 1, rows[0])
+        return rules.write_near(self.lines(name, rows), "A.java", 1, rows[0])
 
     def test_write_path_looks_three_lines_down(self):
         self.assertTrue(self.write("w0", 0))
         self.assertTrue(self.write("w3", 3))
         self.assertFalse(self.write("w4", 4))
         rows = ['Cipher c = Cipher.getInstance("RSA");', "void f() {", "c.publicEncrypt(k, b);"]
-        self.assertFalse(prove.write_near(self.lines("wf", rows), "A.java", 1, rows[0]))
+        self.assertFalse(rules.write_near(self.lines("wf", rows), "A.java", 1, rows[0]))
         rows = ['Cipher c = Cipher.getInstance("RSA");', "// c.publicEncrypt(k, b);"]
-        self.assertFalse(prove.write_near(self.lines("wc", rows), "A.java", 1, rows[0]))
+        self.assertFalse(rules.write_near(self.lines("wc", rows), "A.java", 1, rows[0]))
 
     # 허용 목록 쓰기 경로(ALLOW_WRITEOPS)의 대안마다 걸리는 줄, 그리고 안 걸리는 줄
     WRITES = ["c.init(Cipher.ENCRYPT_MODE, k);", "c.init(Cipher.WRAP_MODE, k);", "s.initSign(k);", "KeyPairGenerator g = null;",
@@ -406,16 +407,16 @@ class AllowRules(unittest.TestCase):
     def test_write_operations(self):
         for t in self.WRITES:
             with self.subTest(line=t):
-                self.assertTrue(prove.ALLOW_WRITEOPS.search(t))
+                self.assertTrue(rules.ALLOW_WRITEOPS.search(t))
         for t in self.NOT_WRITES:
             with self.subTest(line=t):
-                self.assertFalse(prove.ALLOW_WRITEOPS.search(t))
-        for alt in alternatives(prove.ALLOW_WRITEOPS.pattern):
+                self.assertFalse(rules.ALLOW_WRITEOPS.search(t))
+        for alt in alternatives(rules.ALLOW_WRITEOPS.pattern):
             with self.subTest(alternative=alt):
                 self.assertTrue(any(re.search(alt, t) for t in self.WRITES), f"no row for {alt!r}")
 
     def test_same_line_reasons(self):
-        legacy_file, legacy_line = prove.LEGACY_REASONS
+        legacy_file, legacy_line = rules.LEGACY_REASONS
         rows = [
             ("src/LegacyBox.java", 'KeyFactory.getInstance("RSA");', "RSA", legacy_file),
             ("src/Box.java", 'KeyFactory.getInstance("RSA"); // legacy', "RSA", legacy_line),
@@ -427,7 +428,7 @@ class AllowRules(unittest.TestCase):
         ]
         for path, text, alg, want in rows:
             with self.subTest(path=path, text=text):
-                self.assertEqual(prove.allow_reason(path, text, alg), want)
+                self.assertEqual(rules.allow_reason(path, text, alg), want)
 
 
 class InputPair(unittest.TestCase):
@@ -450,7 +451,7 @@ class InputPair(unittest.TestCase):
         return next(c["status"] for c in r["checks"] if c["id"] == "a-input")
 
     def test_half_of_the_original_files_is_the_boundary(self):
-        self.assertEqual(prove.MIN_COMMON, 0.5)
+        self.assertEqual(rules.MIN_COMMON, 0.5)
         n = len(rc.tree_files(str(EXAMPLES / "classic")))
         self.assertEqual(self.a_input(n), "pass")             # 공통 n / 원본 2n = 50%
         self.assertEqual(self.a_input(n + 1), "undecided")    # 50% 미만
@@ -472,10 +473,10 @@ class KnownGapsOutsideResidue(unittest.TestCase):
             line = "const kp = crypto.generateKeyPairSync('ed25519'); // 운영·테스트 서버 공통 키 형식"
             write_tree(tmp, {"web/keys.js": line})
             row = {"위치": "web/keys.js:1", "양자 위협": "쇼어로 깨짐", "알고리즘·키 길이": "Ed25519", "용도": "서명"}
-            items, _, _ = prove.merge_cbom([dict(row, **{"근거·비고": f"`{line}`"})], [], prove.Lines(tmp), False)
+            items, _, _ = rules.merge_cbom([dict(row, **{"근거·비고": f"`{line}`"})], [], rules.Lines(tmp), False)
             self.assertEqual(items[0]["status"], "comment", gap_msg("X06"))
             control = line.replace(" // 운영·테스트 서버 공통 키 형식", "")
-            items, _, _ = prove.merge_cbom([dict(row, **{"근거·비고": f"`{control}`"})], [], prove.Lines(tmp), False)
+            items, _, _ = rules.merge_cbom([dict(row, **{"근거·비고": f"`{control}`"})], [], rules.Lines(tmp), False)
             self.assertEqual(items[0]["status"], "block")
         finally:
             shutil.rmtree(tmp, ignore_errors=True)  # 이 시험이 만든 자기 폴더만

@@ -12,7 +12,14 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 ## [Unreleased]
 
-**Verdict impact (판정 영향): none.**
+Planned as 0.2.0: ruleset 2 (new name and hash), evidence format 2.
+
+**Verdict impact (판정 영향): none.** So far ruleset 2 only moves the verdict code: the 14 golden tree cases give the same verdicts, check statuses and counts as under ruleset 1.
+
+### Changed
+
+- The verdict rules that lived in `prove.py` (the nine classical families, the name rule, the write paths, the hybrid window, the 50% input threshold, how residue output is read, and each check's status) moved, value for value, to `pqlite/rules.py`. That file and `pqlite/tlsprobe.py` (the TLS target verdict) are now in the ruleset hash, so a change to any of them needs a new ruleset name. Before, `prove.py` could change a verdict while `ruleset_sha256` stayed the same. A test fails when a new pattern constant appears in `prove.py`.
+- `scan/ruleset.json` keeps a file list per ruleset, and `--verify` recomputes a receipt's `ruleset_sha256` from the files of the ruleset that receipt names. Evidence from ruleset 1 (six files) still verifies.
 
 ## [0.1.1] - 2026-11-19
 

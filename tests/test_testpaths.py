@@ -99,7 +99,7 @@ class OneList(unittest.TestCase):
         cbom = (PROOF / "scan" / "cbom-scan.sh").read_text(encoding="utf-8")
         res = (PROOF / "scan" / "residue.sh").read_text(encoding="utf-8")
         scan = (PROOF / "pqlite" / "scan.py").read_text(encoding="utf-8")
-        pro = (PROOF / "prove.py").read_text(encoding="utf-8")
+        pro = (PROOF / "prove.py").read_text(encoding="utf-8") + (PROOF / "pqlite" / "rules.py").read_text(encoding="utf-8")
         self.assertNotIn("*/__tests__/*", cbom)
         self.assertIn("test-paths.ere", cbom)
         self.assertNotIn("(src\\/test|test|tests)", res)

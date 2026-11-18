@@ -17,6 +17,8 @@ _spec = importlib.util.spec_from_file_location("run_mutations", PROOF / "tests" 
 M = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(M)
 GOLD = json.loads((PROOF / "tests" / "golden" / "verdicts.json").read_text(encoding="utf-8"))["runs"]
+RS = next(iter({v["ruleset_version"] for v in GOLD.values()}))  # golden 이 쓰인 규칙 묶음 이름
+MOD = f"{RS}+modified"
 
 
 def relabel(runs, name):
@@ -28,12 +30,12 @@ def relabel(runs, name):
 
 class GoldenCompare(unittest.TestCase):
     def test_ruleset_name_alone_moves_no_case(self):
-        now = relabel(GOLD, "1+modified")
+        now = relabel(GOLD, MOD)
         moved, rs_gold, rs_now, missing = M.golden_compare(GOLD, now)
         self.assertEqual((moved, missing), ({}, []))
-        self.assertEqual((rs_gold, rs_now), ({"1"}, {"1+modified"}))
+        self.assertEqual((rs_gold, rs_now), ({RS}, {MOD}))
         lines = M.golden_summary(GOLD, now)
-        self.assertIn("ruleset 1 in the golden file, 1+modified now", lines[0])
+        self.assertIn(f"ruleset {RS} in the golden file, {MOD} now", lines[0])
         self.assertEqual(lines[1], f"golden: 0 of {len(GOLD)} cases moved")
         self.assertEqual(len(lines), 2)
         # 실행기가 사례마다 붙이는 FAIL 줄도 같은 규칙(묶음 이름은 빼고 비교)
@@ -44,7 +46,7 @@ class GoldenCompare(unittest.TestCase):
         self.assertEqual(M.golden_summary(GOLD, GOLD), [f"golden: 0 of {len(GOLD)} cases moved"])
 
     def test_a_verdict_move_is_reported_per_case_and_field(self):
-        now = relabel(GOLD, "1+modified")
+        now = relabel(GOLD, MOD)
         cid = "c01-examples-classic-to-pqc"
         now[cid]["verdict"] = "fail"
         now[cid]["checks"]["c-classic"] = "fail"
@@ -53,7 +55,7 @@ class GoldenCompare(unittest.TestCase):
         self.assertEqual(list(moved), [cid])
         self.assertEqual(moved[cid], [("checks.c-classic", '"pass"', '"fail"'), ("exit", "0", "1"), ("verdict", '"pass"', '"fail"')])
         lines = M.golden_summary(GOLD, now)
-        self.assertTrue(lines[0].startswith("golden: ruleset 1 in the golden file"))
+        self.assertTrue(lines[0].startswith(f"golden: ruleset {RS} in the golden file"))
         self.assertEqual(lines[1], f"golden: 1 of {len(GOLD)} cases moved")
         self.assertIn(f'  {cid}  verdict: "pass" -> "fail"', lines)
 
