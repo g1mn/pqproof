@@ -104,7 +104,20 @@ lc() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 trim() { local s=$1; s=${s#"${s%%[![:space:]]*}"}; s=${s%"${s##*[![:space:]]}"}; printf '%s' "$s"; }
 note() { local o="" x; for x in "$@"; do [ -n "$x" ] && o="${o:+$o · }$x"; done; printf '%s' "$o"; }
 # 근거 줄 발췌. 키·토큰일 수 있는 긴 base64 덩어리는 가린다(증거 파일이 보고서에 그대로 붙으므로)
-snip() { local s; s=$(trim "$1" | sed -E 's#[A-Za-z0-9+/=]{40,}#<가림>#g'); s=${s//$TAB/ }; [ ${#s} -gt 90 ] && s="${s:0:90}…"; printf '%s' "\`$s\`"; }
+# 비밀번호·토큰처럼 보이는 값(-storepass 뒤, pass:, password=·token= 대입, Bearer)도 *** 로 가린다(prove.py REDACT 와 같은 뜻, 교차 리뷰 X33)
+MASKAWK='function msk(re,   o, p) {
+  o = ""
+  while (match(L, re)) {
+    p = RSTART + RLENGTH - 1; o = o substr(S, 1, p) "***"; S = substr(S, p + 1); L = substr(L, p + 1)
+    if (match(L, /^("[^"]*"|\047[^\047]*\047|[^ \t"\047`,;)]+)/)) { S = substr(S, RLENGTH + 1); L = substr(L, RLENGTH + 1) }
+  }
+  S = o S; L = tolower(S)
+}
+{ S = $0; L = tolower(S)
+  msk("-(src|dest)?(storepass|keypass)[ \t]+"); msk("pass:"); msk("bearer[ \t]+")
+  msk("(password|passwd|passphrase|pwd|secret|api[_-]?key|access[_-]?key|private[_-]?key|token)[\"\047]?[ \t]*[:=][ \t]*")
+  print S }'
+snip() { local s; s=$(trim "$1" | sed -E 's#[A-Za-z0-9+/=]{40,}#<가림>#g' | awk "$MASKAWK"); s=${s//$TAB/ }; [ ${#s} -gt 90 ] && s="${s:0:90}…"; printf '%s' "\`$s\`"; }
 # ROOT 안에서 '.'을 찾는다: GNU grep의 --exclude-dir는 명령줄 디렉터리 이름(예: 루트가 build)에도 걸리기 때문
 # shellcheck disable=SC2086  # GX 는 --exclude-dir=이름 목록(이름에 공백·글롭 문자가 없다, set -f)
 G() { ( cd "$ROOT" && grep -rnIE "$@" $GX --exclude=cbom-scan.sh . 2>/dev/null ) |
@@ -115,9 +128,16 @@ add() { # 위치 용도 알고리즘 위협 우선순위 권장 비고
   case "$7" in 주석|"주석 · "*|테스트·예제|"테스트·예제 · "*) k=$((k+10));; esac   # flag_of 표시는 비고 맨 앞(원본 발췌의 낱말은 보지 않는다)
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$k" "$1" "$2" "$3" "$4" "$5" "$6" "$7" >> "$ROWS"; printf '%s\n' "$1" >> "$SEEN"
 }
-flag_of() { # $1=상대경로 $2=줄 → FL
-  local t=${2#"${2%%[![:space:]]*}"}; FL=""
-  case "$t" in '#'*|'//'*|'/*'*|'*'*|'--'*|';'*|'<!--'*) FL="주석";; esac
+flag_of() { # $1=상대경로 $2=줄 → FL. 주석 표시는 파일 언어를 본다(교차 리뷰 X22): '#'는 #-주석 언어에서만(C 의 #include·Rust 의 #[...]는
+  # 코드), '*'는 C 계열 블록 주석 이음 줄, '--'는 SQL·Lua·Haskell, ';'는 ini·어셈블리·Lisp 에서만
+  local t=${2#"${2%%[![:space:]]*}"} b=${1##*/}; FL=""
+  case "$t" in
+    '//'*|'/*'*|'<!--'*) FL="주석";;
+    '#'*) case "$b" in *.java|*.kt|*.kts|*.scala|*.groovy|*.js|*.mjs|*.cjs|*.jsx|*.ts|*.tsx|*.go|*.c|*.h|*.cc|*.cpp|*.cxx|*.hpp|*.hh|*.cs|*.rs|*.swift|*.m|*.mm|*.dart) ;; *) FL="주석";; esac;;
+    '*'*) case "$b" in *.java|*.kt|*.kts|*.scala|*.groovy|*.js|*.mjs|*.cjs|*.jsx|*.ts|*.tsx|*.go|*.c|*.h|*.cc|*.cpp|*.cxx|*.hpp|*.hh|*.cs|*.php|*.rs|*.swift|*.css|*.scss|*.dart) FL="주석";; esac;;
+    '--'*) case "$b" in *.sql|*.lua|*.hs) FL="주석";; esac;;
+    ';'*) case "$b" in *.ini|*.asm|*.s|*.lisp|*.clj|*.el|*.scm) FL="주석";; esac;;
+  esac
   local p="/$1"
   if [ -n "$MAINRE" ] && [[ $p =~ $MAINRE ]]; then p=${p%%"${BASH_REMATCH[0]}"*}/; fi  # 본 소스 표시 앞부분만 본다
   [[ $p =~ $TESTRE ]] && FL=$(note "$FL" "테스트·예제")
@@ -135,9 +155,13 @@ autouse() { case "$(lc "$1")" in
 
 # 위협·우선순위·권장 판정 → TH PR RP WN. P1=키교환·암호화(HNDL 직접 노출) P2=서명·인증서·고전 취약 P3=그로버 약화
 WEAKPQ='ml[-_]?kem[-_]?512|ml[-_]?dsa[-_]?44|kyber[-_]?512|dilithium[-_]?2([^0-9]|$)'   # NIST 보안레벨 3 미만 PQC(교차 리뷰 X07)
+# 복합 서명(ML-DSA 와 고전 서명을 한 키로 묶은 IETF LAMPS·BC 이름). residue.sh RES_COMPOSITE·pqlite/rules.py COMPOSITE 와 같은 뜻(교차 리뷰 X26)
+COMPRE='ml[-_]?dsa[-_]?(44|65|87)[-_](rsa|ecdsa|ed25519|ed448)'
+COMPTH="복합 서명(PQC+고전)"; COMPRP="복합 서명은 허용 여부를 정책으로 정하고 사람이 확인(목표는 ML-DSA-65 단독)"
 verdict() {
   local u=$1 a; a=$(lc "$2"); WN=""
   if [[ $a =~ $WEAKPQ ]]; then TH="보안레벨 3 미만(PQC)"; PR=P2; RP="ML-KEM-768 · ML-DSA-65(NIST 보안레벨 3)"; return; fi
+  if [[ $a =~ $COMPRE ]]; then TH=$COMPTH; PR=P2; RP=$COMPRP; return; fi
   case "$a" in *mlkem*|*ml-kem*|*ml_kem*|*ml-dsa*|*mldsa*|*slh-dsa*|*sntrup761*|*kyber*|*dilithium*|*falcon*|*sphincs*|*smaug*|*haetae*|*aimer*|*ntru*|*hqc*)
     TH="안전(PQC)"; PR="참고"; RP="유지"; return;; esac
   case "$a" in *rsa*|*ecdsa*|*ecdh*|*dsa*|*ed25519*|*ed448*|*x25519*|*x448*|*xdh*|*curve25519*|*secp*|*prime1*|*prime2*|*prime3*|*brainpool*|*p-256*|*p-384*|*p-521*|*p256*|*p384*|*p521*|*nistp*|*diffie*|*ffdhe*|*dhe*|dh|dh[!a-z]*|*[!a-z]dh|*[!a-z]dh[!a-z]*|ec|ec[!a-z]*|ecc*|*[!a-z]ec|*[!a-z]ec[!a-z]*|[rpe]s[0-9][0-9][0-9]*|*[!a-z][rpe]s[0-9][0-9][0-9]*|*elgamal*)
@@ -206,6 +230,10 @@ h_gocurves() {
   alg="CurvePreferences ${x:-(목록 확인)}"
   case "$x" in *MLKEM*) oT="안전(PQC 하이브리드)"; oP=참고; oR=유지;; *) oR="tls.X25519MLKEM768 추가 또는 CurvePreferences 비움(Go 1.24+ 기본값)";; esac
 }
+h_nodesign() { oT="미확인(키 종류가 정함)"; oP=확인; oR="같은 파일의 키 생성(generateKeyPair·createPrivateKey) 행으로 판정"; n="알고리즘 인자가 null 이면 키 종류(RSA·EC·Ed25519·ML-DSA)를 따른다"; }
+h_cap() { oT="쇼어로 깨짐"; oP=P1; oR="상한을 TLS 1.3 으로(또는 설정 삭제): X25519MLKEM768 은 TLS 1.3 전용"; n="TLS 1.3 꺼짐 → ML-KEM 하이브리드 불가"; }
+h_wolf() { case "$4" in wc_ecc*|wc_Ecc*) alg="ECC(wolfSSL $4)";; wc_ed25519*) alg="Ed25519(wolfSSL $4)";; wc_curve25519*) alg="X25519(wolfSSL $4)";; *) alg="RSA(wolfSSL $4)";; esac; use=$(autouse "$alg"); }
+h_nimbus() { case "$4" in ECKeyGenerator|P_*|SECP256K1) alg="EC $4(Nimbus)";; RSAKeyGenerator) alg="RSA(Nimbus RSAKeyGenerator)";; Ed25519|Ed448) alg="$4(Nimbus)";; X25519|X448) alg="$4(Nimbus)";; *) alg="Ed25519·X25519(Nimbus OKP)";; esac; use=$(autouse "$alg"); }
 h_xssh() { n="x/crypto v0.38.0+를 Go 1.24+로 빌드하면 기본 kex 1순위 mlkem768x25519-sha256(ssh/mlkem.go): go.mod 버전과 Config.KeyExchanges 직접 지정 여부 확인"; }
 h_osslcmd() {
   local t=$3 k=""
@@ -228,7 +256,7 @@ h_pomver() {
 }
 h_pydep() {
   local lt nm ver; lt=$(lc "$3")
-  nm=$(printf '%s' "$lt" | grep -o -E 'cryptography|pycryptodomex?|pyjwt|pyopenssl|paramiko|python-jose|ecdsa' | head -1)
+  nm=$(printf '%s' "$lt" | grep -o -E 'cryptography|pycryptodomex?|pyjwt|pyopenssl|paramiko|python-jose|ecdsa|pynacl|libnacl' | head -1)
   ver=$(printf '%s' "$lt" | grep -o -E '[0-9]+(\.[0-9]+)+' | head -1); alg="$nm${ver:+ $ver}"; oT="간접(라이브러리)"; oP=확인; oR="PQC 지원 여부 확인"
   if [ "$nm" = cryptography ]; then
     if [ -n "$ver" ] && [ "${ver%%.*}" -lt 48 ]; then oP=P2; oR="cryptography 48.0.0+ (OpenSSL 3.5+ 위 ML-KEM·ML-DSA: pyca CHANGELOG)"; else oP=참고; oR="48.0.0+면 ML-KEM·ML-DSA 사용 가능(OpenSSL 3.5+)"; fi
@@ -239,6 +267,7 @@ h_npm() {
   case "$4" in jsonwebtoken) oP=P2; oR="PQC 알고리즘 없음(HS/RS/PS/ES·none만: README) → ML-DSA JWS 라이브러리 또는 HS512";;
     @noble/post-quantum) oT="안전(PQC 라이브러리)"; oP=참고; oR=유지;; esac
 }
+h_cargo() { local ver; ver=$(printf '%s' "$3" | grep -o -E '[0-9]+(\.[0-9]+)+' | head -1); alg="$4${ver:+ $ver}(Rust)"; oT="간접(라이브러리)"; oP=확인; oR="PQC 지원 여부 확인(ml-kem·ml-dsa 크레이트)"; }
 h_gomod() {
   local t; t=$(trim "$3")
   case "$t" in
@@ -279,9 +308,25 @@ scan_code() {
   G $JS -e 'createECDH\(' | each 키교환 'ECDH @' "createECDH\\([[:space:]]*${Q}([^'\"]+)"
   G $JS -e 'createDiffieHellman' | each 키교환 DH
   G $JS -e '(publicEncrypt|privateDecrypt)\(' | each 암호화 'RSA(publicEncrypt)'
-  G $JS -e 'createSign\(|crypto\.sign\(' | each 서명 'RSA/ECDSA 서명 @' "createSign\\([[:space:]]*${Q}([^'\"]+)"
+  G $JS -e 'createSign\(' | each 서명 'RSA/ECDSA 서명 @' "createSign\\([[:space:]]*${Q}([^'\"]+)"
+  # crypto.sign(null, ...)·crypto.verify 는 키 종류가 알고리즘을 정한다(Ed25519·ML-DSA 도 이 꼴): '확인' 행, 판정은 같은 파일 키 생성 행(교차 리뷰 X25)
+  G $JS -e 'crypto\.(sign|verify)\(' | each 서명 'crypto.sign·verify(알고리즘은 키 종류)' '' h_nodesign
   G $JS -e "createHash\([[:space:]]*${Q}(md5|sha1)" | each 해시 '@' "createHash\\([[:space:]]*${Q}([^'\"]+)"
   G $JS -e "create(Cipheriv|Decipheriv|Cipher)\([[:space:]]*${Q}" | each 암호화 '@' "[Cc]ipher[a-z]*\\([[:space:]]*${Q}([^'\"]+)"
+  G $JS -e "maxVersion[[:space:]]*:[[:space:]]*${Q}TLSv1(\\.[0-2])?${Q}|secureProtocol[[:space:]]*:[[:space:]]*${Q}(TLSv1(_[12])?|SSLv23)_(client_|server_)?method" | each 프로토콜 'Node TLS 상한' '' h_cap
+  G $PY -e 'maximum_version[[:space:]]*=[[:space:]]*(ssl\.)?TLSVersion\.(TLSv1(_[0-2])?|SSLv3)|OP_NO_TLSv1_3|PROTOCOL_TLSv1(_[12])?([^_0-9A-Za-z]|$)' | each 프로토콜 'Python TLS 상한' '' h_cap
+  # 이름이 API 에 안 드러나는 라이브러리(PyNaCl·tweetnacl·libsodium·Go x/crypto/nacl·wolfSSL·Nimbus, 교차 리뷰 X20)
+  G $PY -e '(^|[^A-Za-z_.])nacl\.public|from[[:space:]]+nacl\.public[[:space:]]+import|from[[:space:]]+nacl[[:space:]]+import.*public' | each 키교환 'X25519(PyNaCl Box)'
+  G $PY -e '(^|[^A-Za-z_.])nacl\.signing|from[[:space:]]+nacl\.signing[[:space:]]+import|from[[:space:]]+nacl[[:space:]]+import.*signing' | each 서명 'Ed25519(PyNaCl signing)'
+  G $JS -e 'nacl\.box(\.keyPair|\.before)?\(|nacl\.scalarMult\(' | each 키교환 'X25519(tweetnacl box)'
+  G $JS -e 'nacl\.sign(\.keyPair|\.detached)?\(' | each 서명 'Ed25519(tweetnacl sign)'
+  G $JS $PY $GO --include=*.c --include=*.h --include=*.cc --include=*.cpp --include=*.rs -e 'crypto_(box|kx|scalarmult)_?[a-z0-9_]*\(' | each 키교환 'X25519(libsodium crypto_box·kx)'
+  G $JS $PY $GO --include=*.c --include=*.h --include=*.cc --include=*.cpp --include=*.rs -e 'crypto_sign_?[a-z0-9_]*\(' | each 서명 'Ed25519(libsodium crypto_sign)'
+  G $GO -e '"golang\.org/x/crypto/(nacl/box|curve25519)"' | each 키교환 'X25519(Go x/crypto/@)' '"golang\.org/x/crypto/([a-z0-9/]+)"'
+  G $GO -e '"golang\.org/x/crypto/(nacl/sign|ed25519)"' | each 서명 'Ed25519(Go x/crypto/@)' '"golang\.org/x/crypto/([a-z0-9/]+)"'
+  G --include=*.c --include=*.h --include=*.cc --include=*.cpp -e 'wc_(ecc_|EccPrivateKey|ed25519_|curve25519_|RsaPublicEncrypt|RsaSSL_Sign|MakeRsaKey|InitRsaKey)' | each auto 'wolfSSL @' '(wc_[A-Za-z0-9]+)' h_wolf
+  G $JAVA -e '(ECKeyGenerator|RSAKeyGenerator|OctetKeyPairGenerator)[[:space:]]*\(' | each auto 'Nimbus @' '(ECKeyGenerator|RSAKeyGenerator|OctetKeyPairGenerator)' h_nimbus
+  G $JAVA -e 'Curve\.(P_256|P_384|P_521|SECP256K1|Ed25519|Ed448|X25519|X448)([^A-Za-z0-9_]|$)' | each auto 'Nimbus Curve.@' 'Curve\.([A-Za-z0-9_]+)' h_nimbus
   # Go
   G $GO -e '"crypto/(rsa|ecdsa|ecdh|ed25519|dsa|md5|sha1|des|rc4|mlkem)"' | each auto 'Go crypto/@' '"crypto/([a-z0-9]+)"'
   G $GO -e 'rsa\.GenerateKey\(' | each 서명·암호화 RSA
@@ -290,6 +335,8 @@ scan_code() {
   G $GO -e 'ecdsa\.GenerateKey\(' | each 서명 ECDSA
   G $GO -e 'ecdh\.(P256|P384|P521|X25519)\(' | each 키교환 'ECDH @' 'ecdh\.([A-Za-z0-9]+)\('
   G $GO -e 'CurvePreferences' | each 키교환 'TLS 그룹' '' h_gocurves
+  # 코드에서 TLS 1.3 을 끄는 상한(X25519MLKEM768 은 TLS 1.3 전용, 교차 리뷰 X18). 설정 파일의 ssl_protocols 와 같은 판정
+  G $GO -e 'MaxVersion[[:space:]]*(:|=|:=)[[:space:]]*(tls\.)?VersionTLS1[0-2]([^0-9]|$)' | each 프로토콜 'Go MaxVersion @' 'Version(TLS1[0-2])' h_cap
   G $GO -e 'tls\.VersionTLS1[01]' | each 프로토콜 'tls.Version@' 'tls\.Version(TLS1[01])'
   G $GO -e 'golang\.org/x/crypto/ssh"' | each 키교환·서명 'SSH(x/crypto/ssh)' '' h_xssh
   # 코드 속 TLS 그룹 지정(Node tls ecdhCurve · Python ssl set_ecdh_curve): 설정 파일과 같은 판정. 따옴표 없는 인자(변수)는 값을 모르니 '확인' 행
@@ -310,8 +357,9 @@ scan_code() {
   G --include=pom.xml -e '<artifactId>(bcprov|bcpkix|bcutil|bctls|bcpg|bc-fips|bcfips|jjwt|java-jwt|nimbus-jose-jwt)[^<]*</artifactId>' | each 라이브러리 '@' '<artifactId>([^<]+)</artifactId>' h_pomver
   G --include=*.gradle --include=*.gradle.kts -e 'org\.bouncycastle:[a-z0-9-]+:[0-9.]+' | each 라이브러리 '@' '(org\.bouncycastle:[a-z0-9-]+:[0-9.]+)' h_pomver
   G -i --include=requirements*.txt --include=pyproject.toml --include=Pipfile --include=setup.py --include=setup.cfg \
-    -e "(^|[[:space:]\"'])(cryptography|pycryptodomex?|pyjwt|pyopenssl|paramiko|python-jose|ecdsa)([[:space:]]*[=<>~!]=?[[:space:]]*[0-9][0-9.]*)?([[:space:]\"',;]|\$)" | each 라이브러리 '' '' h_pydep
-  G --include=package.json -e '"(jsonwebtoken|jose|node-forge|node-rsa|elliptic|crypto-js|jsrsasign|@noble/post-quantum|openpgp)"[[:space:]]*:' | each 라이브러리 '@' '"([^"]+)"[[:space:]]*:' h_npm
+    -e "(^|[[:space:]\"'])(cryptography|pycryptodomex?|pyjwt|pyopenssl|paramiko|python-jose|ecdsa|pynacl|libnacl)([[:space:]]*[=<>~!]=?[[:space:]]*[0-9][0-9.]*)?([[:space:]\"',;]|\$)" | each 라이브러리 '' '' h_pydep
+  G --include=package.json -e '"(jsonwebtoken|jose|node-forge|node-rsa|elliptic|crypto-js|jsrsasign|@noble/post-quantum|openpgp|tweetnacl|libsodium-wrappers|sodium-native|@noble/curves|@noble/ed25519|@noble/secp256k1)"[[:space:]]*:' | each 라이브러리 '@' '"([^"]+)"[[:space:]]*:' h_npm
+  G --include=Cargo.toml -e '^[[:space:]]*(ed25519-dalek|x25519-dalek|curve25519-dalek|p256|p384|k256|rsa|ring)[[:space:]]*=' | each 라이브러리 '@' '^[[:space:]]*([a-z0-9-]+)' h_cargo
   G --include=go.mod -e '^go[[:space:]]+[0-9]+\.[0-9]+|golang\.org/x/crypto[[:space:]]|cloudflare/circl[[:space:]]' | each 라이브러리 '' '' h_gomod
 }
 
@@ -426,7 +474,7 @@ hostkey_alg() { # DIR 밖 호스트 키는 HOST_FILES=1 일 때만 연다(아니
 }
 hostkey_name() { case "$(lc "${1##*/}")" in *mldsa*) echo "ML-DSA(파일 이름 추정)";; *ecdsa*) echo ECDSA;; *ed25519*) echo Ed25519;; *rsa*) echo RSA;; *dsa*) echo DSA;; *) echo "미확인($1)";; esac; }
 scan_ssh() {
-  find "$ROOT" $PRUNE -type f \( -name 'sshd_config*' -o -name ssh_config -o -path '*/sshd_config.d/*' -o -path '*/ssh_config.d/*' \) -print 2>/dev/null | skip_out "$SKIPL" |
+  find "$ROOT" $PRUNE -type f \( -name 'sshd_config*' -o -name ssh_config -o -path '*/sshd_config.d/*' -o -path '*/ssh_config.d/*' -o -path '*/.ssh/config' \) -print 2>/dev/null | skip_out "$SKIPL" |
   while IFS= read -r f; do
     local r=${f#"$ROOT"/} dn="" ; case "$r" in */*_config.d/*) dn="드롭인: 먼저 읽힌 값 적용(sshd -T로 실효값 확인)";; esac
     [ -r "$f" ] || { add "$r" "키교환·서명(SSH)" "SSH 설정(읽기 권한 없음)" 미확인 확인 "sudo로 다시 스캔 또는 sudo sshd -T" "RHEL 계열은 sshd_config 0600·sshd_config.d 0700(CentOS Stream 9 openssh.spec)"; continue; }
@@ -554,16 +602,18 @@ scan_file() { # 파일 표시경로 [비고]
   [ -r "$1" ] || { add "$2" 기타 "키·인증서 파일(읽기 권한 없음)" 미확인 확인 "sudo로 다시 스캔" "${3:-}"; return; }
   if grep -q -e '-----BEGIN ' "$1" 2>/dev/null; then pem_blocks "$1" "$2" "${3:-}"
   elif head -c 2000 "$1" 2>/dev/null | grep -q -E '(^|[[:space:]])((ssh|sk)-[a-z0-9@.-]+|ecdsa-sha2-[a-z0-9]+) AAAA'; then
-    ssh_rows "$1" "$2" "공개키(SSH)" "${3:-}" || add "$2" "공개키(SSH)" "SSH 공개키(형식 미확인)" 미확인 확인 "수동 확인" "${3:-}"
+    local su="공개키(SSH)"; case "${1##*/}" in *known_hosts*) su="서명(SSH 호스트 키 고정, known_hosts)";; esac   # 교차 리뷰 X59
+    ssh_rows "$1" "$2" "$su" "${3:-}" || add "$2" "$su" "SSH 공개키(형식 미확인)" 미확인 확인 "수동 확인" "${3:-}"
   else cert_row "$1" DER "$2" "${3:-}" || key_row "$1" DER "$2" priv "${3:-}" || key_row "$1" DER "$2" pub "${3:-}" ||
     add "$2" 기타 "키·인증서 파일(형식 미확인)" 미확인 확인 "수동 확인" "${3:-}"; fi
 }
 scan_keys() {
   { find "$ROOT" $PRUNE -type f \( -name '*.pem' -o -name '*.crt' -o -name '*.cer' -o -name '*.der' -o -name '*.key' -o -name '*.p8' -o -name '*.pk8' \
-      -o -name '*.csr' -o -name '*.pub' -o -name 'id_rsa' -o -name 'id_ecdsa' -o -name 'id_ed25519' -o -name 'id_dsa' -o -name 'authorized_keys' -o -name 'ssh_host_*' \) -print 2>/dev/null | skip_out "$SKIPL"
+      -o -name '*.csr' -o -name '*.pub' -o -name 'id_rsa' -o -name 'id_ecdsa' -o -name 'id_ed25519' -o -name 'id_dsa' -o -name 'authorized_keys' -o -name 'ssh_host_*' \
+      -o -name 'known_hosts' -o -name 'known_hosts2' -o -name 'ssh_known_hosts' \) -print 2>/dev/null | skip_out "$SKIPL"
     G -l -e '^[[:space:]]*-----BEGIN '; } | sort -u | while IFS= read -r f; do flag_of "${f#"$ROOT"/}" ""; scan_file "$f" "${f#"$ROOT"/}" "$FL"; done
   find "$ROOT" $PRUNE -type f \( -name '*.jks' -o -name '*.keystore' -o -name '*.truststore' -o -name '*.p12' -o -name '*.pfx' -o -name '*.jceks' -o -name '*.bks' \) -print 2>/dev/null | skip_out "$SKIPL" |
-  while IFS= read -r f; do scan_store "$f" "${f#"$ROOT"/}"; done
+  while IFS= read -r f; do flag_of "${f#"$ROOT"/}" ""; scan_store "$f" "${f#"$ROOT"/}" "$FL"; done   # 시험 폴더 키스토어도 표시(교차 리뷰 X24)
 }
 passhint() { # 키스토어 폴더의 비밀번호 후보: 파일 이름과 설정 키 이름만 적고 값은 출력하지 않는다
   local h; h=$( { find "${1%/*}" -maxdepth 1 -type f \( -name '*.pass' -o -name '*.passfile' -o -name '*.password' -o -name '*.pwd' -o -name '*pass*.txt' \) 2>/dev/null
@@ -573,11 +623,11 @@ passhint() { # 키스토어 폴더의 비밀번호 후보: 파일 이름과 설�
     awk -v r="$ROOT/" 'index($0, r) == 1 {$0 = substr($0, length(r) + 1)} {printf "%s%s", (NR > 1 ? " · " : ""), $0}')
   [ -n "$h" ] && printf '%s' "비밀번호 후보(값은 출력 안 함): $h → STOREPASS=\"\$(cat 파일)\"로 다시 스캔"
 }
-scan_store() {
-  local f=$1 r=$2 out="" p how="" al
+scan_store() { # 파일 표시경로 [주석·시험 표시]. 비밀번호 후보는 명령줄 대신 환경 변수로 넘긴다(ps 에 안 보이게, 교차 리뷰 X33)
+  local f=$1 r=$2 fl=${3:-} out="" p how="" al
   if [ -n "$KT" ]; then
     for p in ${STOREPASS:-changeit changeme password secret}; do
-      out=$("$KT" -J-Duser.language=en -J-Duser.country=US -list -v -keystore "$f" -storepass "$p" 2>/dev/null </dev/null) && { how=비밀번호; break; }; out=""; done
+      out=$(PQP_STOREPASS=$p "$KT" -J-Duser.language=en -J-Duser.country=US -list -v -keystore "$f" -storepass:env PQP_STOREPASS 2>/dev/null </dev/null) && { how=비밀번호; break; }; out=""; done
     [ -z "$out" ] && out=$(printf '\n' | "$KT" -J-Duser.language=en -J-Duser.country=US -list -v -keystore "$f" 2>/dev/null) && how="비밀번호 없이 목록만(무결성 미검증)"
   fi
   # PKCS12를 비밀번호 없이 열면 별칭만 나오고 인증서는 안 나온다(시험에서 .p12가 0행이었다) → 인증서 줄이 있을 때만 여기서 끝낸다
@@ -588,21 +638,21 @@ scan_store() {
     while IFS="$TAB" read -r al et n pk sg u; do
       pk=$(printf '%s' "$pk" | sed -E 's/^([0-9]+)-bit ([A-Za-z0-9-]+)( \(([^)]*)\))? key$/\2-\1 \4/; s/ key$//'); pk=$(trim "$pk")
       verdict 인증서 "$sg"; case "$TH" in 안전*|미확인*) verdict 인증서 "$pk";; esac
-      add "$r#$al$( [ "${n:-0}" -gt 1 ] && echo "[$n]")" "인증서(키스토어 $et)" "$pk / 서명 $sg" "$TH" "$PR" "$RP" "$(note "$how" "${u:+만료 ${u##* }}")"
+      add "$r#$al$( [ "${n:-0}" -gt 1 ] && echo "[$n]")" "인증서(키스토어 $et)" "$pk / 서명 $sg" "$TH" "$PR" "$RP" "$(note "$fl" "$how" "${u:+만료 ${u##* }}")"
     done; return
   fi
   al=$(printf '%s\n' "$out" | awk -F': ' '/^Alias name:/{a=$2} /^Entry type:/{printf "%s%s(%s)", (n++ ? ", " : ""), a, $2}')
   case "$f" in *.p12|*.pfx)
     for p in ${STOREPASS:-changeit changeme password secret}; do
-      for lg in "" -legacy; do out=$("$O" pkcs12 $lg -in "$f" -nokeys -passin "pass:$p" 2>/dev/null </dev/null) && [ -n "$out" ] && break 2; out=""; done; done
-    if [ -n "$out" ]; then printf '%s\n' "$out" > "$TMP/p12.pem"; pem_blocks "$TMP/p12.pem" "$r#pem" "PKCS#12(openssl)"; rm -f "$TMP/p12.pem"; return; fi;; esac
+      for lg in "" -legacy; do out=$(PQP_STOREPASS=$p "$O" pkcs12 $lg -in "$f" -nokeys -passin env:PQP_STOREPASS 2>/dev/null </dev/null) && [ -n "$out" ] && break 2; out=""; done; done
+    if [ -n "$out" ]; then printf '%s\n' "$out" > "$TMP/p12.pem"; pem_blocks "$TMP/p12.pem" "$r#pem" "$(note "$fl" "PKCS#12(openssl)")"; rm -f "$TMP/p12.pem"; return; fi;; esac
   if [ "$how" = 비밀번호 ]; then   # 열렸는데 공개키 알고리즘 줄이 없다: 그 줄을 안 찍는 옛 keytool(Owner: 줄은 있음) → -rfc PEM으로, 아니면 대칭키(SecretKeyEntry)만
     if printf '%s' "$out" | grep -q '^Owner:'; then
-      "$KT" -J-Duser.language=en -J-Duser.country=US -list -rfc -keystore "$f" -storepass "$p" 2>/dev/null </dev/null > "$TMP/ks.pem"
-      pem_blocks "$TMP/ks.pem" "$r#rfc" "키스토어(keytool -rfc)"; rm -f "$TMP/ks.pem"; return; fi
-    add "$r" "인증서(키스토어)" "키스토어(열림: 인증서 항목 없음)" 미확인 확인 "항목 확인: SecretKeyEntry는 대칭키(AES-256인지)" "$(note "${al:+항목: $al}")"; return; fi
+      PQP_STOREPASS=$p "$KT" -J-Duser.language=en -J-Duser.country=US -list -rfc -keystore "$f" -storepass:env PQP_STOREPASS 2>/dev/null </dev/null > "$TMP/ks.pem"
+      pem_blocks "$TMP/ks.pem" "$r#rfc" "$(note "$fl" "키스토어(keytool -rfc)")"; rm -f "$TMP/ks.pem"; return; fi
+    add "$r" "인증서(키스토어)" "키스토어(열림: 인증서 항목 없음)" 미확인 확인 "항목 확인: SecretKeyEntry는 대칭키(AES-256인지)" "$(note "$fl" "${al:+항목: $al}")"; return; fi
   add "$r" "인증서(키스토어)" "키스토어(열지 못함: STOREPASS 지정)" 미확인 확인 "STOREPASS로 비밀번호를 주고 다시 스캔(keytool -list -v)" \
-    "$(note "${al:+keytool 목록만: $al}" "$(passhint "$f")" "$( [ -n "$KT" ] || echo "keytool 없음")")"
+    "$(note "$fl" "${al:+keytool 목록만: $al}" "$(passhint "$f")" "$( [ -n "$KT" ] || echo "keytool 없음")")"
 }
 
 # 문자열 속 PEM(.env·JSON·코드의 "-----BEGIN ...\n..."): \n 이스케이프를 풀어 같은 파서에 넣는다
@@ -632,6 +682,8 @@ scan_generic() {
       [ $k -lt $b ] && { b=$k; bu=$u; bt=$TH; bp=$PR; br=$RP; }
     done
     [ -n "$pq" ] && [ $b -lt 5 ] && pq="PQC 이름도 함께 있음(전환·하이브리드 코드일 수 있음)" || pq=""
+    local lt; lt=$(lc "$txt")
+    if [[ $lt =~ $COMPRE ]] && ! [[ $lt =~ $WEAKPQ ]]; then bu=서명; bt=$COMPTH; bp=P2; br=$COMPRP; pq=""; fi   # 복합 서명 줄(X26)
     flag_of "$r" "$txt"
     add "$r:$ln" "$bu" "$tk" "$bt" "$bp" "$br" "$(note "$FL" "일반 패턴: 문맥 확인" "$pq" "$w" "$(snip "$txt")")"
   done
@@ -719,12 +771,15 @@ gen_fixtures() {
   [ -f "$g/locked/locked.p12" ] || { mkdir -p "$g/locked"; pw=$("$O" rand -hex 12); printf '%s\n' "$pw" > "$g/locked/ks.pass"
     printf 'keystore.path=locked.p12\nkeystore.passfile=ks.pass\n' > "$g/locked/app.properties"
     "$O" pkcs12 -export -in "$g/rsa-server.crt" -inkey "$g/rsa2048.key" -name locked -out "$g/locked/locked.p12" -passout "pass:$pw" 2>/dev/null; }
+  # 시험 폴더의 키스토어(주석·시험 표시가 붙어야 한다, 교차 리뷰 X24)
+  [ -f "$g/test/ks.p12" ] || { mkdir -p "$g/test"; "$O" pkcs12 -export -in "$g/rsa-server.crt" -inkey "$g/rsa2048.key" -name t -out "$g/test/ks.p12" -passout pass:changeit 2>/dev/null; }
   # 비밀번호로 열리지만 인증서가 없는 키스토어(대칭키만)
   [ -n "$KT" ] && [ ! -f "$g/secret.jceks" ] && "$KT" -genseckey -alias aes -keyalg AES -keysize 256 -storetype JCEKS -keystore "$g/secret.jceks" \
     -storepass changeit -keypass changeit >/dev/null 2>&1
   return 0
 }
-PASS=0; FAIL=0
+PASS=0; FAIL=0; SKIP=0
+skip() { SKIP=$((SKIP + ${1:-1})); }   # 도구가 없어 못 돈 단언(통과로 세지 않는다). 요약 줄에 전체 단언 수와 함께 찍는다
 ck() { # 위치 알고리즘 위협 우선순위 [비고]: 모두 부분 문자열(알고리즘만 대소문자 무시: 리눅스에서 fixtures 의 /etc/ssh 호스트키를 root 는 'RSA-3072'·'ED25519-256', 일반 사용자는 .pub 로 'ssh-rsa'로 읽는다: 우분투 컨테이너에서 확인)
   if awk -F'\t' -v l="$1" -v a="$2" -v t="$3" -v p="$4" -v n="${5:-}" 'index($2,l)&&(a==""||index(tolower($4),tolower(a)))&&(t==""||index($5,t))&&(p==""||index($6,p))&&(n==""||index($7" "$8,n)){f=1} END{exit !f}' "$ROWS"
   then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "  FAIL: $*"; fi; }
@@ -783,18 +838,18 @@ selftest() {
   # 키·인증서·키스토어(gen/은 selftest가 만든다)
   ck gen/rsa-server.crt:1 RSA-2048 "쇼어로 깨짐" P2 "2035 이후"; ck gen/chain.pem:1 EC-256 "쇼어로 깨짐" P2 "CA:TRUE"; ck gen/chain.pem: RSA-2048 "쇼어로 깨짐" P2
   ck gen/enc.key:1 "암호화된 PKCS#8" "미확인" 확인
-  [ -f "$g/ed25519.key" ] && ck gen/ed25519.key:1 ED25519 "쇼어로 깨짐" P2   # LibreSSL은 Ed25519 genpkey 불가
+  if [ -f "$g/ed25519.key" ]; then ck gen/ed25519.key:1 ED25519 "쇼어로 깨짐" P2; else skip; fi   # LibreSSL은 Ed25519 genpkey 불가
   ck gen/ca-bundle.pem "인증서 12개" "미확인" 참고; none gen/ca-bundle.pem:
   ck gen/rsa-server.der RSA-2048 "쇼어로 깨짐" P2; ck gen/server.p12 RSA-2048 "쇼어로 깨짐" P2
-  [ -n "$SK" ] && { ck gen/id_rsa:1 RSA-2048 "쇼어로 깨짐" P2; ck gen/id_ed25519.pub ED25519 "쇼어로 깨짐" P2; }
-  [ -n "$KT" ] && [ -f "$g/legacy.jks" ] && ck "gen/legacy.jks#" EC "쇼어로 깨짐" P2   # '#legacy'(별칭) 또는 옛 keytool이면 '#rfc:N'
-  [ -f "$g/mldsa65.crt" ] && { ck gen/mldsa65.crt:1 ML-DSA-65 "안전" 참고; ck gen/mlkem768.key:1 ML-KEM-768 "안전" 참고; }
+  if [ -n "$SK" ]; then ck gen/id_rsa:1 RSA-2048 "쇼어로 깨짐" P2; ck gen/id_ed25519.pub ED25519 "쇼어로 깨짐" P2; else skip 2; fi
+  if [ -n "$KT" ] && [ -f "$g/legacy.jks" ]; then ck "gen/legacy.jks#" EC "쇼어로 깨짐" P2; else skip; fi   # '#legacy'(별칭) 또는 옛 keytool이면 '#rfc:N'
+  if [ -f "$g/mldsa65.crt" ]; then ck gen/mldsa65.crt:1 ML-DSA-65 "안전" 참고; ck gen/mlkem768.key:1 ML-KEM-768 "안전" 참고; else skip 2; fi
   # 엔드포인트
   ck 127.0.0.1:$P1 X25519 "쇼어로 깨짐" P1; ck 127.0.0.1:$P1 RSA-2048 "쇼어로 깨짐" P2 "서버 인증서"
-  [ -n "$s2" ] && { ck 127.0.0.1:$P2 X25519MLKEM768 "안전" 참고 "강등 차단"; ck 127.0.0.1:$P2 ML-DSA-65 "안전" 참고; }
+  if [ -n "$s2" ]; then ck 127.0.0.1:$P2 X25519MLKEM768 "안전" 참고 "강등 차단"; ck 127.0.0.1:$P2 ML-DSA-65 "안전" 참고; else skip 2; fi
   # 보강: ①못 여는 키스토어도 행(비밀번호 후보는 이름만) ②TLSv1.2·1.3 오탐 없음 ③PG≤17 설정 불가·'/' 호환 제안 ④짝 인증서 있는 개인키 P2 ⑤업스트림 proxy_ssl_*
   local pw; ck gen/locked/locked.p12 "열지 못함" "미확인" 확인 "gen/locked/ks.pass"; ck gen/locked/locked.p12 "열지 못함" "" "" "app.properties:2 keystore.passfile"
-  [ -n "$KT" ] && ck gen/locked/locked.p12 "" "" "" "locked(PrivateKeyEntry)"
+  if [ -n "$KT" ]; then ck gen/locked/locked.p12 "" "" "" "locked(PrivateKeyEntry)"; else skip; fi
   pw=$(cat "$g/locked/ks.pass" 2>/dev/null); if [ -n "$pw" ] && ! grep -F -q -- "$pw" "$ROWS"; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "  FAIL: gen/locked/ks.pass 값이 CBOM에 있음(또는 픽스처 없음)"; fi
   none node/tls.js:2; ck node/tls.js:3 TLSv1 "고전 취약" P2
   # 코드 속 TLS 그룹: 따옴표 인자는 값으로 판정, 변수 인자는 '확인' 행(교차 리뷰에서 변수 인자 줄이 0행이었다)
@@ -816,8 +871,20 @@ selftest() {
   ck apache/ssl.conf:7 TLSv1.2 "쇼어로 깨짐" P1 "업스트림"; ck apache/ssl.conf:8 TLS_AES_128 "그로버로 약화" P3 "업스트림"
   ck config/tls.properties:3 TLSv1 "해당 없음" 참고 "제외 목록"; nck config/tls.properties:3 "고전 취약"; ck config/tls.properties:4 TLSv1.3 "쇼어로 깨짐" P1 "TLS 1.3 꺼짐"
   ck postgresql-proxy/nginx.conf:1 prime256v1 "쇼어로 깨짐" P1 "X25519MLKEM768/X25519:P-256"; nck postgresql-proxy/nginx.conf:1 "PG"
-  [ -n "$KT" ] && [ -f "$g/secret.jceks" ] && { ck gen/secret.jceks "인증서 항목 없음" "미확인" 확인 "aes(SecretKeyEntry)"; nck gen/secret.jceks "열지 못함"; }
-  echo "selftest: PASS $PASS · FAIL $FAIL (OpenSSL: $("$O" version), ML-KEM $MLKEM, keytool ${KT:-없음})"
+  if [ -n "$KT" ] && [ -f "$g/secret.jceks" ]; then ck gen/secret.jceks "인증서 항목 없음" "미확인" 확인 "aes(SecretKeyEntry)"; nck gen/secret.jceks "열지 못함"; else skip 2; fi
+  # 규칙 묶음 2(교차 리뷰 X18·X20·X22·X24·X25·X26·X33·X59)
+  ck r2/node/sign.js:2 ml-dsa-65 "안전" 참고; ck r2/node/sign.js:3 "crypto.sign" "미확인" 확인; nck r2/node/sign.js:3 "쇼어로 깨짐"
+  ck r2/node/sign.js:4 "Node TLS 상한" "쇼어로 깨짐" P1 "TLS 1.3 꺼짐"; ck r2/node/sign.js:5 "X25519(tweetnacl" "쇼어로 깨짐" P1
+  ck r2/go/cap.go:3 "X25519(Go x/crypto/nacl/box" "쇼어로 깨짐" P1; ck r2/go/cap.go:5 "MaxVersion TLS12" "쇼어로 깨짐" P1 "TLS 1.3 꺼짐"
+  ck r2/python/tls.py:1 "Python TLS 상한" "쇼어로 깨짐" P1; ck r2/python/tls.py:2 "Ed25519(PyNaCl" "쇼어로 깨짐" P2; ck r2/python/tls.py:3 "Python TLS 상한" "쇼어로 깨짐" P1
+  ck r2/java/Composite.java:1 MLDSA65-ECDSA "복합 서명" P2; nck r2/java/Composite.java:1 "안전(PQC)"
+  ck r2/java/Composite.java:2 "Nimbus" "쇼어로 깨짐" ""
+  ck r2/c/rsa.c:1 rsa "쇼어로 깨짐" ""; nck r2/c/rsa.c:1 "주석"
+  ck r2/ssh/.ssh/config:2 ssh-rsa "쇼어로 깨짐" P2
+  ck r2/ssh/known_hosts 25519 "쇼어로 깨짐" P2   # ssh-keygen 이 없어도 공개키 줄의 형식 이름으로 읽는다
+  ck gen/test/ks.p12 RSA "쇼어로 깨짐" "" "테스트·예제"
+  ck r2/scripts/ks.sh:1 RSA "" "" "-storepass ***"; nck r2/scripts/ks.sh:1 "s3cretPW"
+  echo "selftest: PASS $PASS · FAIL $FAIL · SKIP $SKIP of $((PASS + FAIL + SKIP)) (OpenSSL: $("$O" version), ML-KEM $MLKEM, keytool ${KT:-없음}, ssh-keygen ${SK:-없음})"
 }
 
 # ---------- main ----------

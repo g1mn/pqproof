@@ -5,5 +5,7 @@
 # 본 소스 패키지 이름에 example·test 가 들어가도, 파일 이름이 …Test.java 여도 시험이 아니다. tests/it/src/main/… 처럼 표시 앞에
 # 시험 폴더가 있으면 시험이다. examples·samples·spec·fixtures·mock(s) 는 트리 맨 위 폴더일 때만 시험·예제로 본다.
 # 이 경로의 고전 코드 줄은 판정에 넣지 않고 '시험'으로 따로 센다.
-/(test|tests|__tests__|testdata)/|^/(spec|fixtures|mocks?|examples?|samples?)/|_test[.]go$|/test_[^/]*[.]py$|_test[.]py$|/conftest[.]py$|Tests?[.](java|kt)$|[.](test|spec)[.][cm]?[jt]s$|/test[.][cm]?[jt]s$
+# 규칙 묶음 2(교차 리뷰 X24): __mocks__·Gradle integrationTest·testFixtures 폴더, Django tests.py·_tests.py, .test.tsx·.cy.ts·.e2e-spec.ts,
+# Ruby _spec.rb 를 더했다.
+/(test|tests|__tests__|__mocks__|testdata|integrationTest|testFixtures)/|^/(spec|fixtures|mocks?|examples?|samples?)/|_test[.]go$|/test_[^/]*[.]py$|_tests?[.]py$|/tests?[.]py$|/conftest[.]py$|Tests?[.](java|kt)$|[.](test|spec|cy|e2e-spec)[.][cm]?[jt]sx?$|/test[.][cm]?[jt]sx?$|_spec[.]rb$
 /src/main/

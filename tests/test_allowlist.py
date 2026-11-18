@@ -815,7 +815,9 @@ class UnusedEntries(unittest.TestCase):
         verdict = [x for x in lines if x.startswith("VERDICT=")][0]
         # 지운 OldBox.java 의 검증 호출이 빠져 r-review 도 검토 필요다. 0.1.0(증적 형식 2)부터 판정 줄에 그 수가 먼저 붙는다
         self.assertEqual(st(r)["r-review"], "review")
-        self.assertTrue(verdict.startswith("VERDICT=PASS (1 removed verification needs review; 1 allowlist entry unused in the fixed tree)"
+        # 형식 3: 판정 줄에 검토 필요인 a-input(원본 막는 위치가 있던 파일이 사라짐)도 적는다(교차 리뷰 X30)
+        self.assertTrue(verdict.startswith("VERDICT=PASS (1 removed verification needs review; 1 allowlist entry unused in the fixed tree; "
+                                           "needs review: a-input)"
                                            "  receipt_id="), verdict)
         self.assertTrue(all(ok for ok, _ in rc.verify(out)), [w for ok, w in rc.verify(out) if not ok])
         r, code, _, _ = self.run_("deleted-strict", self.fixed, lst, orig=orig, REQUIRE_REVIEW="1")

@@ -31,6 +31,9 @@ def receipt_schema(fv):
     for key, since in R.FORMAT_ONLY.items():
         if fv < since:
             del body["properties"][key]
+    for (outer, key), since in R.FORMAT_ONLY_NESTED.items():
+        if fv < since:
+            del body["properties"][outer]["properties"][key]
     body["required"] = sorted(set(body["required"]) | set(V2_REQUIRED) | {k for k, s in R.FORMAT_ONLY.items() if fv >= s})
     body["properties"]["format_version"] = {"const": fv}
     body["properties"]["note"] = {"const": ABOUT[fv][1]}

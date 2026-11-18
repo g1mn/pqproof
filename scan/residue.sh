@@ -4,7 +4,8 @@
 #   [2] GEN    : 일반 고전 패턴(RSA·EC·곡선·OAEP/PKCS1·고전 서명·JWT RS/ES/PS·EdDSA·X25519 단독·DH/DSA·AES-128·NIST 보안레벨 3 미만 PQC)
 #                폴더 안 모든 텍스트 파일. 앞의 아홉 줄(G-RSA ~ G-DH-DSA)이 prove.sh 가 세는 '공개키 9계열'이다.
 #   [3] LWRITE : 이름 규칙 레거시 파일(Legacy*.java) 안 쓰기 경로(암호화·서명·키 생성·파일 쓰기). 있으면 LEFT.
-#   [4] EXPECT : 코드 줄(시험 경로 밖)의 ML-KEM-768·ML-DSA-65 사용 흔적. 없으면 MISSING.
+#   [4] EXPECT : 코드 줄(시험 경로 밖)의 PQC 사용 흔적(ML-KEM-768·1024, ML-DSA-65·87, KpqC). 자산 칸이 묶음(kem·sig·kpqc-kem·kpqc-sig)이다.
+#                단독 실행 판정은 kem·sig 묶음마다 한 줄 이상. prove.sh 의 c-expect 는 프로필(scan/profiles.json)이 고른 규칙만 센다.
 # 분류: code=코드 줄 LEFT / allow=이름 규칙 허용 / comment=주석·문서 줄 / test=시험 경로의 코드 줄(comment·test 는 따로 센다, LEFT 아님).
 # 이름 규칙 허용(ALLOW, LEFT 로 세지 않음. 상세 줄은 사람이 다시 본다):
 #   - Legacy*.java 파일 안(옛 데이터 읽기·검증 전용으로 떼어 낸 파일)
@@ -82,22 +83,30 @@ skip_out() { # $1=skip_dirs 목록 파일. 표준 입력 줄 중 그 폴더 아�
 IFS= read -r -d '' RES_RULES <<'RULES'
 # KIND@@ID@@자산@@파일(SITE=파일 이름, 나머지 *)@@정규식(ERE)@@설명@@규칙별 허용 정규식(선택)
 GEN@@G-RSA@@-@@*@@(^|[^A-Za-z])[Rr][Ss][Aa]@@RSA 전반(Cipher·KeyFactory·라벨·변수)
-GEN@@G-EC@@-@@*@@(^|[^A-Za-z])EC(DSA|DH|IES|PrivateKey|PublicKey|Point|GenParameterSpec|NamedCurve|ParameterSpec|Curve|[^A-Za-z]|$)@@EC/ECDSA/ECDH 전반
-GEN@@G-CURVE@@-@@*@@secp[0-9]+[rk]1|prime[0-9]+v1|P-?(256|384|521)([^0-9]|$)|brainpool|1\.2\.840\.10045|1\.3\.132\.0@@고전 곡선 이름·OID
+GEN@@G-EC@@-@@*@@(^|[^A-Za-z0-9#])EC(DSA|DH|IES|PrivateKey|PublicKey|Point|GenParameterSpec|NamedCurve|ParameterSpec|Curve|[^A-Za-z0-9:]|$)|(^|[^A-Za-z])ecdsa([^A-Za-z]|$)@@EC/ECDSA/ECDH 전반(EC 단독은 낱말일 때만: EC2·#EC4899·0x00EC·AWS::EC2 는 아님)
+GEN@@G-CURVE@@-@@*@@[Ss][Ee][Cc][Pp][0-9]+[RrKk]1|[Pp][Rr][Ii][Mm][Ee][0-9]+[Vv]1|P-?(256|384|521)([^0-9]|$)|[Bb][Rr][Aa][Ii][Nn][Pp][Oo][Oo][Ll]|1\.2\.840\.10045|1\.3\.132\.0|[Nn][Ii][Ss][Tt][Pp](256|384|521)|Curve\.P_(256|384|521)@@고전 곡선 이름·OID(대소문자 무관, SSH nistp·Nimbus Curve.P_)@@[Mm][Ll][-_]?[Kk][Ee][Mm]
 GEN@@G-OAEP-PKCS1@@-@@*@@OAEP|MGF1|PKCS#?1([^0-9]|$)|PSource@@RSA 패딩
 GEN@@G-CLASSIC-SIG@@-@@*@@with(RSA|ECDSA|DSA|PLAIN-ECDSA)|NONEwith|RSASSA|RSA-?PSS@@고전 서명 알고리즘 이름(SHA256withRSA·SHA256withECDSA 등)
 GEN@@G-JWT-ALG@@-@@*@@(^|[^A-Za-z0-9])(RS|ES|PS)(256|384|512)([^0-9]|$)@@JWT/JOSE 고전 alg(RS256·ES256·PS256)
-GEN@@G-EDDSA@@-@@*@@Ed25519|Ed448|EdDSA|Curve25519@@EdDSA 서명
-GEN@@G-X25519@@-@@*@@X25519|X448|XDH|ECDH|KeyAgreement@@X25519/ECDH 단독(같은 줄 ML-KEM 이면 하이브리드 허용)@@ML-?KEM|MLKEM
-GEN@@G-DH-DSA@@-@@*@@DiffieHellman|"DH"|"DHE"|"DSA"|ElGamal|ECIES@@DH·DSA·ElGamal
+GEN@@G-EDDSA@@-@@*@@Ed25519|Ed448|EdDSA|Curve25519|(^|[^A-Za-z0-9])(ed25519|ed448|eddsa|curve25519|ED25519|ED448)@@EdDSA 서명(소문자 ed25519·ssh-ed25519 포함)
+GEN@@G-X25519@@-@@*@@X25519|X448|XDH|ECDH|KeyAgreement|(^|[^A-Za-z0-9])(x25519|x448|ecdh)@@X25519/ECDH 단독(같은 줄 ML-KEM 이면 하이브리드 허용)@@[Mm][Ll][-_]?[Kk][Ee][Mm]
+GEN@@G-DH-DSA@@-@@*@@[Dd]iffie-?[Hh]ellman|"DH"|"DHE"|"DSA"|'(DH|DHE|DSA|dh|dhe|dsa)'|"(dh|dhe|dsa)"|ssh-dss|ElGamal|ECIES@@DH·DSA·ElGamal(diffie-hellman·ssh-dss·작은따옴표 'dh' 포함)
 GEN@@G-AES128@@-@@*@@AES-?128|AES_128|[Aa]es-?128|\.init\(128\)@@AES-128(보안레벨 1)
 GEN@@G-WEAK-PQC@@-@@*@@[Mm][Ll][-_]?[Kk][Ee][Mm][-_]?512|[Mm][Ll][-_]?[Dd][Ss][Aa][-_]?44|[Kk][Yy][Bb][Ee][Rr][-_]?512|[Dd][Ii][Ll][Ii][Tt][Hh][Ii][Uu][Mm][-_]?2([^0-9]|$)@@보안레벨 3 미만 PQC(대소문자·구분자 무관)
 LWRITE@@LW-legacy-write@@-@@*@@ENCRYPT_MODE|WRAP_MODE|initSign|KeyPairGenerator|generateKeyPair|Files\.(write|writeString|move|copy)@@Legacy*.java 는 읽기·검증 전용이어야 함
-EXPECT@@E-MLKEM768@@-@@*@@ML-KEM-768|MLKEM768|ml_kem_768|ML_KEM_768@@ML-KEM-768 사용
-EXPECT@@E-MLDSA65@@-@@*@@ML-DSA-65|MLDSA65|ml_dsa_65|ML_DSA_65@@ML-DSA-65 사용
+EXPECT@@E-MLKEM768@@kem@@*@@[Mm][Ll][-_]?[Kk][Ee][Mm][-_]?768@@ML-KEM-768 사용(대소문자·구분자 무관)
+EXPECT@@E-MLKEM1024@@kem@@*@@[Mm][Ll][-_]?[Kk][Ee][Mm][-_]?1024@@ML-KEM-1024 사용(보안레벨 5)
+EXPECT@@E-MLDSA65@@sig@@*@@[Mm][Ll][-_]?[Dd][Ss][Aa][-_]?65@@ML-DSA-65 사용(대소문자·구분자 무관)
+EXPECT@@E-MLDSA87@@sig@@*@@[Mm][Ll][-_]?[Dd][Ss][Aa][-_]?87@@ML-DSA-87 사용(보안레벨 5)
+EXPECT@@E-KPQC-KEM@@kpqc-kem@@*@@[Ss][Mm][Aa][Uu][Gg]-?[Tt]|NTRU\+|[Nn][Tt][Rr][Uu]_?[Pp][Ll][Uu][Ss]@@KpqC KEM 사용(SMAUG-T·NTRU+, 국내 표준, NIST 비승인)
+EXPECT@@E-KPQC-SIG@@kpqc-sig@@*@@[Hh][Aa][Ee][Tt][Aa][Ee]|(^|[^A-Za-z])(AIMer|AIMER|aimer)([^a-z]|$)@@KpqC 서명 사용(HAETAE·AIMer, 국내 표준, NIST 비승인)
 RULES
 export RES_RULES RES_ROOT="$ROOT" RES_TESTRE RES_MAINRE
 export RES_ALLOWLINE='[Ll][Ee][Gg][Aa][Cc][Yy]'
+# 복합 서명 이름(ML-DSA 와 고전 서명을 한 키로 묶은 IETF LAMPS·BouncyCastle 이름, 교차 리뷰 X26). 공개키 9계열에서 LEFT 로 세지 않고
+# ALLOW 로 두면 prove.sh 가 '복합 서명'으로 따로 세어 검토 필요로 올린다(pqlite/rules.py COMPOSITE 와 같은 뜻). ML-DSA-44 를 묶은 것은
+# 보안레벨 3 미만이라 허용하지 않고(LEFT), G-WEAK-PQC 도 그대로 센다
+export RES_COMPOSITE='[Mm][Ll][-_]?[Dd][Ss][Aa][-_]?(65|87)[-_](RSA|rsa|ECDSA|ecdsa|Ed25519|ed25519|Ed448|ed448)'
 export RES_WRITEOPS='ENCRYPT_MODE|WRAP_MODE|initSign|KeyPairGenerator|generateKeyPair'
 # 이름 규칙의 쓰기 연산: RES_WRITEOPS 에 Python·Go·Node 의 새 서명·새 암호화·새 키 생성을 보탠다(pqlite/rules.py ALLOW_WRITEOPS 와 같은 뜻의 ERE)
 export RES_ALLOW_WRITEOPS='ENCRYPT_MODE|WRAP_MODE|initSign|KeyPairGenerator|generateKeyPair|\.sign[[:space:]]*\(|(^|[^A-Za-z0-9_])Sign(PKCS1v15|PSS|ASN1)?[[:space:]]*\(|\.encrypt[[:space:]]*\(|(^|[^A-Za-z0-9_])Encrypt(OAEP|PKCS1v15)[[:space:]]*\(|generate_private_key|(^|[^A-Za-z0-9_])GenerateKey[[:space:]]*\(|\.generate[[:space:]]*\(|createSign[[:space:]]*\(|publicEncrypt[[:space:]]*\(|generateKeyPair(Sync)?[[:space:]]*\('
@@ -130,8 +139,10 @@ LC_ALL=C awk -v RES_LIST="$TMPD/files" '
 function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t\r]+$/, "", s); return s }
 function short(s) { s = trim(s); if (length(s) > 150) s = substr(s, 1, 147) "..."; return s }
 function ftype(b) {
-  if (b ~ /\.(java|js|mjs|cjs|ts|kt|kts|go|c|h|cc|cpp|css|scss|gradle|jsonc|rs|swift)$/) return "c"
-  if (b ~ /\.(sh|bash|zsh|ya?ml|properties|py|toml|conf|cfg|ini|env|example|r|rb)$/ || b ~ /^(Dockerfile|Makefile|\.dockerignore|\.gitignore|\.env)/) return "hash"
+  if (b ~ /\.(java|js|mjs|cjs|jsx|ts|tsx|kt|kts|go|c|h|cc|cpp|cxx|hpp|hh|cs|php|scala|groovy|dart|m|mm|css|scss|gradle|jsonc|rs|swift)$/ || b ~ /^Jenkinsfile/) return "c"
+  if (b ~ /\.py$/) return "py"
+  if (b ~ /\.(sh|bash|zsh|ya?ml|toml|conf|r|rb|tf|tfvars|hcl)$/ || b ~ /^(Dockerfile|Makefile|sshd_config|ssh_config|known_hosts|authorized_keys)/) return "hashtail"
+  if (b ~ /\.(properties|cfg|ini|env|example)$/ || b ~ /^(\.dockerignore|\.gitignore|\.env)/) return "hash"
   if (b ~ /\.(xml|html|htm|svg|vue)$/) return "xml"
   if (b ~ /\.sql$/) return "sql"
   if (b ~ /\.(md|txt|adoc|rst)$/) return "doc"
@@ -160,6 +171,26 @@ function splitx(s,   p, code, com, rest) {
   }
   CODE = code; COM = com
 }
+function splith(s,   i, n, c, q, code) {  # 줄 끝 # 주석: 따옴표 밖이고 줄 머리나 공백 뒤일 때만(교차 리뷰 X22)
+  code = ""; q = ""; n = length(s)
+  for (i = 1; i <= n; i++) {
+    c = substr(s, i, 1)
+    if (q != "") { if (c == "\\") { code = code c substr(s, i + 1, 1); i++; continue } if (c == q) q = ""; code = code c; continue }
+    if (c == "\"" || c == "\047") { q = c; code = code c; continue }
+    if (c == "#" && (i == 1 || substr(s, i - 1, 1) ~ /[ \t]/)) { CODE = code; COM = substr(s, i); return }
+    code = code c
+  }
+  CODE = code; COM = ""
+}
+function splitpy(s,   t, d, p) {  # 파이썬: 줄 끝 # 주석, 문장 자리의 세 따옴표 글(독스트링)은 주석으로 본다(교차 리뷰 X22)
+  if (INDOC != "") { p = index(s, INDOC); if (p == 0) { CODE = ""; COM = s; return } INDOC = ""; CODE = ""; COM = s; return }
+  t = trim(s); sub(/^[rRuUbB]/, "", t); d = substr(t, 1, 3)
+  if (d == "\"\"\"" || d == "\047\047\047") {
+    if (index(substr(t, 4), d) == 0) INDOC = d
+    CODE = ""; COM = s; return
+  }
+  splith(s)
+}
 function add(r, t, ln, txt) {
   CNT[r, t]++
   if (CNT[r, t] <= MAXD) DET[r, t] = DET[r, t] "      " t " " REL ":" ln ": " short(txt) "\n"
@@ -168,7 +199,7 @@ function add(r, t, ln, txt) {
 BEGIN {
   while ((getline f < RES_LIST) > 0) ARGV[ARGC++] = f   # 파일 목록은 임시 파일로 받는다(인자 한도, 교차 리뷰 X08)
   close(RES_LIST)
-  ROOT = ENVIRON["RES_ROOT"]; ALLOWLINE = ENVIRON["RES_ALLOWLINE"]; WRITEOPS = ENVIRON["RES_WRITEOPS"]; ALLOWWR = ENVIRON["RES_ALLOW_WRITEOPS"]; TESTRE = ENVIRON["RES_TESTRE"]; MAINRE = ENVIRON["RES_MAINRE"]; MAXD = 100000
+  ROOT = ENVIRON["RES_ROOT"]; ALLOWLINE = ENVIRON["RES_ALLOWLINE"]; COMPOSITE = ENVIRON["RES_COMPOSITE"]; WRITEOPS = ENVIRON["RES_WRITEOPS"]; ALLOWWR = ENVIRON["RES_ALLOW_WRITEOPS"]; TESTRE = ENVIRON["RES_TESTRE"]; MAINRE = ENVIRON["RES_MAINRE"]; MAXD = 100000
   n = split(ENVIRON["RES_RULES"], LN, "\n"); NRULE = 0
   for (i = 1; i <= n; i++) {
     if (LN[i] == "" || substr(LN[i], 1, 1) == "#") continue
@@ -177,7 +208,7 @@ BEGIN {
   }
 }
 FNR == 1 {
-  INBLOCK = 0; REL = FILENAME; if (index(REL, ROOT "/") == 1) REL = substr(REL, length(ROOT) + 2)
+  INBLOCK = 0; INDOC = ""; REL = FILENAME; if (index(REL, ROOT "/") == 1) REL = substr(REL, length(ROOT) + 2)
   BASE = FILENAME; sub(/.*\//, "", BASE); TYP = ftype(BASE)
   TP = "/" REL; if (MAINRE != "" && match(TP, MAINRE)) TP = substr(TP, 1, RSTART); ISTEST = (TP ~ TESTRE)  # 본 소스 표시 앞부분만 본다
   ISLEG = (BASE ~ /^Legacy[A-Za-z0-9_]*\.java$/); SEEN[BASE] = 1; NFILES++
@@ -186,6 +217,8 @@ FNR == 1 {
   s = $0
   if (TYP == "c") splitc(s)
   else if (TYP == "xml") splitx(s)
+  else if (TYP == "py") splitpy(s)
+  else if (TYP == "hashtail") splith(s)
   else if (TYP == "hash") { if (substr(trim(s), 1, 1) == "#") { CODE = ""; COM = s } else { CODE = s; COM = "" } }
   else if (TYP == "sql") { if (substr(trim(s), 1, 2) == "--") { CODE = ""; COM = s } else { CODE = s; COM = "" } }
   else if (TYP == "doc") { CODE = ""; COM = s }
@@ -199,7 +232,8 @@ FNR == 1 {
       if (ISTEST) { add(r, "TEST", FNR, s); continue }
       if (k == "LWRITE") { add(r, "LEFT", FNR, s); continue }
       wr = (CODE ~ WRITEOPS)
-      if ((ISLEG || CODE ~ ALLOWLINE) && CODE !~ ALLOWWR) add(r, "ALLOW", FNR, s)
+      if (COMPOSITE != "" && ID[r] != "G-WEAK-PQC" && ID[r] != "G-AES128" && CODE ~ COMPOSITE) add(r, "ALLOW", FNR, s)   # 복합 서명(X26)
+      else if ((ISLEG || CODE ~ ALLOWLINE) && CODE !~ ALLOWWR) add(r, "ALLOW", FNR, s)
       else if (!wr && ALW[r] != "" && CODE ~ ALW[r]) add(r, "ALLOW", FNR, s)   # 같은 줄 ML-KEM 도 코드에서만(주석 속 이름은 아님, X58)
       else add(r, "LEFT", FNR, s)
     } else if (COM != "" && COM ~ RE[r]) add(r, "COMMENT", FNR, s)
@@ -236,9 +270,10 @@ END {
   print ""
   print "[4] PQC 실사용 흔적(시험 경로 밖 코드 줄)"
   for (r = 1; r <= NRULE; r++) if (KIND[r] == "EXPECT") {
-    P = CNT[r, "P"] + 0; eN++; if (P == 0) eM++
+    P = CNT[r, "P"] + 0; EG[AS[r]] += P
     printf "EXPECT %-16s %-8s n=%d  L%s  - %s\n", ID[r], (P > 0 ? "PRESENT" : "MISSING"), P, (P > 0 ? LOC[r, "P"] : "-"), NOTE[r]
   }
+  eN = 2; eM = (EG["kem"] + 0 == 0) + (EG["sig"] + 0 == 0)   # 단독 실행 판정: kem(ML-KEM-768·1024)과 sig(ML-DSA-65·87) 묶음마다 한 줄 이상
   verdict = (sL == 0 && gL == 0 && lw == 0 && eM == 0) ? "CLEAN" : "RESIDUE"
   print ""
   printf "SUMMARY files=%d sites=%d LEFT=%d ALLOW=%d GONE=%d | gen_rules=%d LEFT=%d (code=%d allow=%d comment=%d test=%d) | legacy_write=%d | pqc_expect MISSING=%d/%d | VERDICT=%s\n", NFILES, sL + sA + sG, sL, sA, sG, gN, gL, gc, ga, gm, gt, lw, eM, eN, verdict

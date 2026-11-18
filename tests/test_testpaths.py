@@ -18,6 +18,7 @@ import unittest
 PROOF = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROOF))
 import prove  # noqa: E402
+from pqlite import rules  # noqa: E402
 from pqlite import scan as scanmod  # noqa: E402
 
 LIST = PROOF / "scan" / "test-paths.ere"
@@ -177,10 +178,10 @@ class EndToEnd(unittest.TestCase):
         self.assertEqual((r["verdict"], code, st(r)["a-cbom"], st(r)["c-classic"]), ("pass", 0, "pass", "pass"),
                          [c for c in r["checks"] if c["status"] not in ("pass", "na")])
         t = r["java"]["fixed"]["tests"]
-        self.assertEqual(t["count"], 3)
+        self.assertEqual(t["count"], 5)  # 규칙 묶음 2: 소문자 ecdsa(crypto/ecdsa, ecdsa.GenerateKey)도 G-EC 로 센다(X19)
         self.assertIn("internal/seal/seal_test.go:12", t["lines"])
         cc = next(c for c in r["checks"] if c["id"] == "c-classic")
-        self.assertIn("시험 경로 코드 3줄(판정에 안 넣고 따로 셈: internal/seal/seal_test.go:11", cc["actual"])
+        self.assertIn("시험 경로 코드 5줄(판정에 안 넣고 따로 셈: internal/seal/seal_test.go:4", cc["actual"])
         self.assertGreaterEqual(r["cbom"]["fixed"]["tests"], 1)  # cbom-scan 의 '테스트·예제' 위치
         self.assertIn("(시험 ", next(c for c in r["checks"] if c["id"] == "a-cbom")["actual"])
         # 증적: 시험 경로 목록 사본과 해시, 도구 목록
@@ -199,7 +200,7 @@ class EndToEnd(unittest.TestCase):
         fx = self.tree("pqc-in-test", {"src/test/java/demo/sealer/NamesTest.java":
                                        'class NamesTest { String k = "ML-KEM-768"; String s = "ML-DSA-65"; }\n'}, base=CLASSIC)
         r, _, _, _ = self.run_("pqc-in-test", CLASSIC, fx)
-        self.assertEqual(r["java"]["fixed"]["expect"], {"E-MLKEM768": 0, "E-MLDSA65": 0})
+        self.assertEqual(r["java"]["fixed"]["expect"], dict.fromkeys(rules.EXPECT_IDS, 0))
         self.assertEqual(st(r)["c-expect"], "fail")
 
     def test_classic_code_under_a_test_looking_folder_is_visible(self):

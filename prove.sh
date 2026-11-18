@@ -31,6 +31,8 @@
 #                          지금 목록과 맞을 때만 센다(확인 뒤 더하거나 고친 항목은 확인 전으로 돌아간다). 실무 검토에서는 1을 권한다
 # 시험·예제 경로는 scan/test-paths.ere 한 곳에 있다(두 스캐너가 같이 쓴다). 그 경로의 고전 줄은 판정에 안 넣고 따로 센다
 #   PROBE_BIN_DIR=<폴더>   tls_probe 바이너리 폴더. 기본 bin/(build-probe.sh가 만든다)
+#   PROFILE=nist-cat3 | cnsa2 | kpqc   알고리즘 프로필(scan/profiles.json). 기본 nist-cat3: c-expect 가 ML-KEM-768·1024, ML-DSA-65·87 을 센다.
+#                          cnsa2 는 ML-KEM-1024·ML-DSA-87 만 세고 b-tls 가 SecP384r1MLKEM1024 를 홀로 제시한다. kpqc 는 국내 KpqC 도 센다
 # 출력 폴더의 deck.json 은 발표 자료·대시보드용 요약이다(receipt.json에서 결정적으로 만든다)
 # 진행: 단계마다 stderr 에 'pqproof: [n/6] ...' 줄과 걸린 시간을 찍는다. 맨 앞 줄은 적용 설정이고, 설정 이름 오타(REQUIRE_REVEIW 등)와
 #   모르는 PQPROOF_ 이름은 경고한다. 설정 설명(영어): guide/configuration.md

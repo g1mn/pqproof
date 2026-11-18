@@ -99,11 +99,12 @@ def control_problem(results):
     return None
 
 
-def target_verdict(hybrid, classical, classic="allow"):
-    """대상 하나의 판정: (통과 여부, 이유 목록). hybrid·classical은 Handshake."""
+def target_verdict(hybrid, classical, classic="allow", group=OFFER_HYBRID):
+    """대상 하나의 판정: (통과 여부, 이유 목록). hybrid·classical은 Handshake. group: 홀로 제시한 하이브리드 그룹(PROFILE 이 정한다,
+    기본 X25519MLKEM768, cnsa2 는 SecP384r1MLKEM1024. 교차 리뷰 X11)."""
     why = []
-    if hybrid.group != OFFER_HYBRID:
-        why.append(f"하이브리드 전용 제시에 {OFFER_HYBRID}가 아님({hybrid.group or hybrid.error})")
+    if hybrid.group != group:
+        why.append(f"하이브리드 전용 제시에 {group}가 아님({hybrid.group or hybrid.error})")
     elif (hybrid.protocol or "").replace(" ", "").replace("v", "") != "TLS1.3":  # "TLS 1.3"(Go), "TLSv1.3"(OpenSSL)
         why.append(f"프로토콜이 TLS 1.3이 아님({hybrid.protocol})")
     if classic == "allow" and classical.kind != "classical":
@@ -267,10 +268,10 @@ def references(runner, cert_runner):
     return results, control_problem(results), {"positive": pos, "negative": neg}
 
 
-def probe_target(runner, target, servername="localhost", ca=None, label="t"):
+def probe_target(runner, target, servername="localhost", ca=None, label="t", hybrid_group=OFFER_HYBRID):
     """대상 하나에 하이브리드 전용·옛 클라이언트 두 번 접속. ca가 없으면 -tofu(처음 받은 사슬의 마지막 인증서를 믿고 다시 검증)."""
     out = {}
-    for name, groups in (("hybrid", OFFER_HYBRID), ("classical", OFFER_CLASSICAL)):
+    for name, groups in (("hybrid", hybrid_group), ("classical", OFFER_CLASSICAL)):
         tofu = None if ca else runner.path(f"{label}-{name}-tofu-ca.pem")
         rc, so, se = runner.run(connect_args(target, groups, ca=ca, tofu=tofu, servername=servername))
         out[name] = (parse(so), so + se, rc)

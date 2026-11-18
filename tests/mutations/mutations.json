@@ -597,7 +597,7 @@
      "c-classic": "fail"
     },
     "contains": {
-     "checks[c-classic].actual": "다시 셈"
+     "checks[c-classic].actual": "gateway_keys.py:5"
     }
    },
    "sarif": {
@@ -820,6 +820,353 @@
    "sarif": {
     "rules": {
      "b-weakening": "error"
+    }
+   }
+  },
+  {
+   "id": "m17-x19-node-ed25519",
+   "title": "X19: a lowercase Node ed25519 key is counted by c-classic too",
+   "title_ko": "X19: Node 소문자 ed25519 키를 c-classic 도 센다",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "web/sign.js",
+     "text_file": "files/node_ed25519.js"
+    }
+   ],
+   "expect": {
+    "exit": 1,
+    "verdict": "fail",
+    "checks": {
+     "a-cbom": "fail",
+     "c-classic": "fail"
+    }
+   },
+   "sarif": {
+    "rules": {
+     "a-cbom": "error",
+     "c-classic": "error"
+    }
+   }
+  },
+  {
+   "id": "m18-x23-ec2-and-color",
+   "title": "X23: AWS::EC2 and a CSS colour #EC4899 are not EC keys",
+   "title_ko": "X23: AWS::EC2 와 CSS 색 #EC4899 는 EC 키가 아님",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "infra/stack.yaml",
+     "text_file": "files/stack.yaml"
+    },
+    {
+     "op": "add",
+     "file": "web/badge.css",
+     "text_file": "files/badge.css"
+    }
+   ],
+   "expect": {
+    "exit": 0,
+    "verdict": "pass",
+    "checks": {
+     "a-cbom": "pass",
+     "c-classic": "pass"
+    }
+   },
+   "sarif": {
+    "absent": [
+     "a-cbom",
+     "c-classic"
+    ]
+   }
+  },
+  {
+   "id": "m19-x24-tsx-test",
+   "title": "X24: an RSA key in a .test.tsx file is test code, counted apart",
+   "title_ko": "X24: .test.tsx 의 RSA 키는 시험 코드로 따로 센다",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "web/src/Sealer.test.tsx",
+     "text_file": "files/Sealer.test.tsx"
+    }
+   ],
+   "expect": {
+    "exit": 0,
+    "verdict": "pass",
+    "checks": {
+     "a-cbom": "pass",
+     "c-classic": "pass"
+    },
+    "min": {
+     "java.fixed.tests.count": 1,
+     "cbom.fixed.tests": 1
+    }
+   },
+   "sarif": {
+    "absent": [
+     "a-cbom",
+     "c-classic"
+    ]
+   }
+  },
+  {
+   "id": "m20-x25-node-sign-null",
+   "title": "X25: crypto.sign(null, ...) with an ML-DSA-65 key is not a classical signature",
+   "title_ko": "X25: ML-DSA-65 키의 crypto.sign(null, ...) 은 고전 서명이 아님",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "web/sign.js",
+     "text_file": "files/node_sign.js"
+    }
+   ],
+   "expect": {
+    "exit": 0,
+    "verdict": "pass",
+    "checks": {
+     "a-cbom": "pass",
+     "c-classic": "pass"
+    }
+   },
+   "sarif": {
+    "absent": [
+     "a-cbom"
+    ]
+   }
+  },
+  {
+   "id": "m21-x26-composite-signature",
+   "title": "X26: a composite ML-DSA-65 + ECDSA signature needs review in both checks",
+   "title_ko": "X26: 복합 서명 ML-DSA-65+ECDSA 는 두 검사 모두 검토 필요",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "src/main/java/demo/sealer/Composite.java",
+     "text_file": "files/Composite.java"
+    }
+   ],
+   "expect": {
+    "exit": 0,
+    "verdict": "pass",
+    "checks": {
+     "a-cbom": "review",
+     "c-classic": "review"
+    },
+    "contains": {
+     "allowlist.composite": "src/main/java/demo/sealer/Composite.java:7"
+    }
+   },
+   "sarif": {
+    "rules": {
+     "a-cbom": "warning",
+     "c-classic": "warning"
+    }
+   }
+  },
+  {
+   "id": "m22-x18-tls13-capped",
+   "title": "X18: MaxVersion TLS 1.2 in Go code turns off X25519MLKEM768",
+   "title_ko": "X18: Go 코드의 MaxVersion TLS 1.2 는 X25519MLKEM768 을 끈다",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "edge/tls.go",
+     "text_file": "files/tls_cap.go"
+    }
+   ],
+   "expect": {
+    "exit": 1,
+    "verdict": "fail",
+    "checks": {
+     "b-weakening": "fail",
+     "a-cbom": "fail"
+    }
+   },
+   "sarif": {
+    "rules": {
+     "b-weakening": "error",
+     "a-cbom": "error"
+    }
+   }
+  },
+  {
+   "id": "m23-x20-pynacl-box",
+   "title": "X20: PyNaCl Box (X25519) is a classical key exchange",
+   "title_ko": "X20: PyNaCl Box(X25519)는 고전 키 교환",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "tools/box.py",
+     "text_file": "files/nacl_box.py"
+    }
+   ],
+   "expect": {
+    "exit": 1,
+    "verdict": "fail",
+    "checks": {
+     "a-cbom": "fail"
+    }
+   },
+   "sarif": {
+    "rules": {
+     "a-cbom": "error"
+    }
+   }
+  },
+  {
+   "id": "m24-x22-python-docstring",
+   "title": "X22: RSA named in a Python docstring or a trailing comment is not code",
+   "title_ko": "X22: 파이썬 독스트링·꼬리 주석의 RSA 는 코드가 아님",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "tools/notes.py",
+     "text_file": "files/notes_doc.py"
+    }
+   ],
+   "expect": {
+    "exit": 0,
+    "verdict": "pass",
+    "checks": {
+     "a-cbom": "pass",
+     "c-classic": "pass"
+    }
+   },
+   "sarif": {
+    "absent": [
+     "a-cbom",
+     "c-classic"
+    ]
+   }
+  },
+  {
+   "id": "m25-x11-level5",
+   "title": "X11: a migration to ML-KEM-1024 and ML-DSA-87 passes c-expect",
+   "title_ko": "X11: ML-KEM-1024·ML-DSA-87 전환은 c-expect 통과",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "replace",
+     "file": "src/main/java/demo/sealer/Sealer.java",
+     "find": "\"ML-KEM-768\"",
+     "replace": "\"ML-KEM-1024\""
+    },
+    {
+     "op": "replace",
+     "file": "src/main/java/demo/sealer/Sealer.java",
+     "find": "\"ML-DSA-65\"",
+     "replace": "\"ML-DSA-87\""
+    },
+    {
+     "op": "replace",
+     "file": "tools/sign_manifest.py",
+     "find": "MLDSA65PrivateKey",
+     "replace": "MLDSA87PrivateKey"
+    },
+    {
+     "op": "replace",
+     "file": "tools/sign_manifest.py",
+     "find": "MLKEM768PrivateKey",
+     "replace": "MLKEM1024PrivateKey"
+    }
+   ],
+   "expect": {
+    "exit": 0,
+    "verdict": "pass",
+    "checks": {
+     "c-expect": "pass",
+     "c-classic": "pass"
+    },
+    "min": {
+     "java.fixed.expect.E-MLKEM1024": 1,
+     "java.fixed.expect.E-MLDSA87": 1
+    }
+   },
+   "sarif": {
+    "absent": [
+     "c-expect"
+    ]
+   }
+  },
+  {
+   "id": "m25b-x11-cnsa2-profile",
+   "title": "X11: PROFILE=cnsa2 does not count ML-KEM-768 and ML-DSA-65",
+   "title_ko": "X11: PROFILE=cnsa2 는 ML-KEM-768·ML-DSA-65 를 세지 않음",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [],
+   "env": {
+    "PROFILE": "cnsa2"
+   },
+   "expect": {
+    "exit": 1,
+    "verdict": "fail",
+    "checks": {
+     "c-expect": "fail",
+     "c-classic": "pass"
+    }
+   },
+   "sarif": {
+    "absent": [
+     "a-cbom",
+     "c-classic"
+    ]
+   }
+  },
+  {
+   "id": "m26-x59-known-hosts",
+   "title": "X59: a classical host key pinned in known_hosts is a signature key to migrate",
+   "title_ko": "X59: known_hosts 에 고정한 고전 호스트 키는 바꿀 서명 키",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "deploy/known_hosts",
+     "text_file": "files/known_hosts"
+    }
+   ],
+   "expect": {
+    "exit": 1,
+    "verdict": "fail",
+    "checks": {
+     "a-cbom": "fail",
+     "c-classic": "fail"
+    }
+   },
+   "sarif": {
+    "rules": {
+     "a-cbom": "error",
+     "c-classic": "error"
     }
    }
   }

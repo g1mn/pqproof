@@ -5,6 +5,7 @@
 # tests/test_rule_sync.py 가 실패한다(여기로 옮긴다).
 # 판정식 derive_verdict(실패 > 미판정 > 통과)는 증적 형식의 정의라 pqlite/receipt.py 에 둔다(--verify 가 같은 식으로 맞춰 본다).
 """Verdict rules of PQ-Proof: classical families, allow rules, hybrid window, residue reading and the checks."""
+import json
 import os
 import posixpath
 import re
@@ -17,7 +18,27 @@ from .receipt import STATUS_KO
 
 # 공개키 9계열(residue.sh GEN 규칙 앞의 아홉 줄, c-classic 이 센다)과 EXPECT 규칙 이름
 FAMILIES = ["G-RSA", "G-EC", "G-CURVE", "G-OAEP-PKCS1", "G-CLASSIC-SIG", "G-JWT-ALG", "G-EDDSA", "G-X25519", "G-DH-DSA"]
-EXPECT_IDS = {"kem": "E-MLKEM768", "sig": "E-MLDSA65"}
+EXPECT_IDS = ("E-MLKEM768", "E-MLKEM1024", "E-MLDSA65", "E-MLDSA87", "E-KPQC-KEM", "E-KPQC-SIG")  # residue.sh EXPECT 규칙
+# 알고리즘 프로필(교차 리뷰 X11·X28): c-expect 가 EXPECT=kem·sig 마다 세는 EXPECT 규칙, b-tls 가 홀로 제시하는 하이브리드 그룹,
+# EXPECT=cert 가 받는 인증서 키. scan/profiles.json 한 곳에 두고 규칙 묶음 해시에 든다. PROFILE=<이름>, 기본 nist-cat3
+PROFILES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scan", "profiles.json")
+
+
+def load_profiles(path=PROFILES_FILE):
+    """scan/profiles.json → (기본 이름, {이름: {title, kem, sig, tls_group, cert_keys}})."""
+    with open(path, encoding="utf-8") as f:
+        doc = json.load(f)
+    profiles = doc["profiles"]
+    for name, p in profiles.items():
+        bad = [x for x in p["kem"] + p["sig"] if x not in EXPECT_IDS]
+        if bad or not p["kem"] or not p["sig"] or not p.get("tls_group") or not p.get("cert_keys"):
+            raise ValueError(f"scan/profiles.json: profile {name} is incomplete or names unknown EXPECT rules {bad}")
+    if doc["default"] not in profiles:
+        raise ValueError("scan/profiles.json: the default profile is not listed")
+    return doc["default"], profiles
+
+
+DEFAULT_PROFILE, PROFILES = load_profiles()
 # SCOPE=kex 에서 범위 안으로 보는 행
 KEX_USE = re.compile(r"키교환|TLS 설정|TLS 엔드포인트")  # cbom-scan 용도 칸('서명·키교환'처럼 섞인 것도 범위 안으로 본다)
 KEX_KINDS = {"key-exchange", "toolchain", "base-image"}  # scan.py kind
@@ -143,11 +164,32 @@ def in_scope(scope, tool, use):
     return bool(KEX_USE.search(use or "")) if tool == "cbom-scan" else use in KEX_KINDS
 
 
+# 파이썬 문장 자리의 세 따옴표 글(독스트링). 코드 보기에서 지운다(교차 리뷰 X22)
+DOCSTRING = re.compile(r"(?m)^([ \t]*)[rRuUbB]?(\"\"\"|\'\'\')[\s\S]*?(?:\2|\Z)")
+CODE_KINDS = (verify.GO, verify.JS, verify.PY, verify.JAVA)  # 언어별 주석 판정을 하는 파일(verify.kind_of)
+PQC_TOKEN = re.compile(r"(?i)ml-?kem|ml-?dsa|kyber|dilithium|slh-?dsa|sphincs|falcon")
+
+
 class Lines:
     """트리 파일의 줄(허용 규칙용). 파일마다 한 번만 읽는다."""
 
     def __init__(self, root):
-        self.root, self.cache = root, {}
+        self.root, self.cache, self.views = root, {}, {}
+
+    def code(self, path, line):
+        """그 줄의 코드 부분: 언어 토크나이저(pqlite/verify.py)로 주석을 지우고 파이썬 독스트링도 지운 글. Go·JS·TS·Python·Java·Kotlin
+        파일만, 아니면 None(그 밖 언어는 cbom-scan.sh 의 줄머리 주석 표시를 믿는다)."""
+        if path not in self.views:
+            text, kind = read_text(self.root, path), verify.kind_of(path)
+            if text is None or kind not in CODE_KINDS:
+                self.views[path] = None
+            else:
+                v = verify.views(text, kind, keep_positions=True)[0]
+                if kind == verify.PY:
+                    v = DOCSTRING.sub(lambda m: m[1] + re.sub(r"[^\n]", " ", m[0][len(m[1]):]), v)
+                self.views[path] = v.split("\n")
+        v = self.views[path]
+        return v[line - 1] if v is not None and line and 1 <= line <= len(v) else None
 
     def all(self, path):
         if path not in self.cache:
@@ -171,10 +213,29 @@ def code_part(text):
 
 
 LEGACY_REASONS = ("Legacy*.java(옛 데이터 읽기·검증 전용)", "같은 줄 legacy(옛 데이터 읽기·검증)")
+# 복합 서명(ML-DSA 와 고전 서명을 한 키로 묶은 IETF LAMPS·BouncyCastle 이름, 교차 리뷰 X26). 두 스캐너가 같은 이름표(scan.COMPOSITE_NAME,
+# residue.sh RES_COMPOSITE, cbom-scan.sh COMPRE)로 읽고, 막지도 허용하지도 않고 '검토 필요'로 따로 센다. ML-DSA-44 를 묶은 것은 막는다
+COMPOSITE = scanmod.COMPOSITE_NAME
+COMPOSITE_REASON = "복합 서명(ML-DSA+고전 서명, 허용 여부는 사람이 확인)"
+CBOM_COMPOSITE = "복합 서명(PQC+고전)"  # cbom-scan.sh verdict() 가 다는 위협
 # cbom-scan.sh flag_of 가 비고 맨 앞에 붙이는 표시(note() 가 ' · ' 로 잇는다). 원본 줄 발췌나 뒤 문장의 낱말은 표시가 아니다(교차 리뷰 X06)
 CBOM_FLAGS = ("주석", "테스트·예제")
 # cbom-scan.sh verdict() 가 NIST 보안레벨 3 미만 PQC(ML-KEM-512·ML-DSA-44·Kyber512·Dilithium2)에 다는 위협(교차 리뷰 X07). 허용하지 않는다
 CBOM_WEAK_PQC = "보안레벨 3 미만(PQC)"
+
+
+def in_comment(lines, path, line, alg, note):
+    """cbom-scan 행이 주석·독스트링 안인가(교차 리뷰 X22). 언어 토크나이저로 본 코드 부분이 비었거나, '일반 패턴' 행의 고전 이름이
+    코드 부분에 하나도 없으면(줄 끝 주석에만 있다) 주석이다. 언어를 모르는 파일은 아니라고 본다."""
+    cv = lines.code(path, line) if line else None
+    if cv is None:
+        return False
+    if not re.search(r"\w", cv):
+        return True
+    if "일반 패턴" not in (note or ""):
+        return False
+    toks = [x.strip().lower() for x in (alg or "").split(",") if x.strip() and not PQC_TOKEN.search(x)]
+    return bool(toks) and not any(x in cv.lower() for x in toks)
 
 
 def cbom_flags(note):
@@ -198,6 +259,9 @@ def allow_reason(path, text, alg, lines=None, line=None):
     암호화가 있으면 안 되고(ALLOW_WRITEOPS, 모든 언어), lines·line 을 주면 아래 3줄도 본다(write_near, 허용 목록과 같은 창)."""
     if text is None:
         return None
+    c = COMPOSITE.search(code_part(text))
+    if c and c[1] != "44":
+        return COMPOSITE_REASON
     if name_rule(path, text) and not ALLOW_WRITEOPS.search(code_part(text)) \
             and not (lines is not None and line and write_near(lines, path, line, text)):
         return LEGACY_REASONS[0] if LEGACY_FILE.search(path) else LEGACY_REASONS[1]
@@ -366,8 +430,11 @@ def merge_cbom(cbom_rows, scan_rows, lines, terminator, scope="all", allow=None)
         path, line = split_loc(loc)
         threat, note, alg = r.get("양자 위협", ""), r.get("근거·비고", ""), r.get("알고리즘·키 길이", "")
         reason = None
-        if threat in ("쇼어로 깨짐", CBOM_WEAK_PQC):
-            if cbom_flags(note):
+        comment = threat in ("쇼어로 깨짐", CBOM_WEAK_PQC, CBOM_COMPOSITE) and (cbom_flags(note) or in_comment(lines, path, line, alg, note))
+        if threat == CBOM_COMPOSITE:  # 복합 서명: 막지 않고 검토 필요(교차 리뷰 X26)
+            status, reason = ("comment", None) if comment else ("review", COMPOSITE_REASON)
+        elif threat in ("쇼어로 깨짐", CBOM_WEAK_PQC):
+            if comment:
                 status = "comment"
             elif threat == CBOM_WEAK_PQC:  # 보안레벨 3 미만 PQC 는 허용 규칙을 쓰지 않는다
                 status = "block"
@@ -391,6 +458,8 @@ def merge_cbom(cbom_rows, scan_rows, lines, terminator, scope="all", allow=None)
             status = "allow" if reason else "block"
         elif r.threat == scanmod.WEAK_PQC:
             status = "block"
+        elif r.threat == scanmod.COMPOSITE:
+            status, reason = "review", COMPOSITE_REASON
         elif r.threat == scanmod.UNKNOWN:
             status = "check"
         else:
@@ -451,7 +520,7 @@ def merge_cbom(cbom_rows, scan_rows, lines, terminator, scope="all", allow=None)
     # cbom-scan이 변수라 '미확인'으로 둔 자리에 scan.py가 대입 추적으로 읽은 이름이 있으면 사유 칸에 적는다(판정은 그대로 '확인')
     traced = {}
     for r in scan_rows:
-        if r.threat in (scanmod.PQC, scanmod.WEAK_PQC, scanmod.SHOR) and ("(상수)" in r.detail or "(변수 추적)" in r.detail):
+        if r.threat in (scanmod.PQC, scanmod.WEAK_PQC, scanmod.SHOR, scanmod.COMPOSITE) and ("(상수)" in r.detail or "(변수 추적)" in r.detail):
             traced.setdefault(f"{r.path}:{r.line}", []).append(r.algorithm)
     for it in items:
         if it["tool"] == "cbom-scan" and it["status"] == "check" and not it["reason"] and it["loc"] in traced:
@@ -515,7 +584,7 @@ def reclass_residue(parsed, lines, allow):
     if not parsed:
         return None
     by = {"allowed": {}, "hybrid": {}, "review": {}}
-    rows, left, named = [], [], []
+    rows, left, named, composite = [], [], [], []
     relisted = 0
     sites = [r for r in parsed["rules"].values() if r["kind"] == "SITE"]
     sites_left = 0 if sites else None
@@ -534,6 +603,8 @@ def reclass_residue(parsed, lines, allow):
                 if why is not None:
                     if why in LEGACY_REASONS and (allow is None or allow.match(ln["path"], ln["line"]) is None):
                         named.append(loc)
+                    elif why == COMPOSITE_REASON:  # 복합 서명: 줄 수에는 안 넣고 검토 필요로 따로 센다(X26)
+                        composite.append(loc)
                     continue
                 again += 1
             kind, entry, via = None, None, "line"
@@ -563,7 +634,8 @@ def reclass_residue(parsed, lines, allow):
             sites_left += 1
     tot = {k: sum(v.values()) for k, v in by.items()}
     return {"allowed": tot["allowed"], "hybrid": tot["hybrid"], "review": tot["review"], "relisted": relisted, "by_family": by,
-            "sites_left": sites_left, "lines": rows[:400], "left": left[:60], "name_rule": sorted(set(named), key=al._loc_key)[:400]}
+            "sites_left": sites_left, "lines": rows[:400], "left": left[:60], "name_rule": sorted(set(named), key=al._loc_key)[:400],
+            "composite": sorted(set(composite), key=al._loc_key)[:400]}
 
 
 def java_left(j):
@@ -601,6 +673,25 @@ def link_text(x):
     return (f"링크 {x['path']} -> {x['target'][:200]}" + (f" · {x['why']}" if x["why"] else "")
             + (" · zip 에서 풀지 않음" if x.get("zip") else ""))
 
+def expect_count(jf, ids):
+    """프로필이 고른 EXPECT 규칙 줄 수의 합과 보이는 글('E-MLKEM768 3 + E-MLKEM1024 0 = 3'). residue 출력에 그 규칙이 하나도
+    없으면(옛 RESIDUE 판) 합은 None."""
+    got = [(i, (jf or {}).get("expect", {}).get(i)) for i in ids]
+    known = [v for _, v in got if v is not None]
+    n = sum(known) if known else None
+    shown = " + ".join(f"{i} {v}" for i, v in got)
+    return n, shown + (f" = {n}" if len(got) > 1 else "")
+
+
+def review_kinds(items):
+    """CBOM 검토 필요 위치를 까닭별로: 허용 목록의 쓰기 경로, 복합 서명."""
+    rev = [it for it in items if it["status"] == "review"]
+    comp = sorted({it["loc"] for it in rev if it["reason"] == COMPOSITE_REASON})
+    wr = sorted({it["loc"] for it in rev if it["reason"] != COMPOSITE_REASON})
+    return " · ".join(x for x in (("허용 목록의 쓰기 경로: " + ", ".join(wr[:4]) if wr else ""),
+                                  (f"복합 서명 {len(comp)}곳: " + ", ".join(comp[:4]) if comp else "")) if x)
+
+
 # ---------------------------------------------------------------------------------------------
 # 검사 판정식: 단계마다 모은 결과로 검사 여덟 줄과 판정을 낸다. prove.run 이 부른다.
 def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o, sig_f, tls, problem, deny, changed, review,
@@ -615,6 +706,7 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
         checks.append({"id": cid, "title": title, "status": status, "expected": expected, "actual": actual})
 
     cf, co = cbom["fixed"], cbom["orig"]
+    prof = PROFILES[getattr(params, "profile", DEFAULT_PROFILE)]
     # review(검토 필요): 막는 위치는 0인데 허용 목록에 쓰기 경로 줄이 있다(허용 규칙). 판정은 바꾸지 않고 줄·사유를 남긴다
     a_status = "fail" if cf["blocking"] else ("undecided" if not cf["cbom_scan_ok"] else ("review" if cf["review"] else "pass"))
     kex = params.scope == "kex"
@@ -673,8 +765,7 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
           + (": " + ", ".join(block_locs[:6]) + (" 외" if len(block_locs) > 6 else "") if block_locs else "")
           + f" · 허용 {cf['allowed']} · 주석·테스트 {cf['comment_or_test']}" + (f"(시험 {cf['tests']})" if cf.get("tests") else "")
           + f" · 확인 {cf['check']}"
-          + (f" · 검토 필요 {cf['review']}(허용 목록의 쓰기 경로: "
-             + ", ".join(sorted({it['loc'] for it in cbom_items['fixed'] if it['status'] == 'review'})[:4]) + ")" if cf["review"] else "")
+          + (f" · 검토 필요 {cf['review']}(" + review_kinds(cbom_items["fixed"]) + ")" if cf["review"] else "")
           + (f" · 범위 밖 {cf['out_of_scope']}" if kex else "") + ("" if cf["cbom_scan_ok"] else " · cbom-scan 실패"))
     check("b-weakening", "TLS 약화 수정 없음", "fail" if deny else "pass", "deny 0",
           f"deny {len(deny)}" + (": " + "; ".join(deny[:3]) if deny else "") + f" · 본 파일 {len(changed)}")
@@ -710,7 +801,7 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
             if any(t.get("openssl_note") for t in t_results):
                 act += " · OpenSSL 교차 확인 불가(3.5 미만이거나 컨테이너 모드, tls_probe 결과만)"
         check("b-tls", "TLS 하이브리드 협상·옛 클라이언트", st,
-              f"대조 성립, 하이브리드 전용 제시 → X25519MLKEM768(TLS 1.3), 옛 클라이언트 {'접속' if params.classic == 'allow' else '거부'}",
+              f"대조 성립, 하이브리드 전용 제시 → {prof['tls_group']}(TLS 1.3), 옛 클라이언트 {'접속' if params.classic == 'allow' else '거부'}",
               act)
     jf = java_rec["fixed"]
     if kex:
@@ -729,8 +820,9 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
         orig_left = sum(v["code"] for v in java_rec["orig"]["families"].values()) if java_rec["orig"] else None
         ok = left == 0 and jf["weak_pqc"] == 0 and jf["legacy_write"] == 0 and not sites
         moved = lst.get("allowed", 0) + lst.get("hybrid", 0) + lst.get("review", 0)
+        comp = lst.get("composite") or []
         check("c-classic", "고전 공개키 9계열 code 0, 보안레벨 3 미만 PQC 0, 레거시 쓰기 0",
-              ("review" if lst.get("review") else "pass") if ok else "fail",
+              ("review" if lst.get("review") or comp else "pass") if ok else "fail",
               "모두 0(허용 목록·하이브리드 결합 줄은 사유와 함께 뺀다)",
               f"공개키 code {left}(원본 {orig_left}) · 보안레벨 3 미만 {jf['weak_pqc']} · 레거시 쓰기 {jf['legacy_write']}"
               + (f" · SITE LEFT {sites}" if sites is not None else "")
@@ -738,6 +830,8 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
                  f"·검토 필요 {lst.get('review', 0)}줄 뺌" if moved else "")
               + (f" · residue 가 허용했지만 이름 규칙·같은 줄 ML-KEM 에 안 맞는 {lst['relisted']}줄(주석에만 legacy·ML-KEM, 쓰기 경로)을 다시 셈"
                  if lst.get("relisted") else "")
+              + (f" · 복합 서명 {len(comp)}줄 검토 필요(줄 수에는 안 넣음): " + ", ".join(comp[:4]) + (" 외" if len(comp) > 4 else "")
+                 if comp else "")
               + (": 남은 LEFT " + ", ".join(lst.get("left", [])[:6]) + (" 외" if left > 6 else "") if left and lst.get("left") else "")
               + (f" · 시험 경로 코드 {jf['tests']['count']}줄(판정에 안 넣고 따로 셈: "
                  + ", ".join(jf["tests"]["lines"][:3]) + (" 외" if jf["tests"]["count"] > 3 else "") + ")"
@@ -747,9 +841,9 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
     else:
         parts, st = [], "pass"
         for e in params.expect:
-            if e in EXPECT_IDS:
-                n = jf["expect"].get(EXPECT_IDS[e]) if jf else None
-                parts.append(f"{EXPECT_IDS[e]} {n}")
+            if e in ("kem", "sig"):
+                n, shown = expect_count(jf, prof[e])
+                parts.append(shown)
                 if n is None:
                     st = "undecided" if st == "pass" else st
                 elif n < 1:
@@ -761,8 +855,8 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
                     st = "fail"
                 elif b in ("undecided", "review") and st == "pass":  # review = 클라이언트 TLS만, 잰 것이 없다
                     st = "undecided"
-        check("c-expect", "EXPECT PQC 사용", st, "EXPECT=" + ",".join(params.expect) + " 마다 1줄 이상(tls·cert는 b-tls 통과)",
-              " · ".join(parts))
+        check("c-expect", "EXPECT PQC 사용", st, "EXPECT=" + ",".join(params.expect) + " 마다 1줄 이상(tls·cert는 b-tls 통과)"
+              + f", 프로필 {getattr(params, 'profile', DEFAULT_PROFILE)}", " · ".join(parts))
     check("r-review", "검증 생략 흔적(검토 등급, 실패 아님)", "review" if review else "pass", "0 또는 줄마다 사유",
           f"{len(review)}건" + (": " + "; ".join(f"{x['path']} {x['rule']}" for x in review[:3]) if review else ""))
     # r-allow: 허용 목록이 판정에서 뺀 줄을 사람이 확인했다는 기록(reviewed_by·reviewed_at)이 있는가. 도구는 사유가 맞는지

@@ -45,7 +45,31 @@ class ResidueAndProve(unittest.TestCase):
         self.assertEqual(ids("GEN")[:9], rules.FAMILIES)
 
     def test_expect_rule_ids(self):
-        self.assertEqual(set(ids("EXPECT")), set(rules.EXPECT_IDS.values()))
+        self.assertEqual(ids("EXPECT"), list(rules.EXPECT_IDS))
+        # 프로필(scan/profiles.json)이 고르는 규칙은 모두 residue.sh 에 있고, kem·sig 묶음(자산 칸)이 맞다
+        group = {r["id"]: r for r in rulesrc.residue_rules() if r["kind"] == "EXPECT"}
+        for name, prof in rules.PROFILES.items():
+            for kind in ("kem", "sig"):
+                for rid in prof[kind]:
+                    with self.subTest(profile=name, rule=rid):
+                        self.assertIn(rid, group)
+        self.assertEqual(rules.DEFAULT_PROFILE, "nist-cat3")
+        self.assertEqual(rules.PROFILES["nist-cat3"]["tls_group"], "X25519MLKEM768")
+
+    def test_composite_names(self):
+        # 복합 서명 이름표: residue.sh RES_COMPOSITE(ML-DSA-65·87 만), pqlite/scan.py COMPOSITE_NAME, cbom-scan.sh COMPRE 가 같은 이름을 잡는다
+        ere = rulesrc.residue_export("RES_COMPOSITE")
+        text = (PROOF / "scan" / "cbom-scan.sh").read_text(encoding="utf-8")
+        cbom = re.search(r"^COMPRE='([^']+)'$", text, re.M)[1]
+        rows = ["MLDSA65-ECDSA-P256-SHA512", "id-MLDSA87-RSA4096-PSS-SHA512", "ML-DSA-65-Ed25519-SHA512", "mldsa65_ed448",
+                "MLDSA65", "ML-DSA-65", "MLDSA65withECDSA", "RSA-MLDSA65"]
+        for row in rows:
+            with self.subTest(name=row):
+                want = bool(scanmod.COMPOSITE_NAME.search(row))
+                self.assertEqual(bool(re.search(ere, row)), want)
+                self.assertEqual(bool(re.search(cbom, row.lower())), want)
+        self.assertTrue(scanmod.COMPOSITE_NAME.search("MLDSA44-RSA2048-PSS-SHA256"))  # 44 는 scan.py 가 잡아 보안레벨 3 미만으로 막는다
+        self.assertFalse(re.search(ere, "MLDSA44-RSA2048-PSS-SHA256"))  # residue 는 44 를 허용하지 않는다
 
     def test_weak_pqc_rule_is_the_one_prove_counts(self):
         self.assertIn("G-WEAK-PQC", ids("GEN"))
@@ -83,12 +107,16 @@ class ResidueAndProve(unittest.TestCase):
         self.assertTrue(awk and awk.startswith("^"))
         self.assertEqual(rules.LEGACY_FILE.pattern, "(?:^|/)" + awk[1:])
 
-    def test_same_line_ml_kem_forms_differ_as_recorded(self):
-        # 같은 줄 ML-KEM 인정 꼴이 두 곳에서 다르다: residue.sh 는 대소문자를 가리고 밑줄을 안 받는다(ml_kem_768 X25519 는 LEFT),
-        # prove.py 는 둘 다 받는다. 지금 값을 적어 두어 한쪽만 바뀌면 여기서 알린다(바꿀 때는 판정 영향을 따진다)
+    def test_same_line_ml_kem_forms_agree(self):
+        # 같은 줄 ML-KEM 인정 꼴: 규칙 묶음 2부터 residue.sh(G-X25519·G-CURVE)와 pqlite/rules.py 가 같다(대소문자·밑줄 무관).
+        # 0.1.1 의 residue.sh 는 대소문자를 가리고 밑줄을 안 받아 ml_kem_768 X25519 줄이 LEFT 였다
         allow = {r["id"]: r["allow"] for r in rulesrc.residue_rules()}
-        self.assertEqual(allow["G-X25519"], "ML-?KEM|MLKEM")
+        self.assertEqual(allow["G-X25519"], allow["G-CURVE"])
         self.assertEqual((rules.HYBRID_LINE.pattern, bool(rules.HYBRID_LINE.flags & re.I)), ("ML[-_]?KEM", True))
+        for row in ("X25519MLKEM768", "x25519mlkem768", "X25519_ml_kem_768", "ML-KEM-768", "SecP256r1MLKEM768", "MLKEM", "ML KEM",
+                    "MLK EM"):
+            with self.subTest(row=row):
+                self.assertEqual(bool(re.search(allow["G-X25519"], row)), bool(rules.HYBRID_LINE.search(row)))
 
 
 class RulesInOnePlace(unittest.TestCase):

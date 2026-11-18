@@ -215,6 +215,7 @@ def strip_comments(text, kind):
 GO_VERSIONS = {"VersionSSL30": 0x0300, "VersionTLS10": 0x0301, "VersionTLS11": 0x0302, "VersionTLS12": 0x0303,
                "VersionTLS13": 0x0304}
 TLS12 = 0x0303
+TLS13 = 0x0304  # X25519MLKEM768 은 TLS 1.3 에서만 협상된다: 상한을 1.3 아래로 두면 하이브리드 키 교환이 막힌다(교차 리뷰 X18)
 # GODEBUG settings that bring back what newer Go turned off: TLS 1.0/1.1 servers, RSA key exchange,
 # 3DES, the unsafe EKM, SHA-1 signatures in TLS 1.2 and in certificates.
 LEGACY_GODEBUG = r"\b(?:tls10server|tlsrsakex|tls3des|tlsunsafeekm|tlssha1|x509sha1)\s*=\s*1\b"
@@ -233,6 +234,7 @@ UPSTREAM = ("proxy_", "grpc_", "uwsgi_")
 OLD_PROTOCOLS = {"sslv2", "sslv3", "tlsv1", "tlsv1.1"}
 GO_SET = r"\s*(?::=|[:=](?!=))\s*"  # an assignment or a struct field, not ==
 GO_VERSION_VALUE = re.compile(rf"\b(?:Min|Max)Version{GO_SET}([^,;\n}}]+)")
+GO_MAX_VALUE = re.compile(rf"\bMaxVersion{GO_SET}([^,;\n}}]+)")
 GO_SUITE_LIST = re.compile(r"\[\]uint16\s*\{([^}]*)\}")
 GO_SUITES_SET = re.compile(rf"\bCipherSuites{GO_SET}(?!\[\]uint16\s*\{{)\S")
 GO_NAMED_SUITE = re.compile(r"(?:\w+\.)?TLS_\w+")
@@ -306,17 +308,23 @@ def _go_int(s):
     return None
 
 
+def _go_version_value(v):
+    v = v.strip()
+    inner = re.fullmatch(r"uint16\s*\(\s*(.*?)\s*\)", v)
+    v = inner[1] if inner else v
+    named = re.fullmatch(r"(?:\w+\.)?(Version\w+)", v)
+    return GO_VERSIONS.get(named[1]) if named else _go_int(v)
+
+
 def _go_version_values(text):
     """The value of every MinVersion or MaxVersion setting: a number, or None when the check cannot
     read it (an expression, a variable, a rune)."""
-    out = []
-    for m in GO_VERSION_VALUE.finditer(text):
-        v = m[1].strip()
-        inner = re.fullmatch(r"uint16\s*\(\s*(.*?)\s*\)", v)
-        v = inner[1] if inner else v
-        named = re.fullmatch(r"(?:\w+\.)?(Version\w+)", v)
-        out.append(GO_VERSIONS.get(named[1]) if named else _go_int(v))
-    return out
+    return [_go_version_value(m[1]) for m in GO_VERSION_VALUE.finditer(text)]
+
+
+def _go_capped(text):
+    """MaxVersion settings below TLS 1.3, which keep X25519MLKEM768 out (it is a TLS 1.3 group)."""
+    return sum(1 for m in GO_MAX_VALUE.finditer(text) if (v := _go_version_value(m[1])) is not None and v < TLS13)
 
 
 def _go_old_numbers(text):
@@ -372,6 +380,27 @@ def _old_tokens(value):
 def _java_old_protocols(text):
     """setEnabledProtocols(...)·setProtocols(...) 인자에 든 옛 프로토콜 문자열 수."""
     return sum(_old_tokens(" ".join(J_STRING.findall(m[1]))) for m in J_CALL_ARGS.finditer(text))
+
+
+def _java_no_tls13(text):
+    """TLS 1.3 이 빠진 프로토콜 지정: setEnabledProtocols·setProtocols 인자에 TLS·SSL 이름은 있는데 TLSv1.3 이 없는 호출,
+    SSLContext.getInstance("TLSv1.2")(그 문맥은 클라이언트 기본이 TLS 1.2 까지다). 교차 리뷰 X18."""
+    n = 0
+    for m in J_CALL_ARGS.finditer(text):
+        vals = [v.lower() for v in J_STRING.findall(m[1])]
+        if any(v.startswith(("tls", "ssl")) for v in vals) and "tlsv1.3" not in vals:
+            n += 1
+    return n + len(re.findall(r"\bSSLContext\s*\.\s*getInstance\s*\(\s*\"TLSv1\.2\"", text))
+
+
+def _prop_no_tls13(keys):
+    """Spring·JDK 프로토콜 설정 값 전체에 TLS 이름은 있는데 TLSv1.3 이 하나도 없으면 1(enabled-protocols[0]·[1] 처럼 키가 나뉘어도 합쳐 본다)."""
+    rx = re.compile(keys)
+
+    def count(text):
+        toks = [x.lower() for _, k, v in _props(text) if rx.fullmatch(k) for x in re.split(r"[\s,;:\[\]\"'()+]+", v) if x]
+        return int(any(x.startswith(("tls", "ssl")) for x in toks) and "tlsv1.3" not in toks)
+    return count
 
 
 def _java_empty_trust(text):
@@ -456,6 +485,8 @@ RULES = [
     ("TLS version set to a value the check cannot read (an expression, a variable)", GO, "added", _go_unread_versions),
     ("MinVersion lowered", GO, "lowered", _go_min_versions),
     ("MinVersion removed", GO, "removed", rf"\bMinVersion{GO_SET}"),
+    # 교차 리뷰 X18: 코드에서 TLS 1.3 을 끄는 설정(상한 1.2 이하). X25519MLKEM768 은 TLS 1.3 그룹이라 하이브리드 키 교환이 막힌다
+    ("MaxVersion below TLS 1.3 (turns off the X25519MLKEM768 key exchange)", GO, "added", _go_capped),
     ("weak cipher suite (3DES, RC4, NULL, EXPORT or RSA key exchange)", GO, "added",
      r"\bTLS_\w*(?:_3DES_|_RC4_|_NULL_|_DES_|EXPORT)\w*|\bTLS_RSA_WITH_\w+|\bInsecureCipherSuites\b"),
     ("cipher suite the check cannot name (a number or an expression)", GO, "added", _go_unread_suites),
@@ -485,6 +516,10 @@ RULES = [
     ("OpenSSL MinProtocol below TLS 1.2 (openssl.cnf)", ANY, "added",
      r"(?i)\bMinProtocol\s*=\s*(?:SSLv3|TLSv1(?:\.1)?|None)(?![.\w])"),
     ("rejectUnauthorized: false", JS, "added", r"\brejectUnauthorized\s*:\s*false\b"),
+    ("Node TLS capped below 1.3 (maxVersion, secureProtocol)", JS, "added",
+     r"\bmaxVersion\s*:\s*['\"]TLSv1(?:\.[0-2])?['\"]|\bsecureProtocol\s*:\s*['\"](?:TLSv1(?:_[12])?|SSLv23)_(?:client_|server_)?method['\"]"),
+    ("Python TLS capped below 1.3 (maximum_version, OP_NO_TLSv1_3, PROTOCOL_TLSv1_2)", PY, "added",
+     r"\bmaximum_version\s*=\s*(?:ssl\.)?TLSVersion\.(?:TLSv1(?:_[0-2])?|SSLv3)\b|\bOP_NO_TLSv1_3\b|\bPROTOCOL_TLSv1(?:_[12])?\b"),
     ("NODE_TLS_REJECT_UNAUTHORIZED=0", ANY, "added", r"\bNODE_TLS_REJECT_UNAUTHORIZED['\"\]]*\s*[:=]?\s*['\"]?0"),
     ("verify=False", PY, "added", r"\bverify\s*=\s*False\b"),
     ("check_hostname = False", PY, "added", r"\bcheck_hostname\s*=\s*False\b"),
@@ -504,15 +539,18 @@ RULES = [
     ("SSLContext for SSL 3.0 or TLS 1.0/1.1", JAVA, "added",
      r"\bSSLContext\s*\.\s*getInstance\s*\(\s*\"(?:SSL|SSLv2|SSLv3|TLSv1|TLSv1\.1)\""),
     ("TLS 1.0/1.1 or SSLv3 in setEnabledProtocols/setProtocols", JAVA, "added", _java_old_protocols),
+    ("TLS 1.3 left out of setEnabledProtocols/setProtocols or SSLContext TLSv1.2", JAVA, "added", _java_no_tls13),
     # 오프라인판 추가: 설정(Spring application.properties·yml, java.security, -D 옵션, JAVA_TOOL_OPTIONS, setProperty).
     ("jdk.tls/certpath disabledAlgorithms set or changed (can re-enable weak algorithms)", ANY, "changed",
      _prop_values(JDK_DISABLED)),
+    # -Djdk.internal... 처럼 앞에 글자가 붙어도 잡는다(행동 시험에서 찾은 N1: 앞의 \b 때문에 JVM 옵션 꼴을 놓쳤다)
     ("JDK HTTP client hostname verification turned off", ANY, "added",
-     r"\bjdk\.internal\.httpclient\.disableHostnameVerification\b"),
+     r"(?<![\w.])(?:-D)?jdk\.internal\.httpclient\.disableHostnameVerification\b"),
     ("server.ssl.enabled=false (Spring Boot TLS turned off)", ANY, "added",
      _prop_count(r"server\.ssl\.enabled", lambda v: v.lower() == "false")),
     ("TLS 1.0/1.1 or SSLv3 in a Spring or JDK protocol setting", ANY, "added",
      _prop_old_protocols(SPRING_PROTOCOLS + "|" + JDK_PROTOCOLS)),
+    ("TLS 1.3 left out of a Spring or JDK protocol setting", ANY, "added", _prop_no_tls13(SPRING_PROTOCOLS + "|" + JDK_PROTOCOLS)),
     ("server.ssl.client-auth none or want (client certificate no longer required)", ANY, "added",
      _prop_count(r"server\.ssl\.clientauth|spring\.ssl\.bundle\..+\.clientauth", lambda v: v.lower() in ("none", "want"))),
     ("server.ssl.client-auth=need removed", ANY, "removed",

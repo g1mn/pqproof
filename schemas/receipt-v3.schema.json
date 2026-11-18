@@ -275,6 +275,9 @@
         },
         "require_review": {
           "type": "boolean"
+        },
+        "profile": {
+          "type": "string"
         }
       }
     },
@@ -1184,6 +1187,12 @@
         "write_review": {
           "type": "integer",
           "minimum": 0
+        },
+        "composite": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },

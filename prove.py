@@ -61,7 +61,7 @@ class UsageError(Exception):
 
 # 설정 이름(환경 변수). prove.sh 머리 주석과 같아야 한다. 흔한 오타(REQUIRE_REVEIW 등)는 실행 머리에 경고한다(교차 리뷰 X50)
 SETTINGS = ("OUT", "TLS_TARGETS", "TLS_TARGETS_ORIG", "TLS_VIA", "CLASSIC", "EXPECT", "SCOPE", "RESIDUE", "EXTRA_EV", "OPENSSL",
-            "CBOM_SCAN", "ALLOW", "EXCLUDE", "RECON", "EV_NAME", "REQUIRE_REVIEW", "PROBE_BIN_DIR")
+            "CBOM_SCAN", "ALLOW", "EXCLUDE", "RECON", "EV_NAME", "REQUIRE_REVIEW", "PROBE_BIN_DIR", "PROFILE")
 OTHER_ENV = ("PYTHON", "STRICT", "SELFTEST_DIR", "KEEP", "ORDERS_EDGE", "TEST_PATHS", "SARIF_SCHEMA", "PQPROOF_HOME",
              "PQPROOF_ENTRY")
 DOCS = "https://github.com/g1mn/pqproof/blob/v{v}/{page}"
@@ -186,6 +186,10 @@ class Params:
             raise UsageError(f"CLASSIC은 allow 또는 deny: {self.classic!r}")
         if not (self.tls_via == "host" or re.fullmatch(r"container:[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", self.tls_via)):
             raise UsageError(f"TLS_VIA는 host 또는 container:<컨테이너 이름>: {self.tls_via!r}")
+        # PROFILE: 알고리즘 프로필(scan/profiles.json). c-expect 가 세는 이름, b-tls 가 홀로 제시하는 그룹, EXPECT=cert 의 인증서 키
+        self.profile = (env.get("PROFILE") or rules.DEFAULT_PROFILE).strip().lower()
+        if self.profile not in rules.PROFILES:
+            raise UsageError(f"PROFILE은 {', '.join(rules.PROFILES)} 중 하나: {self.profile!r}")
         bad = [x for x in self.expect if x not in EXPECT_OK]
         if bad:
             raise UsageError(f"EXPECT에 모르는 값 {bad} (쓸 수 있는 값: kem, sig, tls, cert, none)")
@@ -318,6 +322,9 @@ def prepare_input(path, out, side, skip_rules=None):
         raise UsageError(f"폴더나 zip이 아님: {path}")
     skips = []
     files = rc.tree_files(root, skip_rules, skips)
+    odd = next((r for r, _, _ in files if ZIP_CONTROL.search(r)), None)
+    if odd is not None:  # 줄바꿈·탭 같은 제어 문자가 든 이름은 줄 단위로 읽는 스캐너가 놓치거나 잘못 가른다(교차 리뷰 X21)
+        raise UsageError(f"파일 이름에 제어 문자(줄바꿈·탭 등)가 있다: {odd!r}. 이름을 바꾼 뒤 다시 돌린다(스캐너가 줄 단위로 읽어 그 파일을 놓친다)")
     skipped_rel = [r for r, _ in skips]
     skip_out = []
     for r, k in skips:
@@ -420,11 +427,13 @@ def redact(text):
 
 
 def cbom_csv(items):
-    """CBOM 표 CSV 와 비고 칸에서 가린 곳 수. 비고 칸의 발췌는 redact() 를 거친다."""
+    """CBOM 표 CSV 와 비고 칸에서 가린 곳 수. 비고 칸의 발췌는 redact() 를 거친다. 규칙 묶음 2부터 cbom-scan.sh 가 발췌에서
+    먼저 가린 값(***)도 가린 곳으로 센다(교차 리뷰 X33)."""
     rows, masked = [], 0
     for i in sorted(items, key=lambda x: (-RANK[x["status"]], x["loc"], x["tool"])):
+        pre = redact(i["note"].replace(MASK, "x" * 8))[1] if MASK in i["note"] else 0
         note, n = redact(i["note"])
-        masked += n
+        masked += max(n, pre)
         rows.append([i["loc"], i["source"], i["use"], i["alg"], i["threat"], STATUS_LABEL[i["status"]], i["reason"], note])
     return csv_text(["위치", "출처", "용도·종류", "알고리즘", "양자 위협", "판정", "허용·참고 사유", "비고"], rows), masked
 
@@ -463,6 +472,8 @@ def tls_runs(params, tls_dir, art_log, targets, baseline, expect):
     # 교차 확인은 X25519MLKEM768을 아는 OpenSSL 3.5 이상만. 맥 기본 LibreSSL 3.3·리눅스 OpenSSL 3.0이면 맞는 서버도
     # '교차 확인이 다름'으로 미판정이 됐다(현장 PC에 openssl@3.5가 없을 수 있다)
     xcheck = params.openssl if params.tls_via == "host" and openssl_35(params.openssl) else None
+    prof = rules.PROFILES[params.profile]
+    group, cert_keys = prof["tls_group"], prof["cert_keys"]
     try:
         results, problem, addrs = tlsprobe.references(runner, cert_runner)
         if results:
@@ -476,11 +487,11 @@ def tls_runs(params, tls_dir, art_log, targets, baseline, expect):
                 if ca:
                     shutil.copyfile(ca, os.path.join(tls_dir, f"{tag}-ca.pem"))
                     ca_in = runner.path(f"{tag}-ca.pem")
-                res = tlsprobe.probe_target(runner, addr, servername=name, ca=ca_in, label=tag)
+                res = tlsprobe.probe_target(runner, addr, servername=name, ca=ca_in, label=tag, hybrid_group=group)
                 hyb, cls = res["hybrid"][0], res["classical"][0]
-                ok, why = tlsprobe.target_verdict(hyb, cls, params.classic)
-                if "cert" in expect and not (hyb.cert_key or "").startswith("ML-DSA-65"):
-                    ok, why = False, why + [f"인증서 공개키가 ML-DSA-65가 아님({hyb.cert_key})"]
+                ok, why = tlsprobe.target_verdict(hyb, cls, params.classic, group)
+                if "cert" in expect and not any((hyb.cert_key or "").startswith(k) for k in cert_keys):
+                    ok, why = False, why + [f"인증서 공개키가 {'·'.join(cert_keys)}가 아님({hyb.cert_key})"]
                 # openssl·openssl_agrees 칸은 늘 둔다. 교차 확인을 못 하면 둘 다 null 이고 openssl_note 에 '교차 확인 불가'와 까닭을 적는다
                 # (OpenSSL 3.5 미만 러너에서 칸이 없어 읽는 쪽이 KeyError 로 죽던 것을 원인 쪽에서 막는다)
                 item = {"target": spec, "addr": addr, "servername": name, "trust": "ca-file" if ca else "tofu",
@@ -492,7 +503,7 @@ def tls_runs(params, tls_dir, art_log, targets, baseline, expect):
                 if xcheck:
                     ca_path = os.path.join(tls_dir, f"{tag}-ca.pem" if ca else f"{tag}-hybrid-tofu-ca.pem")
                     oh, argv, raw = tlsprobe.openssl_cross_check(xcheck, addr, name,
-                                                                 ca_path if os.path.isfile(ca_path) else None)
+                                                                 ca_path if os.path.isfile(ca_path) else None, group=group)
                     art_log.append({"argv": argv, "exit_code": None, "stdout": raw, "stderr": "", "t": now()})
                     item["openssl"] = oh.to_json()
                     item["openssl_agrees"] = (oh.group == hyb.group) if hyb.ok else (not oh.ok)
@@ -931,6 +942,9 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
         params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o, sig_f, tls, problem, deny, changed, review, allow,
         allow_path, rc.derive_verdict, {"orig": extra_o, "fixed": extra_f})
     jf = java_rec["fixed"]
+    # 복합 서명 위치(CBOM 검토 필요와 residue 가 따로 센 줄). 증적 allowlist.composite 와 판정 줄에 남긴다(형식 3, 교차 리뷰 X26)
+    composite_locs = sorted({it["loc"] for it in cbom_items["fixed"] if it["status"] == "review" and it["reason"] == rules.COMPOSITE_REASON}
+                            | set(((jf or {}).get("listed") or {}).get("composite") or []), key=al._loc_key)
 
     # 표·조각
     extra = []
@@ -942,7 +956,8 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
         extra.append({"source": os.path.abspath(src), "path": p, "path_sha256": s})
     tls_rows = []
     for t in t_results:
-        for k, offered, want in (("hybrid", tlsprobe.OFFER_HYBRID, tlsprobe.OFFER_HYBRID),
+        hg = rules.PROFILES[params.profile]["tls_group"]
+        for k, offered, want in (("hybrid", hg, hg),
                                  ("classical", tlsprobe.OFFER_CLASSICAL, "고전 그룹" if params.classic == "allow" else "거부")):
             h = t[k]
             tls_rows.append([t["target"], params.tls_via, offered, want, h.get("group") or h.get("error") or "",
@@ -977,14 +992,15 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
         "pqc_partial": {"kem": pqc_names(scan_f, "KEM"), "sig": pqc_names(scan_f, "DSA"),
                               "tls_group": hyb_groups[0] if hyb_groups else None, "ev": [ev_name]},
         "proof": {"verdict": verdict, "verdict_text": rc.verdict_text({
-                      "verdict": verdict, "format_version": ver.FORMAT_VERSION, "weakening": {"review": review}, "allowlist": {
-                      "unreviewed": len(pending), "unused": len(unused), "write_review": len(allow.write_review()),
-                      "legacy": name_only}}),
+                      "verdict": verdict, "format_version": ver.FORMAT_VERSION, "weakening": {"review": review}, "checks": checks,
+                      "allowlist": {"unreviewed": len(pending), "unused": len(unused), "write_review": len(allow.write_review()),
+                                    "legacy": name_only, "composite": composite_locs}}),
                   "allow_unreviewed": len(pending), "checks": {c["id"]: c["status"] for c in checks}},
     })
 
     tools = [tool("cbom-scan.sh", params.cbom_scan), tool("residue", res_script, res_kind),
-             tool("test-paths.ere", scanmod.TEST_PATHS_FILE), tool("skip-dirs", skipdirs.SKIP_FILE)]
+             tool("test-paths.ere", scanmod.TEST_PATHS_FILE), tool("skip-dirs", skipdirs.SKIP_FILE),
+             tool("profiles", rules.PROFILES_FILE)]
     pyfiles = ["prove.py", "prove.sh", "pqlite/scan.py", "pqlite/verify.py", "pqlite/tlsprobe.py", "pqlite/receipt.py",
                "pqlite/allowlist.py", "pqlite/version.py", "pqlite/rules.py", "pqlite/skipdirs.py"]
     tools += [tool(p, os.path.join(HERE, p)) for p in pyfiles]
@@ -1007,7 +1023,7 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
          "params": {"classic": params.classic, "expect": params.expect, "scope": params.scope, "tls_via": params.tls_via,
                     "tls_targets": params.tls_targets, "tls_targets_orig": params.tls_targets_orig,
                     "residue": res_script or "", "allow": allow_path or "", "exclude": excl.patterns,
-                    "recon": recon_path or "", "require_review": params.require_review},
+                    "recon": recon_path or "", "require_review": params.require_review, "profile": params.profile},
          "changed": {"added": added, "removed": removed, "modified": modified, "file": ch_path, "file_sha256": ch_sha},
          "cbom": cbom, "java": java_rec, "tls": tls,
          "weakening": {"deny": deny, "review": review, "file": wp, "file_sha256": ws},
@@ -1024,7 +1040,7 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
                       # 결함 D1 뒤에 보탬: 안 쓰인 항목 수, 그 항목들이 원본에서 덮는 고전 줄 수(사람 확인 전), 허용 범위 쓰기 경로 위치 수
                       "unused": len(unused), "unused_orig_lines": sum(len(e["orig"]) for e in unused),
                       "write_review": len(allow.write_review()),
-                      "hybrid": hyb_locs, "legacy": legacy_locs,
+                      "hybrid": hyb_locs, "legacy": legacy_locs, "composite": composite_locs,
                       "imports": sorted({x["loc"] for x in ((jf or {}).get("listed") or {}).get("lines", []) if x.get("via") == "import"}
                                         | {it["loc"] for it in cbom_items["fixed"] if it["status"] in ("allow", "review")
                                            and "쓰는 import" in it["reason"]}, key=al._loc_key)}
@@ -1097,8 +1113,8 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
                  + " (통과로 세는 것은 '통과'뿐)"
                  + f" · 도구 {r['tool_version']} · 규칙 묶음 {r['ruleset_version']} · 증적 형식 {r['format_version']}")
     if masked:
-        lines.append(f"비밀번호·토큰처럼 보이는 값 {masked}곳을 표 발췌에서 *** 로 가렸다(원문은 artifacts/ 와 in/ 에 그대로 있다. "
-                     "폴더를 넘기기 전에 확인한다)")
+        lines.append(f"비밀번호·토큰처럼 보이는 값 {masked}곳을 표 발췌에서 *** 로 가렸다(원문은 in/ 과 artifacts/ 의 residue·scan 출력에 "
+                     "그대로 있다. 폴더를 넘기기 전에 확인한다)")
     lines.append(f"검증 증적 다시 확인: {'ok' if not bad else 'FAIL'} ({len(vres)}개 검사)" + ("" if not bad else ": " + "; ".join(bad[:3])))
     lines += next_steps(r, cbom_items["fixed"], out)
     if bad:

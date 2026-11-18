@@ -64,8 +64,8 @@ RULES = {
               "실제 TLS 주소가 기대한 하이브리드 ML-KEM 협상을 하지 않는다"),
     "c-classic": ("ClassicPublicKeyLine", "Classical public-key code lines remain without a recorded reason",
                   "사유 없이 남은 고전 공개키 코드 줄"),
-    "c-expect": ("ExpectedPqcMissing", "Expected post-quantum algorithms (ML-KEM-768, ML-DSA-65) are not used",
-                 "기대한 PQC 알고리즘(ML-KEM-768, ML-DSA-65)을 쓰지 않는다"),
+    "c-expect": ("ExpectedPqcMissing", "Expected post-quantum algorithms (by default ML-KEM-768 or 1024 and ML-DSA-65 or 87, see PROFILE) "
+                 "are not used", "기대한 PQC 알고리즘(기본은 ML-KEM-768·1024, ML-DSA-65·87, PROFILE 참고)을 쓰지 않는다"),
     "r-review": ("VerificationRemoved", "Signature verification or decryption calls were removed or stubbed out",
                  "서명 검증·복호 호출이 줄었거나 늘 성공만 돌려준다"),
     "r-allow": ("AllowListReview", "Allow-list entry without human review, unused in the converted tree, or covering a write path",
@@ -319,10 +319,14 @@ class Builder:
                               "Quantum computers break it (Shor).",
                               f"고전 공개키가 남았다: {', '.join(algs) or '알고리즘 미상'} ({', '.join(uses)}). 쇼어 알고리즘으로 깨진다.")
                 self.add("a-cbom", lv, text, path, line, snippet=snippet, key=",".join(algs) + "|" + (snippet or ""))
+            elif why.startswith("복합 서명"):  # 규칙 묶음 2(교차 리뷰 X26)
+                text = self.t(f"Composite signature (ML-DSA with a classical signature): {', '.join(algs)}. A person decides whether it "
+                              "may stay.", f"복합 서명(ML-DSA+고전 서명): {', '.join(algs)}. 남겨도 되는지 사람이 정한다.")
             else:
                 text = self.t(f"Allowed range, but this line writes (new key, signature or encryption): {', '.join(algs)}. "
                               f"A person must confirm it. {why}",
                               f"허용 범위 안 쓰기 경로(새 키·서명·암호화): {', '.join(algs)}. 사람이 확인해야 한다. {why}")
+            if kind != "block":
                 self.add("a-cbom", "warning", text.strip(), path, line,
                          snippet=snippet, key="review|" + ",".join(algs) + "|" + (snippet or ""))
 
@@ -362,6 +366,11 @@ class Builder:
             else:
                 msg = self.t(f"{cur}: {name} remains without a recorded reason.", f"{cur}: 사유 없이 남은 고전 공개키 코드 줄.")
                 self.add("c-classic", lv, msg, d[1], int(d[2]), snippet=d[3].strip(), key=f"{cur}|{d[3]}")
+        for loc in listed.get("composite") or []:  # residue 가 따로 센 복합 서명 줄(검토 필요, 규칙 묶음 2)
+            path, line, _ = split_loc(loc)
+            self.add("c-classic", "warning", self.t("Composite signature (ML-DSA with a classical signature). A person decides whether it "
+                                                    "may stay.", "복합 서명(ML-DSA+고전 서명). 남겨도 되는지 사람이 정한다."),
+                     path, line, key=f"composite|{loc}")
         if not seen_left and self.status.get("c-classic") == "fail":
             self.note("c-classic", "warning", self.t("c-classic failed but the residue output lists no line (list may be cut short)",
                                                      "c-classic 실패인데 residue 출력에 줄 목록이 없다(목록이 잘렸을 수 있다)"))

@@ -133,7 +133,7 @@ ALLOW_ENTRY = obj(["n", "where", "what", "why", "kind", "targets", "status", "no
 ALLOWLIST = obj(["source", "auto", "file", "file_sha256", "entries", "warnings", "hybrid", "legacy", "imports"],
                 source=STR_OR_NULL, auto=BOOL, file=PATH_OR_NULL, file_sha256=SHA_OR_NULL,
                 entries={"type": "array", "items": ALLOW_ENTRY}, warnings=STRS, unreviewed=INT, top_digest=DIGEST16,
-                hybrid=STRS, legacy=STRS, imports=STRS, unused=INT, unused_orig_lines=INT, write_review=INT)
+                hybrid=STRS, legacy=STRS, imports=STRS, unused=INT, unused_orig_lines=INT, write_review=INT, composite=STRS)
 EXCLUDED = strict(items={"type": "array", "items": strict(pattern=STR, **{"from": STR}, why=STR)}, notes=STRS, app_roots=STRS,
                   recon_file=STR_OR_NULL, recon_digest=SHA_OR_NULL, count_orig=INT, count_fixed=INT, files_orig=STRS,
                   files_fixed=STRS)
@@ -153,7 +153,7 @@ SCHEMA = obj(_TOP_REQ,
     tools={"type": "array", "minItems": 1, "items": TOOL},
     params=obj(["classic", "expect", "tls_via", "tls_targets", "tls_targets_orig", "residue"],
                classic={"enum": ["allow", "deny"]}, expect=STRS, scope={"enum": ["all", "kex"]}, tls_via=STR, tls_targets=STRS,
-               tls_targets_orig=STRS, residue=STR, allow=STR, exclude=STRS, recon=STR, require_review=BOOL),
+               tls_targets_orig=STRS, residue=STR, allow=STR, exclude=STRS, recon=STR, require_review=BOOL, profile=STR),
     changed=strict(added=STRS, removed=STRS, modified=STRS, file=PATH, file_sha256=SHA),
     cbom=strict(orig=CBOM_SIDE, fixed=CBOM_SIDE),
     java=strict(residue_kind={"enum": ["custom", "generic", "none"]}, script=PATH_OR_NULL, script_sha256=SHA_OR_NULL,
@@ -174,6 +174,8 @@ SCHEMA = obj(_TOP_REQ,
 )
 # 형식마다 꼭 있어야 하는 칸과 있으면 안 되는 칸(스키마는 모든 형식을 한 번에 읽는다). skip_dirs 는 형식 3에서 보탰다
 FORMAT_ONLY = {"skip_dirs": 3}
+# 형식 3에서 보탠 안쪽 칸(선택). 형식 2 스키마(schemas/receipt-v2.schema.json)에는 없다: tests/make_schemas.py 가 뺀다
+FORMAT_ONLY_NESTED = {("params", "profile"): 3, ("allowlist", "composite"): 3}
 
 TYPES = {"string": str, "integer": int, "number": (int, float), "boolean": bool, "array": list, "object": dict,
          "null": type(None)}
@@ -543,8 +545,8 @@ def consistency(r):
         if (by["c-classic"] in ("pass", "review")) != (left == 0 and jf["weak_pqc"] == 0 and jf["legacy_write"] == 0
                                                        and not sites):
             out.append(f"c-classic is {by['c-classic']}, but residue counts {left} classical lines")
-        if by["c-classic"] == "review" and not lst.get("review"):
-            out.append("c-classic is review, but no allow-list line needs review")
+        if by["c-classic"] == "review" and not lst.get("review") and not lst.get("composite"):
+            out.append("c-classic is review, but no allow-list line or composite signature needs review")
     a = r.get("allowlist") or {}
     if "unreviewed" not in a and "r-allow" in by:
         out.append("there is an r-allow check, but allowlist.unreviewed is not recorded")
@@ -911,18 +913,26 @@ def pending_note(r, en=False):
     n, w, u = a.get("unreviewed") or 0, a.get("write_review") or 0, a.get("unused") or 0
     v = len((r.get("weakening") or {}).get("review") or []) if format_version(r) >= 2 else 0
     m = len(a.get("legacy") or []) if format_version(r) >= 3 else 0  # 이름 규칙으로만 허용한 곳(형식 3부터)
-    if r["verdict"] != "pass" or not (v or n or w or u or m):
+    c = len(a.get("composite") or []) if format_version(r) >= 3 else 0  # 복합 서명 위치(형식 3부터, 교차 리뷰 X26)
+    # 형식 3: 검토 필요인 검사 이름을 적는다(교차 리뷰 X30: a-input·b-tls 의 검토 필요가 판정 줄에 안 보였다). r-review·r-allow·a-cbom·
+    # c-classic 의 검토 필요는 앞의 수(검증 호출 제거, 허용 항목, 쓰기 경로, 복합 서명)가 이미 말한다
+    rv = ([x["id"] for x in r.get("checks") or [] if x["status"] == "review" and x["id"] not in ("r-review", "r-allow", "a-cbom", "c-classic")]
+          if format_version(r) >= 3 else [])
+    if r["verdict"] != "pass" or not (v or n or w or u or m or c or rv):
         return ""
     if en:
         parts = ([f"{v} removed {'verification needs' if v == 1 else 'verifications need'} review"] if v else []) \
             + ([f"{n} allowed {'entry' if n == 1 else 'entries'} not yet reviewed by a person"] if n else []) \
             + ([f"{w} write {'path' if w == 1 else 'paths'} in allowed ranges {'needs' if w == 1 else 'need'} review"] if w else []) \
             + ([f"{u} allowlist {'entry' if u == 1 else 'entries'} unused in the fixed tree"] if u else []) \
-            + ([f"{m} {'line' if m == 1 else 'lines'} allowed by the name rule alone"] if m else [])
+            + ([f"{m} {'line' if m == 1 else 'lines'} allowed by the name rule alone"] if m else []) \
+            + ([f"{c} composite {'signature needs' if c == 1 else 'signatures need'} review"] if c else []) \
+            + ([f"needs review: {', '.join(rv)}"] if rv else [])
         return "; ".join(parts)
     parts = ([f"검증 호출 제거 {v}건 검토 필요"] if v else []) + ([f"허용 {n}건 사람 확인 전"] if n else []) \
         + ([f"허용 범위 쓰기 경로 {w}곳 검토 필요"] if w else []) + ([f"안 쓰인 항목 {u}건"] if u else []) \
-        + ([f"이름 규칙으로만 허용 {m}곳"] if m else [])
+        + ([f"이름 규칙으로만 허용 {m}곳"] if m else []) + ([f"복합 서명 {c}곳 검토 필요"] if c else []) \
+        + ([f"검토 필요 검사 {', '.join(rv)}"] if rv else [])
     return " · ".join(parts)
 
 

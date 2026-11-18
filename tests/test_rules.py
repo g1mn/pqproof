@@ -31,17 +31,8 @@ from pqlite import receipt as rc  # noqa: E402
 from pqlite import verify  # noqa: E402
 
 EXAMPLES = PROOF / "examples"
-KNOWN_GAPS = {
-    "X11": "ML-KEM-1024·ML-DSA-87 은 EXPECT(c-expect)가 세지 않음",
-    "X18": "Go 코드의 MaxVersion TLS 1.2(TLS 1.3 끄기)는 약화 규칙에 안 걸림",
-    "X19": "소문자 ed25519·x25519 를 residue 가 못 셈",
-    "X21": "파일 이름에 줄바꿈이 있으면 residue 가 그 파일을 통째로 놓침",
-    "X22": "Python 독스트링 줄을 코드로 셈",
-    "X23": "G-EC 짧은 토큰 오탐(AWS::EC2, CSS #EC4899)",
-    "X24": "시험 경로 빈틈(.test.tsx, Django tests.py)",
-    # 이번 행동 시험을 쓰다 찾은 것(교차 리뷰 목록 밖). 판정이 바뀌는 고침이라 0.2.0 에서 같이 고친다
-    "N1": "-Djdk.internal.httpclient.disableHostnameVerification 꼴(JVM 옵션)은 앞 글자 D 때문에 \\b 가 안 맞아 약화 규칙에 안 걸림",
-}
+# 규칙 묶음 2(0.2.0)에서 X11·X18·X19·X21·X22·X23·X24·N1 도 고쳐 비었다(아래 'ruleset 2' 행과 Ruleset2 시험)
+KNOWN_GAPS = {}
 L, A, C, T = "LEFT", "ALLOW", "COMMENT", "TEST"
 
 
@@ -74,6 +65,10 @@ RESIDUE_CASES = [
     R("c/Ec10.java", "ECCurve c = null;", G_EC=L),
     R("c/Ec11.java", 'KeyFactory.getInstance("EC");', G_EC=L),
     R("c/Ec12.java", "alg = EC", G_EC=L),
+    R("c/Ec13.go", "k, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)", G_EC=L, G_CURVE=L),
+    R("c/EcNo4.yaml", "Type: AWS::EC2::Instance", G_EC=None),
+    R("c/EcNo5.css", ".badge { color: #EC4899; }", G_EC=None),
+    R("c/EcNo6.java", "int b = 0x00EC;", G_EC=None),
     R("c/EcNo1.java", "int ECHO_MODE = 1;", G_EC=None),
     R("c/EcNo2.java", "int RECORD = 2;", G_EC=None),
     R("c/EcNo3.java", 'String s = "SHA256withECDSA";', G_EC=None, G_CLASSIC_SIG=L),  # 앞이 글자면 G-EC 는 안 잡는다
@@ -88,6 +83,12 @@ RESIDUE_CASES = [
     R("c/Cv7b.java", 'String c = "brainpoolT320t1";', G_CURVE=L),
     R("c/Cv8.java", 'String oid = "1.2.840.10045.2.1";', G_CURVE=L),
     R("c/Cv9.java", 'String oid = "1.3.132.0.34";', G_CURVE=L),
+    R("c/Cv10.py", "key = ec.generate_private_key(ec.SECP384R1())", G_CURVE=L),
+    R("c/Cv11.java", 'String c = "Prime256V1";', G_CURVE=L),
+    R("c/Cv12.java", 'String c = "BrainpoolP384r1";', G_CURVE=L),
+    R("c/Cv13.yml", "kex: ecdh-sha2-nistp256", G_CURVE=L, G_X25519=L),
+    R("c/Cv14.java", "ECKey k = new ECKeyGenerator(Curve.P_256).generate();", G_CURVE=L),
+    R("c/Cv15.java", 'String g = "SecP256r1MLKEM768";', G_CURVE=A),
     R("c/CvNo1.java", "int P2560 = 0;", G_CURVE=None),
     R("c/CvNo2.java", 'String c = "secp256";', G_CURVE=None),
     R("c/CvNo3.java", 'String c = "prime256";', G_CURVE=None),
@@ -125,6 +126,14 @@ RESIDUE_CASES = [
     R("c/Ed3.java", 'String a = "EdDSA";', G_EDDSA=L),
     R("c/Ed4.java", 'String a = "Curve25519";', G_EDDSA=L),
     R("c/EdNo.java", 'String e = "Ed2";', G_EDDSA=None),
+    R("c/Ed5.js", "const kp = crypto.generateKeyPairSync('ed25519');", G_EDDSA=L),
+    R("c/Ed6.conf", "HostKeyAlgorithms ssh-ed448", G_EDDSA=L),
+    R("c/Ed7.rs", "use ed25519_dalek::SigningKey; // eddsa", G_EDDSA=L),
+    R("c/Ed8.yml", "kex: curve25519-sha256", G_EDDSA=L),
+    R("c/Ed9.java", "Object p = NamedParameterSpec.ED25519;", G_EDDSA=L),
+    R("c/Ed10.java", "Object p = NamedParameterSpec.ED448;", G_EDDSA=L),
+    R("c/Ed11.go", "x := eddsa.New()", G_EDDSA=L),
+    R("c/EdNo2.txt2", 'sum = "3fa9bed448c1"', G_EDDSA=None),
     # G-X25519(같은 줄 ML-KEM 이면 허용, 쓰기 연산이 있으면 허용하지 않음)
     R("c/Kx1.java", "Object p = NamedParameterSpec.X25519;", G_X25519=L),
     R("c/Kx2.java", 'String a = "X448";', G_X25519=L),
@@ -133,7 +142,11 @@ RESIDUE_CASES = [
     R("c/Kx5.java", 'String g = "X25519MLKEM768";', G_X25519=A),
     R("c/Kx6.java", 'String g = "X25519+ML-KEM-768";', G_X25519=A),
     R("c/Kx7.java", 'KeyPairGenerator g = KeyPairGenerator.getInstance("X25519MLKEM768");', G_X25519=L),
-    R("c/Kx8.java", 'String g = "X25519_ml_kem_768";', G_X25519=L),  # 대소문자를 가린다(prove.py 와 다름, test_rule_sync)
+    R("c/Kx8.java", 'String g = "X25519_ml_kem_768";', G_X25519=A),  # 규칙 묶음 2: prove.py 와 같이 대소문자·밑줄 무관(test_rule_sync)
+    R("c/Kx9.js", "const k = crypto.generateKeyPairSync('x25519');", G_X25519=L),
+    R("c/Kx10.go", "pk, _ := ecdh.P256().GenerateKey(rand.Reader)", G_X25519=L, G_CURVE=L),
+    R("c/Kx11.js", "const k = crypto.generateKeyPairSync('x448');", G_X25519=L),
+    R("c/Kx12.conf", "ssl_ecdh_curve x25519mlkem768;", G_X25519=A),
     R("c/KxNo.java", 'String x = "X255";', G_X25519=None),
     # G-DH-DSA
     R("c/Dh1.java", "Object d = DiffieHellman.group14();", G_DH_DSA=L),
@@ -143,6 +156,10 @@ RESIDUE_CASES = [
     R("c/Dh5.java", "ElGamalEngine e = null;", G_DH_DSA=L),
     R("c/DhNo1.java", 'String d = "DHX";', G_DH_DSA=None),
     R("c/DhNo2.java", "int DSA_SIZE = 3;", G_DH_DSA=None),
+    R("c/Dh6.yml", "kex: diffie-hellman-group14-sha1", G_DH_DSA=L),
+    R("c/Dh7.js", "const dh = crypto.getDiffieHellman('modp14'); const a = 'dh';", G_DH_DSA=L),
+    R("c/Dh8.py", 'alg = "dsa"', G_DH_DSA=L),
+    R("c/Dh9.conf", "HostKeyAlgorithms ssh-dss", G_DH_DSA=L),
     # G-AES128
     R("c/Aes1.java", 'String a = "AES-128";', G_AES128=L),
     R("c/Aes2.java", 'String a = "AES128";', G_AES128=L),
@@ -209,19 +226,30 @@ RESIDUE_CASES = [
     R("c/WqNo3.java", 'String a = "Kyber768";', G_WEAK_PQC=None),
     R("c/WqNo4.java", 'String a = "Dilithium25519";', G_WEAK_PQC=None),
     R("c/Kx58.java", 'KeyAgreement ka = KeyAgreement.getInstance("X25519"); // ML-KEM-768 later', G_X25519=L),
-    # 알려진 실패(지금 동작)
-    R("c/kor.js", "const kp = crypto.generateKeyPairSync('ed25519');", gap="X19", G_EDDSA=None),
-    R("c/kx.js", "const k = crypto.generateKeyPairSync('x25519');", gap="X19", G_X25519=None),
-    R("c/notes.py", '"""Notes.\nThe payload used to be wrapped with RSA-OAEP.\n"""', gap="X22", G_RSA=L, G_OAEP_PKCS1=L),
-    R("c/stack.yaml", "Type: AWS::EC2::Instance", gap="X23", G_EC=L),
-    R("c/style.css", ".badge { color: #EC4899; }", gap="X23", G_EC=L),
-    R("web/src/Sealer.test.tsx", "const k = crypto.generateKeyPairSync('rsa', {modulusLength: 2048});", gap="X24", G_RSA=L),
-    R("app/tests.py", "key = rsa.generate_private_key(public_exponent=65537, key_size=2048)", gap="X24", G_RSA=L),
+    # 규칙 묶음 2에서 고친 것(교차 리뷰 X19·X22·X23·X24·X26). 0.1.1 은 앞의 다섯 줄을 놓쳤고 독스트링·꼬리 주석은 코드로 셌다
+    R("c/kor.js", "const kp = crypto.generateKeyPairSync('ed25519');", G_EDDSA=L),
+    R("c/kx.js", "const k = crypto.generateKeyPairSync('x25519');", G_X25519=L),
+    R("c/tailstr.py", 's = "# RSA in a string"', G_RSA=L),
+    R("c/inc.c", "#include <openssl/rsa.h>", G_RSA=L),
+    R("c/stack.yaml", "Type: AWS::EC2::Instance", G_EC=None),
+    R("c/style.css", ".badge { color: #EC4899; }", G_EC=None),
+    R("web/src/Sealer.test.tsx", "const k = crypto.generateKeyPairSync('rsa', {modulusLength: 2048});", G_RSA=T),
+    R("app/tests.py", "key = rsa.generate_private_key(public_exponent=65537, key_size=2048)", G_RSA=T),
+    R("svc/src/integrationTest/java/a/ItKeys.java", 'KeyFactory.getInstance("RSA");', G_RSA=T),
+    R("web/__mocks__/keys.js", "const k = crypto.generateKeyPairSync('rsa');", G_RSA=T),
+    R("spec/keys_spec.rb", "key = OpenSSL::PKey::RSA.new(2048)", G_RSA=T),
+    R("c/Comp1.java", 'Signature s = Signature.getInstance("MLDSA65-ECDSA-P256-SHA512", "BC");', G_EC=A, G_CURVE=A),
+    R("c/Comp2.java", 'String a = "id-MLDSA87-RSA4096-PSS-SHA512";', G_RSA=A),
+    R("c/Comp3.java", 'String a = "MLDSA44-RSA2048-PSS-SHA256";', G_RSA=L, G_WEAK_PQC=L),  # ML-DSA-44 를 묶은 것은 막는다
 ]
 # EXPECT: 시험 경로 밖 코드 줄만 센다(주석·문서·시험 경로는 안 센다)
 EXPECT_TREE = {
     "e/Kem.java": 'String a = "ML-KEM-768";\nString b = "MLKEM768";\nString c = "ml_kem_768";\nString d = "ML_KEM_768";\n',
     "e/Sig.java": 'String a = "ML-DSA-65";\nString b = "MLDSA65";\nString c = "ml_dsa_65";\nString d = "ML_DSA_65";\n',
+    "e/Kem5.js": "const a = crypto.generateKeyPairSync('ml-kem-1024');\n",
+    "e/Sig5.go": 'const name = "ML-DSA-87"\n',
+    "e/KpqcKem.py": 'kem = kpqc.KEM("SMAUG-T3")\nkem2 = kpqc.KEM("NTRU+576")\nkem3 = "ntruplus"\n',
+    "e/KpqcSig.py": 'sig = kpqc.Signature("HAETAE3")\nsig2 = kpqc.Signature("AIMer128f")\nnote = "disclaimer"\n',
     "e/Cm.java": "// ML-KEM-768 ML-DSA-65\n",
     "e/README.md": "ML-KEM-768 and ML-DSA-65\n",
     "src/test/java/e/KemTest.java": 'String a = "ML-KEM-768"; String b = "ML-DSA-65";\n',
@@ -312,18 +340,38 @@ class ResidueRules(unittest.TestCase):
                     got = self.status(rid, path)
                     self.assertEqual(got, want, (gap_msg(gap) if gap else f"{path}: {text!r}"))
 
+    def test_x22_docstrings_and_tail_comments_are_comments(self):
+        # 규칙 묶음 2(X22): 파이썬 독스트링·줄 끝 # 주석, 셸·YAML·sshd_config 의 줄 끝·줄 머리 # 는 주석이다. C 의 #include 는 코드다.
+        # 표(RESIDUE_CASES)는 규칙마다 주석 줄을 셋까지만 찍는 출력에 기대지 못해 따로 센다
+        g = os.path.join(self.tmp, "x22")
+        notes = ('"""Notes.\nThe payload used to be wrapped with RSA-OAEP.\n"""\nCAPSULE = 1088  # replaces the old RSA-2048\n'
+                 "def f():\n    \'\'\'RSA in a docstring\'\'\'\n    return 1\n")
+        write_tree(g, {"c/notes.py": notes, "etc/ssh/sshd_config": "#HostKey /etc/ssh/ssh_host_rsa_key\nPort 22  # not RSA\n",
+                       "c/inc.c": "#include <openssl/rsa.h>\n"})
+        parsed, _ = residue(g)
+        rsa = parsed["rules"]["G-RSA"]
+        self.assertEqual((rsa["code"], rsa["comment"]), (1, 5), rsa)
+        self.assertEqual([x["path"] for x in rsa["lines"] if x["type"] == "LEFT"], ["c/inc.c"])
+
     def test_link_is_not_followed(self):
         # 링크는 따라가지 않는다(트리 밖을 읽지 않는다). 대신 prove 의 a-input 이 그 링크를 적고 미판정으로 둔다(X04, Bypasses)
         self.assertFalse([k for k in self.seen if k[1] == "c/One.java"])
 
-    def test_known_gap_X11_level5_names_are_not_counted(self):
-        self.assertEqual(self.gaps["expect"], {"E-MLKEM768": 0, "E-MLDSA65": 0}, gap_msg("X11"))
+    def test_level5_names_are_counted_apart(self):
+        # X11(규칙 묶음 2): ML-KEM-1024·ML-DSA-87 은 따로 센다. c-expect 는 프로필(scan/profiles.json)이 고른 규칙을 더한다
+        self.assertEqual(self.gaps["expect"], {"E-MLKEM768": 0, "E-MLKEM1024": 1, "E-MLDSA65": 0, "E-MLDSA87": 1, "E-KPQC-KEM": 0,
+                                               "E-KPQC-SIG": 0})
 
-    def test_known_gap_X21_newline_in_a_file_name(self):
-        self.assertIn("INFO 검사 파일 1개", self.gaps_out, gap_msg("X21"))
+    def test_x21_residue_alone_misses_a_newline_name_so_prove_refuses_it(self):
+        # residue.sh 는 파일 목록을 줄 단위로 읽어 이름에 줄바꿈이 든 파일을 놓친다. 그래서 prove 는 그런 이름을 입력 오류로 막는다(X21)
+        self.assertIn("INFO 검사 파일 1개", self.gaps_out)
+        g = os.path.join(self.tmp, "g")
+        with self.assertRaisesRegex(prove.UsageError, "제어 문자"):
+            prove.prepare_input(g, os.path.join(self.tmp, "x21-out"), "fixed")
 
     def test_expect_counts_code_lines_outside_test_paths(self):
-        self.assertEqual(self.expect["expect"], {"E-MLKEM768": 4, "E-MLDSA65": 4})
+        self.assertEqual(self.expect["expect"], {"E-MLKEM768": 4, "E-MLKEM1024": 1, "E-MLDSA65": 4, "E-MLDSA87": 1, "E-KPQC-KEM": 3,
+                                                 "E-KPQC-SIG": 2})
 
     def test_every_rule_and_alternative_has_rows(self):
         rules = rulesrc.residue_rules()
@@ -498,8 +546,9 @@ class KnownGapsOutsideResidue(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)  # 이 시험이 만든 자기 폴더만
 
     def test_residue_allow_lines_are_checked_again(self):
-        # X01: residue 가 ALLOW 로 둔 줄도 CBOM 과 같은 규칙으로 다시 본다. 주석의 legacy(파이썬 꼬리 주석)와 아래 줄의 쓰기 경로는
-        # 이름 규칙 허용이 아니라 남은 줄(relisted)이고, 코드의 legacy 로 읽기만 하는 줄은 이름 규칙 몫(name_rule)이다
+        # X01: residue 가 ALLOW 로 둔 줄도 CBOM 과 같은 규칙으로 다시 본다. 아래 줄의 쓰기 경로는 이름 규칙 허용이 아니라 남은 줄
+        # (relisted)이고, 코드의 legacy 로 읽기만 하는 줄은 이름 규칙 몫(name_rule)이다. 파이썬 꼬리 주석의 legacy 는 규칙 묶음 2부터
+        # residue 도 주석으로 읽어(X22) 처음부터 LEFT 다
         tmp = tempfile.mkdtemp(prefix="pqproof-relist-")
         try:
             write_tree(tmp, {"c/a.py": "pub = load_rsa_key(blob)  # legacy\n",
@@ -507,9 +556,11 @@ class KnownGapsOutsideResidue(unittest.TestCase):
                              "c/C.java": 'KeyFactory legacyKf = KeyFactory.getInstance("RSA");\n'})
             parsed, _ = residue(tmp)
             allowed = sorted(f"{x['path']}:{x['line']}" for x in parsed["rules"]["G-RSA"]["lines"] if x["type"] == "ALLOW")
-            self.assertEqual(allowed, ["c/B.java:1", "c/C.java:1", "c/a.py:1"])
+            self.assertEqual(allowed, ["c/B.java:1", "c/C.java:1"])
+            self.assertIn({"type": "LEFT", "path": "c/a.py", "line": 1, "text": "pub = load_rsa_key(blob)  # legacy"},
+                          parsed["rules"]["G-RSA"]["lines"])
             got = rules.reclass_residue(parsed, rules.Lines(tmp), None)
-            self.assertEqual((got["relisted"], got["name_rule"]), (2, ["c/C.java:1"]))
+            self.assertEqual((got["relisted"], got["name_rule"]), (1, ["c/C.java:1"]))
             j = {"families": parsed["families"], "listed": got}
             self.assertEqual(rules.java_left(j), 2)
         finally:
@@ -533,16 +584,19 @@ class KnownGapsOutsideResidue(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)  # 이 시험이 만든 자기 폴더만
 
-    def test_known_gap_N1_jdk_hostname_flag_as_a_jvm_option(self):
+    def test_n1_jdk_hostname_flag_as_a_jvm_option(self):
+        # 규칙 묶음 2: -D 를 붙인 JVM 옵션 꼴도 잡는다(0.1.1 은 앞의 \\b 때문에 놓쳤다)
         a = "FROM x\nENV JAVA_TOOL_OPTIONS=-Djdk.internal.httpclient.disableHostnameVerification=true\n"
-        self.assertEqual(verify.weakening({"Dockerfile": ("FROM x\n", a)}), [], gap_msg("N1"))
+        self.assertEqual(len(verify.weakening({"Dockerfile": ("FROM x\n", a)})), 1)
         a = "FROM x\nRUN java -D jdk.internal.httpclient.disableHostnameVerification=true -jar a.jar\n"
         self.assertEqual(len(verify.weakening({"Dockerfile": ("FROM x\n", a)})), 1)  # 앞이 공백이면 잡는다
 
-    def test_known_gap_X18_tls13_turned_off_in_go(self):
+    def test_x18_tls13_turned_off_in_go(self):
         b = "package a\nvar c = &tls.Config{MinVersion: tls.VersionTLS12}\n"
         a = "package a\nvar c = &tls.Config{MinVersion: tls.VersionTLS12, MaxVersion: tls.VersionTLS12}\n"
-        self.assertEqual(verify.weakening({"svc/server.go": (b, a)}), [], gap_msg("X18"))
+        self.assertEqual(len(verify.weakening({"svc/server.go": (b, a)})), 1)  # 규칙 묶음 2: TLS 1.3 을 끄는 상한은 약화다
+        a = "package a\nvar c = &tls.Config{MinVersion: tls.VersionTLS12, MaxVersion: tls.VersionTLS13}\n"
+        self.assertEqual(verify.weakening({"svc/server.go": (b, a)}), [])
 
 
 class Bypasses(unittest.TestCase):
@@ -777,6 +831,19 @@ WEAK = {
     "trust store changed": [
         ("application.properties", PROPS0 + "server.ssl.trust-store=classpath:t.p12\n", PROPS0 + "server.ssl.trust-store=file:/tmp/o.p12\n"),
         ("application.properties", PROPS0 + "server.ssl.trust-store=classpath:t.p12\n", PROPS0 + "server.ssl.trust-store=classpath:t.p12\n")],
+    # 규칙 묶음 2(교차 리뷰 X18): TLS 1.3 을 끄는 상한
+    "MaxVersion below TLS 1.3 (turns off the X25519MLKEM768 key exchange)": [
+        ("a.go", GO0, go("MaxVersion: tls.VersionTLS12")), ("a.go", GO0, go("MaxVersion: tls.VersionTLS13"))],
+    "Node TLS capped below 1.3 (maxVersion, secureProtocol)": [
+        ("a.js", "", "tls.createServer({maxVersion: 'TLSv1.2'});\n"), ("a.js", "", "tls.createServer({maxVersion: 'TLSv1.3'});\n")],
+    "Python TLS capped below 1.3 (maximum_version, OP_NO_TLSv1_3, PROTOCOL_TLSv1_2)": [
+        ("a.py", "", "ctx.maximum_version = ssl.TLSVersion.TLSv1_2\n"), ("a.py", "", "ctx.maximum_version = ssl.TLSVersion.TLSv1_3\n")],
+    "TLS 1.3 left out of setEnabledProtocols/setProtocols or SSLContext TLSv1.2": [
+        ("A.java", "class A {}\n", 'class A { void f() { s.setEnabledProtocols(new String[]{"TLSv1.2"}); } }\n'),
+        ("A.java", "class A {}\n", 'class A { void f() { s.setEnabledProtocols(new String[]{"TLSv1.2", "TLSv1.3"}); } }\n')],
+    "TLS 1.3 left out of a Spring or JDK protocol setting": [
+        ("application.properties", PROPS0, PROPS0 + "server.ssl.enabled-protocols=TLSv1.2\n"),
+        ("application.properties", PROPS0, PROPS0 + "server.ssl.enabled-protocols=TLSv1.2,TLSv1.3\n")],
 }
 
 

@@ -1,6 +1,6 @@
 # Design of PQ-Proof
 
-PQ-Proof takes a codebase before and after a post-quantum migration and checks whether the migration is finished. It looks for classical public-key code left without a recorded reason, checks that ML-KEM-768 and ML-DSA-65 are in use, and checks that no TLS setting got weaker along the way. It runs offline and calls no AI model. It reads the code it inspects and never runs it. Each run leaves verification evidence: the raw tool output, a CBOM for both versions, and an evidence hash that anyone can recompute.
+PQ-Proof takes a codebase before and after a post-quantum migration and checks whether the migration is finished. It looks for classical public-key code left without a recorded reason, checks that ML-KEM and ML-DSA at NIST security category 3 or above are in use (ML-KEM-768 or 1024, ML-DSA-65 or 87; see Algorithm profiles), and checks that no TLS setting got weaker along the way. It runs offline and calls no AI model. It reads the code it inspects and never runs it. Each run leaves verification evidence: the raw tool output, a CBOM for both versions, and an evidence hash that anyone can recompute.
 
 It started as the completion check at the end of my migration pipeline in the finals of a 2026 post-quantum hackathon. [HISTORY.md](HISTORY.md) tells that story and lists what changed after the finals. This is a participant's own tool; the organizers have not reviewed or endorsed it.
 
@@ -31,13 +31,13 @@ The inputs are untrusted. The tool reads files and never runs them. zip entries 
 | `a-input` | never | fewer than half of the original's files exist at the same path in the fixed tree; or the original shows no blocking location, no classical code line and no TLS target, so there was nothing to check |
 | `a-cbom` | the fixed CBOM has at least one blocking location | `cbom-scan.sh` did not finish cleanly |
 | `b-weakening` | a changed file adds a weakening construct or removes a protection | never |
-| `b-tls` | a target does not negotiate `X25519MLKEM768` when offered only that group, or the old client (`X25519,P-256`) is accepted under `CLASSIC=deny` or refused under `CLASSIC=allow`, or `EXPECT=cert` and the certificate key is not ML-DSA-65 | the code shows a TLS server but no `TLS_TARGETS` were given; the original had a TLS server and the fixed tree has none; the reference controls failed; or OpenSSL 3.5 disagrees with the probe |
+| `b-tls` | a target does not negotiate the profile's hybrid group (`X25519MLKEM768`, or `SecP384r1MLKEM1024` under `cnsa2`) when offered only that group, or the old client (`X25519,P-256`) is accepted under `CLASSIC=deny` or refused under `CLASSIC=allow`, or `EXPECT=cert` and the certificate key is not one the profile accepts (ML-DSA-65 or 87 by default) | the code shows a TLS server but no `TLS_TARGETS` were given; the original had a TLS server and the fixed tree has none; the reference controls failed; or OpenSSL 3.5 disagrees with the probe |
 | `c-classic` | the fixed tree has classical code lines left in the nine families after allowed lines are taken out, any ML-KEM-512 or ML-DSA-44 (below NIST security category 3), or a write inside a `Legacy*.java` file | `residue.sh` did not produce a summary |
-| `c-expect` | a requested algorithm (`kem` for ML-KEM-768, `sig` for ML-DSA-65) has zero code lines, or `tls`/`cert` was requested and `b-tls` failed or did not apply | the count is missing, or `b-tls` is undecided |
+| `c-expect` | a requested algorithm has zero code lines (`kem` and `sig` add up the `EXPECT` rules the profile names: ML-KEM-768 or 1024 and ML-DSA-65 or 87 by default), or `tls`/`cert` was requested and `b-tls` failed or did not apply | the count is missing, or `b-tls` is undecided |
 | `r-review` | never | never |
 | `r-allow` | `REQUIRE_REVIEW=1`, and either an allowlist entry that allows a line or sends one to review has no accepted review record (see Human review below), or an entry is unused (see Unused entries below) | never |
 
-Besides pass, fail and undecided, a check can end as "needs review" or "not applicable". "Needs review" does not change the verdict. It shows up in `a-input` (a file that held a blocking location disappeared), `a-cbom` and `c-classic` (an allowlisted line sits on a write path), `b-tls` (only client-side TLS), `r-review` and `r-allow` (an allowlist entry in use has no review record, or an entry is unused). When the verdict is pass, every place that prints the verdict adds what is left for a person: removed verification calls (`r-review`, from evidence format 2), entries not yet reviewed, write paths left for review inside allowed ranges, and unused entries. The console shows `VERDICT=PASS (2 allowed entries not yet reviewed by a person; 2 write paths in allowed ranges need review; 1 allowlist entry unused in the fixed tree)`, and `report.md`, `receipt.html`, `tables/fragment.html`, `deck.json` (`verdict_text`, `verdict_text_en`) and `evidence-fragment.json` show 통과(허용 2건 사람 확인 전 · 허용 범위 쓰기 경로 2곳 검토 필요 · 안 쓰인 항목 1건). Each part appears only when its count is above zero. A `verify()` reduced to `return true` gives `VERDICT=PASS (2 removed verifications need review)`: the dropped call and the body that only returns success. Before 0.1.0 that pass carried no note.
+Besides pass, fail and undecided, a check can end as "needs review" or "not applicable". "Needs review" does not change the verdict. It shows up in `a-input` (a file that held a blocking location disappeared), `a-cbom` and `c-classic` (an allowlisted line sits on a write path, or a composite signature), `b-tls` (only client-side TLS), `r-review` and `r-allow` (an allowlist entry in use has no review record, or an entry is unused). When the verdict is pass, every place that prints the verdict adds what is left for a person: removed verification calls (`r-review`, from evidence format 2), entries not yet reviewed, write paths left for review inside allowed ranges, and unused entries. The console shows `VERDICT=PASS (2 allowed entries not yet reviewed by a person; 2 write paths in allowed ranges need review; 1 allowlist entry unused in the fixed tree)`, and `report.md`, `receipt.html`, `tables/fragment.html`, `deck.json` (`verdict_text`, `verdict_text_en`) and `evidence-fragment.json` show 통과(허용 2건 사람 확인 전 · 허용 범위 쓰기 경로 2곳 검토 필요 · 안 쓰인 항목 1건). Each part appears only when its count is above zero. From evidence format 3 the line also counts composite signatures and names every other check that needs review (`needs review: a-input, b-tls`), so a pass with a vanished file or client-only TLS no longer looks like a clean pass. A `verify()` reduced to `return true` gives `VERDICT=PASS (2 removed verifications need review)`: the dropped call and the body that only returns success. Before 0.1.0 that pass carried no note.
 
 The verdict is fail if any check fails, otherwise undecided if any check is undecided, otherwise pass. The exit code follows: 0, 1, 3. A failed self-verification of the written evidence also gives 3.
 
@@ -49,9 +49,11 @@ A check that did not run is not a check that passed. Every check ends in one of 
 
 A CBOM row blocks when it is a quantum-breakable public-key use (`cbom-scan.sh` threat "쇼어로 깨짐", which means broken by Shor's algorithm, or "보안레벨 3 미만(PQC)", or a `scan.py` row with threat `shor` or `weak-pqc`; a TLS group setting that leaves out hybrid groups is a `shor` row) and none of these apply:
 
-- the line is a comment or sits in a test path (the list in `scan/test-paths.ere`, see Test paths below). `cbom-scan.sh` puts the flag 주석 (comment) or 테스트·예제 (test or example) at the start of the note; a word in the quoted source line further on is not a flag;
+- the line is a comment or sits in a test path (the list in `scan/test-paths.ere`, see Test paths below). `cbom-scan.sh` puts the flag 주석 (comment) or 테스트·예제 (test or example) at the start of the note; a word in the quoted source line further on is not a flag. It reads a leading `#` as a comment only in languages that use it (not `#include` in C or `#[...]` in Rust), `--` only in SQL, Lua and Haskell, and `;` only in ini, assembly and Lisp files. For Go, JavaScript, TypeScript, Python and Java files, `pqlite/rules.py` also reads the line with the language tokenizer of `pqlite/verify.py`: a row whose code part is empty (a comment, a Python docstring) or, for a name-only match, whose classical name sits only in a trailing comment is a comment;
 - `SCOPE=kex` and the row is not about key exchange (it is kept as "out of scope");
 - an allow rule below covers it.
+
+A composite signature (ML-DSA-65 or ML-DSA-87 bound to RSA, ECDSA, Ed25519 or Ed448 under one key, as the IETF LAMPS draft and BouncyCastle name it, for example `MLDSA65-ECDSA-P256-SHA512`) neither blocks nor passes silently. Both tools read the same name table (`COMPOSITE_NAME` in `pqlite/scan.py`, `RES_COMPOSITE` in `residue.sh`, `COMPRE` in `cbom-scan.sh`), `a-cbom` and `c-classic` both need review, and the locations are listed in `allowlist.composite`. Before ruleset 2, `a-cbom` read such a name as post-quantum and `c-classic` as classical, so the same line passed one check and failed the other. A composite with ML-DSA-44 is below category 3 and blocks.
 
 A runtime base image whose OpenSSL is too old to offer `X25519MLKEM768` blocks only when something in the tree terminates TLS with the system OpenSSL (nginx, HAProxy, Apache, Python). Otherwise it stays a row to check.
 
@@ -59,24 +61,37 @@ A runtime base image whose OpenSSL is too old to offer `X25519MLKEM768` blocks o
 
 ### The classical families
 
-`scan/residue.sh` counts code lines for these rules. Comments and docs are counted apart as `comment`, and code lines in test paths as `test`. The first nine rules make up `c-classic`.
+`scan/residue.sh` counts code lines for these rules. Comments and docs are counted apart as `comment`, and code lines in test paths as `test`. The first nine rules make up `c-classic`. Comments follow the language: `//` and `/* */` in C-family files (Java, Kotlin, Scala, Groovy, JavaScript, TypeScript including `.jsx` and `.tsx`, Go, C, C++, C#, PHP, Rust, Swift, Dart), `#` anywhere outside quotes in Python, shell, YAML, TOML, Ruby, Terraform, `sshd_config`, `known_hosts` and Dockerfiles, `#` only at the start of a line in properties, ini and env files, and Python docstrings (a triple-quoted string that starts a statement). Since ruleset 2 the names are matched in any case where code writes them in lower case (`ed25519`, `x25519`, `secp384r1`, `ecdsa`, `diffie-hellman`, `ssh-dss`).
 
 | Rule | Matches |
 |---|---|
 | `G-RSA` | RSA anywhere in code |
-| `G-EC` | EC, ECDSA, ECDH, EC key and parameter classes |
-| `G-CURVE` | secp*, prime*v1, P-256/384/521, brainpool, EC OIDs |
+| `G-EC` | EC, ECDSA, ECDH, EC key and parameter classes; `EC` alone only as its own word (not `EC2`, `#EC4899`, `0x00EC` or `AWS::EC2`); lower-case `ecdsa` |
+| `G-CURVE` | secp*, prime*v1, P-256/384/521, brainpool, EC OIDs, SSH `nistp256`, Nimbus `Curve.P_256`, in any case |
 | `G-OAEP-PKCS1` | OAEP, MGF1, PKCS#1, PSource |
 | `G-CLASSIC-SIG` | `withRSA`, `withECDSA`, `withDSA`, RSASSA, RSA-PSS |
 | `G-JWT-ALG` | RS256/384/512, ES*, PS* |
-| `G-EDDSA` | Ed25519, Ed448, EdDSA, Curve25519 |
-| `G-X25519` | X25519, X448, XDH, ECDH, KeyAgreement (same line with ML-KEM counts as hybrid) |
-| `G-DH-DSA` | DiffieHellman, `"DH"`, `"DSA"`, ElGamal, ECIES |
+| `G-EDDSA` | Ed25519, Ed448, EdDSA, Curve25519, and the lower-case forms as their own word (`'ed25519'`, `ssh-ed25519`, `ed25519_dalek`) |
+| `G-X25519` | X25519, X448, XDH, ECDH, KeyAgreement, lower-case `x25519`, `x448`, `ecdh` (same line with ML-KEM in any case counts as hybrid, as in `pqlite/rules.py`) |
+| `G-DH-DSA` | DiffieHellman, diffie-hellman, `"DH"`, `'dh'`, `"DSA"`, `ssh-dss`, ElGamal, ECIES |
 | `G-WEAK-PQC` | ML-KEM-512, ML-DSA-44, Kyber512, Dilithium2, in any case and with `-`, `_` or nothing between the parts (`ml-kem-512`, `mldsa44`) |
 | `LW-legacy-write` | encryption, signing, key generation or file writes inside `Legacy*.java` |
-| `E-MLKEM768`, `E-MLDSA65` | ML-KEM-768 and ML-DSA-65 in code outside test paths |
+| `E-MLKEM768`, `E-MLKEM1024`, `E-MLDSA65`, `E-MLDSA87` | ML-KEM-768, ML-KEM-1024, ML-DSA-65 and ML-DSA-87 in code outside test paths, in any case and separator |
+| `E-KPQC-KEM`, `E-KPQC-SIG` | the Korean KpqC algorithms SMAUG-T and NTRU+, HAETAE and AIMer (counted only under `PROFILE=kpqc`) |
 
 `G-AES128` is also printed for information. It does not take part in any check.
+
+### Algorithm profiles
+
+`scan/profiles.json` names, per profile, the `EXPECT` rules that count for `EXPECT=kem` and `EXPECT=sig`, the hybrid group `b-tls` offers alone, and the certificate keys `EXPECT=cert` accepts. `PROFILE` picks one, and `receipt.json` records it as `params.profile`. The file is in the ruleset hash.
+
+| Profile | `kem` | `sig` | TLS group | Certificate |
+|---|---|---|---|---|
+| `nist-cat3` (default) | ML-KEM-768 or ML-KEM-1024 | ML-DSA-65 or ML-DSA-87 | `X25519MLKEM768` | ML-DSA-65 or 87 |
+| `cnsa2` | ML-KEM-1024 | ML-DSA-87 | `SecP384r1MLKEM1024` | ML-DSA-87 |
+| `kpqc` | ML-KEM-768, 1024 or SMAUG-T, NTRU+ | ML-DSA-65, 87 or HAETAE, AIMer | `X25519MLKEM768` | ML-DSA-65 or 87 |
+
+A profile only changes what counts as expected post-quantum use. It never makes a classical line pass, and ML-KEM-512 and ML-DSA-44 block under every profile. `pqlite/scan.py` reads the KpqC names as post-quantum rows with the note that NIST has not approved them. Before ruleset 2, `c-expect` counted only ML-KEM-768 and ML-DSA-65, so a move to category 5 failed.
 
 ### Skipped folders
 
@@ -91,7 +106,7 @@ Before ruleset 2 there were four lists. `residue.sh` skipped `vendor` and `node_
 
 ### Test paths
 
-One file, `scan/test-paths.ere`, decides what counts as test or example code. `cbom-scan.sh` (comment flag "테스트·예제"), `residue.sh` (`test` lines), `pqlite/scan.py` (skips Go and Java test files) and the TLS signal check in `pqlite/rules.py` all read it. Its first non-comment line is the test rule and its second is a main-source marker, both POSIX ERE, matched against `/` plus the path inside the tree. When the marker (`/src/main/`) matches, only the part of the path up to the marker's first `/` goes to the test rule. So nothing under `src/main/` is a test path, whatever its package or class name (`com/example/`, `SelfTest.java`), while `tests/it/src/main/` still is. The test rule covers the folders `test`, `tests`, `__tests__` and `testdata` at any depth, the folders `spec`, `fixtures`, `mock(s)`, `example(s)` and `sample(s)` only at the top of the tree, and the file names `*_test.go`, `test_*.py`, `*_test.py`, `conftest.py`, `*Test.java`, `*Tests.java`, `*Test(s).kt`, `*.test.*`/`*.spec.*` for JavaScript and TypeScript, and `test.js`-style files. Each run copies the file to `artifacts/test-paths.ere`, passes that copy to both scanners (`TEST_PATHS`), and records its hash. A scanner run without the file stops with a usage error. A file with only the first line works as before, with no marker.
+One file, `scan/test-paths.ere`, decides what counts as test or example code. `cbom-scan.sh` (comment flag "테스트·예제"), `residue.sh` (`test` lines), `pqlite/scan.py` (skips Go and Java test files) and the TLS signal check in `pqlite/rules.py` all read it. Its first non-comment line is the test rule and its second is a main-source marker, both POSIX ERE, matched against `/` plus the path inside the tree. When the marker (`/src/main/`) matches, only the part of the path up to the marker's first `/` goes to the test rule. So nothing under `src/main/` is a test path, whatever its package or class name (`com/example/`, `SelfTest.java`), while `tests/it/src/main/` still is. The test rule covers the folders `test`, `tests`, `__tests__`, `__mocks__`, `testdata`, `integrationTest` and `testFixtures` at any depth, the folders `spec`, `fixtures`, `mock(s)`, `example(s)` and `sample(s)` only at the top of the tree, and the file names `*_test.go`, `test_*.py`, `*_test(s).py`, `test(s).py` (Django), `conftest.py`, `*Test.java`, `*Tests.java`, `*Test(s).kt`, `*.test.*`, `*.spec.*`, `*.cy.*` and `*.e2e-spec.*` for JavaScript and TypeScript (with `.jsx` and `.tsx`), `test.js`-style files and `*_spec.rb`. A keystore in a test path carries the test flag like any other key file. Each run copies the file to `artifacts/test-paths.ere`, passes that copy to both scanners (`TEST_PATHS`), and records its hash. A scanner run without the file stops with a usage error. A file with only the first line works as before, with no marker.
 
 Classical code lines in test paths do not count toward `c-classic` or `a-cbom`. `residue.sh` lists them as `TEST` lines, `c-classic` names the first few, and the evidence keeps the count and up to 60 locations (`java.*.tests`; `cbom.*.tests` counts CBOM locations flagged as tests). ML-KEM and ML-DSA lines in test paths do not count for `c-expect`.
 
@@ -166,7 +181,7 @@ From evidence format 2 (0.1.0), `receipt.json` also records:
 
 - `format_version`: 3 since 0.2.0, 2 in 0.1.x. Evidence without this field is format 1, written by the public copies before 0.1.0. Format 3 adds `skip_dirs`, hashes the input trees with the skip rules of `scan/skip-dirs` instead of the fixed list (see Tree hash), counts lines allowed by the name rule alone under `r-allow` and on the verdict line, and its note says `pqproof --verify`.
 - `tool_version`: the package version, read from `src/pqproof/__init__.py`, the one place the version is set.
-- `ruleset_version` and `ruleset_sha256`: which rules judged the run. Ruleset 2 is ten files: `scan/cbom-scan.sh`, `scan/residue.sh`, `scan/test-paths.ere`, `scan/skip-dirs`, `pqlite/scan.py`, `pqlite/verify.py`, `pqlite/allowlist.py`, `pqlite/rules.py`, `pqlite/skipdirs.py` and `pqlite/tlsprobe.py`. Together they hold the detection patterns, the test-path rule, the skipped folders, the allow rules, the TLS-weakening rules, the verdict constants and the status of each check, and the TLS target verdict. Ruleset 1 was the first six without `scan/skip-dirs`. `ruleset_sha256` is the SHA-256 of one line per file, `path + "\0" + SHA-256 + "\n"`, sorted by path, over the files that actually ran. `scan/ruleset.json` lists the files of each ruleset, and `--verify` recomputes the hash from the files of the ruleset the receipt names. `scan/ruleset.json` gives each published hash a name. A run with a changed rule file, a custom `RESIDUE` or another `CBOM_SCAN` is named `<current>+modified`.
+- `ruleset_version` and `ruleset_sha256`: which rules judged the run. Ruleset 2 is eleven files: `scan/cbom-scan.sh`, `scan/residue.sh`, `scan/test-paths.ere`, `scan/skip-dirs`, `scan/profiles.json`, `pqlite/scan.py`, `pqlite/verify.py`, `pqlite/allowlist.py`, `pqlite/rules.py`, `pqlite/skipdirs.py` and `pqlite/tlsprobe.py`. Together they hold the detection patterns, the test-path rule, the skipped folders, the algorithm profiles, the allow rules, the TLS-weakening rules, the verdict constants and the status of each check, and the TLS target verdict. Ruleset 1 was the first six without `scan/skip-dirs`. `ruleset_sha256` is the SHA-256 of one line per file, `path + "\0" + SHA-256 + "\n"`, sorted by path, over the files that actually ran. `scan/ruleset.json` lists the files of each ruleset, and `--verify` recomputes the hash from the files of the ruleset the receipt names. `scan/ruleset.json` gives each published hash a name. A run with a changed rule file, a custom `RESIDUE` or another `CBOM_SCAN` is named `<current>+modified`.
 
 `--verify` refuses a format it does not know (`format_version` above 3) and says to use a newer pqproof.
 
@@ -195,7 +210,7 @@ python3 -I tests/mutations/run_mutations.py --strict --golden tests/golden/verdi
 bash scan/cbom-scan.sh --selftest    # scanner assertions
 ```
 
-`--unit` and `--selftest` print `n 통과 · m 건너뜀 · k 실패` (passed, skipped, failed) and name each skipped case. Without the `tls_probe` binary the TLS unit tests and self-test case S6 are skipped, and `--unit` says how to build it; the evidence tamper tests use a run without TLS and do not need it; the SARIF schema test needs `jsonschema` and a schema file in `SARIF_SCHEMA`. With `STRICT=1` any skip fails the run, which is how CI runs them. `cbom-scan.sh --selftest` has 140 assertions. Four need OpenSSL 3.5 or later (an ML-DSA-65 certificate, an ML-KEM-768 key and an ML-KEM TLS server), and seven need `ssh-keygen`, `keytool` or Ed25519 support. A missing tool drops its assertions without a skip line (OpenSSL 3.0 runs 136), so CI counts the dropped ones as skipped, not passed: four are allowed on Ubuntu's OpenSSL 3.0 and none on macOS. None of the tests touch the network; the TLS cases use servers on 127.0.0.1. An installed package runs the same tests with `pqproof --unit`, `pqproof --selftest` and `pqproof mutations`.
+`--unit` and `--selftest` print `n 통과 · m 건너뜀 · k 실패` (passed, skipped, failed) and name each skipped case. Without the `tls_probe` binary the TLS unit tests and self-test case S6 are skipped, and `--unit` says how to build it; the evidence tamper tests use a run without TLS and do not need it; the SARIF schema test needs `jsonschema` and a schema file in `SARIF_SCHEMA`. With `STRICT=1` any skip fails the run, which is how CI runs them. `cbom-scan.sh --selftest` has 160 assertions and prints `selftest: PASS n · FAIL m · SKIP k of t`. Four need OpenSSL 3.5 or later (an ML-DSA-65 certificate, an ML-KEM-768 key and an ML-KEM TLS server), and seven need `ssh-keygen`, `keytool` or Ed25519 support. An assertion whose tool is missing counts as skipped, never as passed, and CI reads the total from that line: four skips are allowed on Ubuntu's OpenSSL 3.0 and none on macOS. Before 0.2.0 the scanner dropped those assertions silently and CI kept the expected total in a variable. None of the tests touch the network; the TLS cases use servers on 127.0.0.1. An installed package runs the same tests with `pqproof --unit`, `pqproof --selftest` and `pqproof mutations`.
 
 ### Self-test
 
@@ -249,6 +264,17 @@ bash scan/cbom-scan.sh --selftest    # scanner assertions
 | `m14-x06-korean-comment` | X06: a Korean trailing comment with the word for test on a key line | verdict fail; `a-cbom` fail |
 | `m15-x07-weak-pqc-lowercase` | X07: Node lowercase ml-kem-512 and ml-dsa-44 | verdict fail; `a-cbom` fail; `c-classic` fail; `java.fixed.weak_pqc` at least 2 |
 | `m16-x03-build-package` | X03: trust-all TrustManager in a production package named build | verdict fail; `b-weakening` fail |
+| `m17-x19-node-ed25519` | X19: a lower-case Node `ed25519` key | verdict fail; `a-cbom` fail; `c-classic` fail |
+| `m18-x23-ec2-and-color` | X23: `AWS::EC2` and a CSS colour `#EC4899` | verdict pass; `a-cbom` pass; `c-classic` pass |
+| `m19-x24-tsx-test` | X24: an RSA key in a `.test.tsx` file | verdict pass; the lines are counted as tests |
+| `m20-x25-node-sign-null` | X25: `crypto.sign(null, ...)` with an ML-DSA-65 key | verdict pass; `a-cbom` pass |
+| `m21-x26-composite-signature` | X26: `Signature.getInstance("MLDSA65-ECDSA-P256-SHA512")` | verdict pass; `a-cbom` review; `c-classic` review; listed in `allowlist.composite` |
+| `m22-x18-tls13-capped` | X18: `MaxVersion: tls.VersionTLS12` in Go | verdict fail; `b-weakening` fail; `a-cbom` fail |
+| `m23-x20-pynacl-box` | X20: PyNaCl `Box` (X25519) | verdict fail; `a-cbom` fail |
+| `m24-x22-python-docstring` | X22: RSA named in a Python docstring and a trailing comment | verdict pass |
+| `m25-x11-level5` | X11: the example moved to ML-KEM-1024 and ML-DSA-87 | verdict pass; `c-expect` pass |
+| `m25b-x11-cnsa2-profile` | X11: `PROFILE=cnsa2` on the ML-KEM-768 example | verdict fail; `c-expect` fail |
+| `m26-x59-known-hosts` | X59: an `ssh-ed25519` host key pinned in `known_hosts` | verdict fail; `a-cbom` fail; `c-classic` fail |
 
 ### Golden verdicts
 
@@ -277,7 +303,7 @@ A different ruleset name alone (`1+modified` while rule files are being edited) 
 
 - **Rules, not proof.** A pass means the rules found nothing. Whether the rules are right, complete or fit your service is a human judgement.
 - **Static detection.** Regular expressions with assignment tracking inside a file and `static final` constants across Java files. An algorithm name that arrives from configuration at run time cannot be read; those rows stay as "check" for a person.
-- **Coverage.** Java, Go, Python, Node and nginx have the most rules. Other languages get what `cbom-scan.sh` and `residue.sh` find by name.
+- **Coverage.** Java, Go, Python, Node and nginx have the most rules. Libraries whose API hides the algorithm name are matched by API: PyNaCl `nacl.public`/`nacl.signing`, tweetnacl `nacl.box`/`nacl.sign`, libsodium `crypto_box`/`crypto_kx`/`crypto_sign`, Go `x/crypto/nacl`, `curve25519` and `ed25519`, wolfSSL `wc_ecc_`/`wc_ed25519_`/`wc_Rsa*`, and Nimbus `ECKeyGenerator`, `RSAKeyGenerator`, `OctetKeyPairGenerator` and `Curve.P_256`; `pynacl`, `tweetnacl`, `libsodium-wrappers`, `@noble/curves` and the `*-dalek` crates are listed as dependency rows. Code that turns TLS 1.3 off (`MaxVersion` below TLS 1.3 in Go, `maxVersion` or `secureProtocol` in Node, `maximum_version` or `OP_NO_TLSv1_3` in Python, a Java protocol list or Spring setting without `TLSv1.3`) blocks in `a-cbom` and, when a change adds it, fails `b-weakening`. Other languages get what `cbom-scan.sh` and `residue.sh` find by name.
 - **TLS.** The probe measures servers. TLS terminated outside the code (Caddy, Envoy, Traefik, a cloud load balancer) produces no signal; pass its address in `TLS_TARGETS` yourself. The tool cannot tell whether the server you measured runs this exact fixed tree.
 - **Hybrid window.** The 12-line window and the function-header pattern are heuristics. If one function holds both a classical-only branch and an ML-KEM branch, the classical branch may count as hybrid. Every such line is listed in `allowlist.hybrid`.
 - **Large files.** `scan.py`, the weakening check and the allowlist check skip any file over 1 MiB. Only `cbom-scan.sh` and `residue.sh` look at such a file. `residue.sh` reads its file list from a temporary file, so a tree with many files or long paths no longer hits the argument limit (before ruleset 2 it stopped with "Argument list too long" and `c-classic` stayed undecided).
@@ -293,7 +319,7 @@ A different ruleset name alone (`1+modified` while rule files are being edited) 
 
 ## 한국어 요약
 
-2026년 양자내성암호 전환 해커톤 본선에서 실제로 쓴 검증 도구다. 이 대회에서 대상(부총리상)을 받았다. 전환 전과 후의 소스를 넣으면 사유 없이 남은 기존 공개키 암호 코드가 없는지, ML-KEM-768과 ML-DSA-65를 쓰는지, TLS 설정을 약하게 바꾸지 않았는지 보고 전환이 끝났는지 판정한다. 판정에 AI 모델을 쓰지 않으므로 입력이 같으면 판정도 같다.
+2026년 양자내성암호 전환 해커톤 본선에서 실제로 쓴 검증 도구다. 이 대회에서 대상(부총리상)을 받았다. 전환 전과 후의 소스를 넣으면 사유 없이 남은 기존 공개키 암호 코드가 없는지, NIST 보안레벨 3 이상의 ML-KEM·ML-DSA(기본은 ML-KEM-768·1024, ML-DSA-65·87)를 쓰는지, TLS 설정을 약하게 바꾸지 않았는지 보고 전환이 끝났는지 판정한다. 판정에 AI 모델을 쓰지 않으므로 입력이 같으면 판정도 같다.
 
 - 실행: `pip install pqproof` 뒤 `pqproof <전환 전 폴더|zip> <전환 후 폴더|zip>`, 저장소에서는 `bash prove.sh <전환 전> <전환 후>`. 예제로 돌려 보려면 `bash prove.sh examples/classic examples/pqc`(휠에도 예제가 들어 있다: guide/quickstart.md). 판정에는 bash·OpenSSL 이 있어야 해서 Windows 에서는 WSL 안에서 돌리고, 증적 재검증(`pqproof --verify`)과 SARIF 변환은 파이썬만으로 Windows 에서도 된다.
 - 출력: 판정(종료 코드 0 통과, 1 실패, 2 사용법·입력 오류, 3 미판정), 전후 CBOM 표, 검증 증적(`receipt.json`, `receipt.html`), 증적 해시. 증적 해시는 증적 JSON을 RFC 8785 방식으로 정규화해 SHA-256으로 계산한 값이다. `pqproof --verify <출력 폴더>`(저장소에서는 `bash prove.sh --verify`)로 누구든 다시 계산해 볼 수 있다. 증적에 실행 시각과 입력 폴더의 절대 경로가 들어가서, 입력이 같아도 증적 해시는 실행할 때마다 달라진다.
@@ -302,9 +328,11 @@ A different ruleset name alone (`1+modified` while rule files are being edited) 
 - 경로·비밀: 출력에는 입력 폴더, 도구, 출력 폴더의 절대 경로가 적히고, zip 입력이면 in/ 에 소스 전체가, artifacts/ 의 스캐너 출력에는 소스 줄이 그대로 들어 있다. 도구가 직접 쓰는 표 발췌와 SARIF snippet 은 비밀번호·토큰처럼 보이는 값을 *** 로 가린다. 출력 폴더를 남에게 넘기기 전에 확인한다.
 - 건너뛰는 폴더: `scan/skip-dirs` 한 곳에 둔다. `.git`·`node_modules` 같은 이름은 어느 깊이든, `build`·`target`·`dist`·`vendor`는 트리 맨 위이거나 빌드 파일(`pom.xml`·`go.mod`·`package.json` 등) 옆일 때만 건너뛰고 `src/main/` 아래는 늘 본다. 트리 해시와 세 스캐너가 같은 목록을 쓴다. 건너뛴 폴더는 파일 수와 함께 증적에 남고, 고친 판의 건너뛴 폴더에 코드 파일이 있으면 a-input 이 검토 필요다.
 - 이름 규칙: `Legacy*.java` 파일이나 주석을 뺀 코드에 `legacy`가 든 줄은 그 줄과 아래 3줄에 새 키·서명·암호화(자바·파이썬·Go·Node)가 없을 때만 허용한다. 주석의 `legacy`는 세지 않는다. 허용 목록 항목 없이 이름 규칙으로만 허용한 줄이 있으면 r-allow 가 검토 필요이고 `REQUIRE_REVIEW=1`이면 실패다.
+- 알고리즘 프로필(`PROFILE`, `scan/profiles.json`): 기본 `nist-cat3` 는 ML-KEM-768·1024 와 ML-DSA-65·87 을 c-expect 에 센다. `cnsa2` 는 ML-KEM-1024·ML-DSA-87 만 세고 TLS 대상에 SecP384r1MLKEM1024 를 홀로 제시한다. `kpqc` 는 국내 KpqC(SMAUG-T·NTRU+·HAETAE·AIMer, NIST 비승인)도 센다. 프로필은 고전 줄을 통과시키지 않는다.
+- 복합 서명(ML-DSA-65·87 과 RSA·ECDSA·Ed25519·Ed448 을 한 키로 묶은 것)은 막지도 그냥 넘기지도 않고 a-cbom·c-classic 모두 검토 필요로 둔다. 판정 줄에 수가 나온다.
 - 트리 밖: 트리 밖 파일은 열지 않는다. 설정이 가리키는 트리 밖 인증서는 '확인' 행으로만 남고, 트리 밖을 가리키는 심볼릭 링크가 코드·폴더면 a-input 이 미판정(`REQUIRE_REVIEW=1`이면 실패)이다. 그래서 같은 트리는 어느 기계에서나 같은 판정을 받는다.
 - 한계: 통과는 이 규칙으로 찾은 것이 없다는 뜻일 뿐, 규칙이 옳다는 보장은 아니다. 기능과 성능은 보지 않는다. 허용 목록은 판정을 바꾼다. 사유가 맞는지는 도구가 모르니 사람이 확인해야 하고 실무 검토에서는 `REQUIRE_REVIEW=1`로 돌리기를 권한다. JSON·YAML 설정 값이 고르는 알고리즘은 보지 않는다. 넣은 소스 밖의 설정(호스트의 TLS 설정 등)도 못 보므로 판정이 실행 중인 서비스를 직접 시험한 결과와 다를 수 있다. 작은 서비스에서만 써 봤고 실서비스 규모로는 아직 검증하지 않았다.
 - 공개하면서 대회 문제와 관련된 내용, 개인 경로, 대회용 보고서 표를 뺐다. 참가자가 만든 도구이며 주최·주관기관이 검토하거나 보증하지 않았다.
 - 건너뛴 검사는 통과로 세지 않는다. 돌지 못한 검사는 이름과 함께 '해당 없음'이나 '미판정'으로 남고, 판정 뒤에 상태별 개수를 따로 찍는다. 단위·셀프 시험도 '통과 n · 건너뜀 m'으로 세며 `STRICT=1`이면 건너뛴 것이 있을 때 실패한다.
-- 버전: 도구 버전은 `src/pqproof/__init__.py` 한 곳에서 정한다. 증적에 도구 버전, 규칙 묶음 이름과 해시(스캐너 패턴·시험 경로·건너뛰는 폴더·허용·약화 규칙과 판정 상수·검사 판정식 파일, 묶음 2는 열), 증적 형식을 남기고 `--verify`가 규칙 묶음 해시를 다시 계산한다. 이전 공개본이 쓴 옛 증적도 계속 읽는다. 판정이 바뀔 수 있는 변경과 새 명령·옵션은 0.x 동안 MINOR로, 그 밖 고침은 PATCH로 올린다. 판정이 바뀌는 릴리스는 PATCH가 될 수 없고 CI와 릴리스 작업이 앞 릴리스 태그와 대조해 막는다(`tests/version_policy.py`). 바뀐 내용은 CHANGELOG.md의 '판정 영향' 칸에 적는다.
+- 버전: 도구 버전은 `src/pqproof/__init__.py` 한 곳에서 정한다. 증적에 도구 버전, 규칙 묶음 이름과 해시(스캐너 패턴·시험 경로·건너뛰는 폴더·알고리즘 프로필·허용·약화 규칙과 판정 상수·검사 판정식 파일, 묶음 2는 열하나), 증적 형식을 남기고 `--verify`가 규칙 묶음 해시를 다시 계산한다. 이전 공개본이 쓴 옛 증적도 계속 읽는다. 판정이 바뀔 수 있는 변경과 새 명령·옵션은 0.x 동안 MINOR로, 그 밖 고침은 PATCH로 올린다. 판정이 바뀌는 릴리스는 PATCH가 될 수 없고 CI와 릴리스 작업이 앞 릴리스 태그와 대조해 막는다(`tests/version_policy.py`). 바뀐 내용은 CHANGELOG.md의 '판정 영향' 칸에 적는다.
 - 문서: 설치·설정·결과 읽기는 [guide/](guide/), 규칙과 증적 형식은 이 파일, 본선에서 쓴 이야기와 본선 뒤 바뀐 점은 [HISTORY.md](HISTORY.md)에 있다.

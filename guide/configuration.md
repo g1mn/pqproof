@@ -7,7 +7,8 @@ Settings are environment variables, the same for `pqproof` and `bash prove.sh`. 
 | `OUT` | `./proof-out-YYYYMMDD-HHMMSS` | output folder; an existing one stops the run |
 | `ALLOW` | `<W>/notes/unconverted.json` when the original is `<W>/orig` | allowlist file, or `none` ([allowlist.md](allowlist.md)) |
 | `REQUIRE_REVIEW` | `0` | `1`: an allowlist entry without a person's review, or an unused entry, fails the run. Recommended for real reviews |
-| `EXPECT` | `kem,sig` | what the fixed tree must use: `kem` (ML-KEM-768), `sig` (ML-DSA-65), `tls` (hybrid TLS), `cert` (ML-DSA-65 certificate), or `none` |
+| `EXPECT` | `kem,sig` | what the fixed tree must use: `kem` (ML-KEM), `sig` (ML-DSA), `tls` (hybrid TLS), `cert` (ML-DSA certificate), or `none`. `PROFILE` says which sizes count |
+| `PROFILE` | `nist-cat3` | algorithm profile from `scan/profiles.json`: `nist-cat3` counts ML-KEM-768 or 1024 and ML-DSA-65 or 87; `cnsa2` counts only ML-KEM-1024 and ML-DSA-87 and offers `SecP384r1MLKEM1024` to TLS targets; `kpqc` also counts SMAUG-T, NTRU+, HAETAE and AIMer |
 | `SCOPE` | `all` | `kex`: judge key exchange only; signatures and encryption are listed as out of scope |
 | `CLASSIC` | `allow` | `deny`: a TLS target must refuse an old client offering only X25519 and P-256 |
 | `EXCLUDE` | none | run-data globs such as `data/** *.db *.log`. Code, config and build files are never excluded |

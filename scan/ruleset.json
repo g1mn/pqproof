@@ -34,7 +34,7 @@
    ]
   },
   "2": {
-   "sha256": "d7c6d77c397e34b14c0ffa3f00bad90dd903b7383448786cf024822be901030e",
+   "sha256": "debc7ed276209059bdae94353807fb512510ff43ac8c2acd77be3f1c8199b19c",
    "since": "0.2.0",
    "verdict_impact": "yes",
    "files": [
@@ -44,11 +44,11 @@
     },
     {
      "path": "pqlite/rules.py",
-     "sha256": "61791cfe368bb0715bbfef616652c8c9df01764079a946ff93d34a94f87da038"
+     "sha256": "d620022600cea362a1f49349b1b348adbb865bdcd963b7cb57c51967a3e2d3ad"
     },
     {
      "path": "pqlite/scan.py",
-     "sha256": "cc293471f39db3b221db0d5dd849b2e8a381af59faf05b9f076c8b3768b267d7"
+     "sha256": "2be4593cd30b6d842c60a693d5ee96bd9496ac167a9b4cad54de07690e95624b"
     },
     {
      "path": "pqlite/skipdirs.py",
@@ -56,19 +56,23 @@
     },
     {
      "path": "pqlite/tlsprobe.py",
-     "sha256": "82ca986379c3a6174626afe25ff057575de712458e899eeacea51534fe77aed9"
+     "sha256": "038ae4a7f105845983c9bb17dc75baad485a7e0f94970466c9dba699cdeee6c8"
     },
     {
      "path": "pqlite/verify.py",
-     "sha256": "2bc1711f13ab5db4a68134470f66ac515bce030ef41076f9bdd868ffb3387958"
+     "sha256": "dc422c4d734457beae72ac8a8abcb1c3d11a804110cbea38a72aa2ddc8a34489"
     },
     {
      "path": "scan/cbom-scan.sh",
-     "sha256": "4943c2f302bbfc9507c0f27d9a8d9a5d0586ba38e38562f2cb347d8a1e71025e"
+     "sha256": "c8a331aa19cb929b9c0d3f6ed21d7fb779025ce9be3ed3cb05f3714d50bd2bf9"
+    },
+    {
+     "path": "scan/profiles.json",
+     "sha256": "87c3a27ea4c7cab6c1c729a40cec7ceaca37b75617798193bf4e9fbcd5a4bdba"
     },
     {
      "path": "scan/residue.sh",
-     "sha256": "903ef55096171668be1fdfce757af54964ac307278cc8818a4a452f86454a9cf"
+     "sha256": "4b5387d5f18acf03c902c2e9024602de7dd1f6585a1650cfd4f7080de469ff61"
     },
     {
      "path": "scan/skip-dirs",
@@ -76,7 +80,7 @@
     },
     {
      "path": "scan/test-paths.ere",
-     "sha256": "9f03d194aa19b4d561610706281ae76f0cf8594e8970dfc943b1ccbe696bf457"
+     "sha256": "1c57d266eb7365ec1766652c6d43277ce0e59fb9924aa02b6bf3a3a5faf89bfa"
     }
    ]
   }

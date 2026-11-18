@@ -8,6 +8,8 @@
 #       같은 파일 둘째 줄의 본 소스 표시(/src/main/) 뒤쪽은 시험으로 보지 않는다(MAIN_PATH, com/example 회귀 수정).
 #       건너뛰는 폴더는 scan/skip-dirs 한 곳(pqlite/skipdirs.py)에서 읽는다. vendor·build·target 은 트리 맨 위나 빌드 파일 옆일
 #       때만 건너뛰고 src/main 아래는 본다(교차 리뷰 X02·X03·X09).
+#       규칙 묶음 2에서 보탬: KpqC(HAETAE·AIMer·SMAUG-T·NTRU+) 이름을 PQC 로(X28), 복합 서명(ML-DSA+고전) 이름은 threat 'composite'(X26),
+#       Nimbus ECKeyGenerator·RSAKeyGenerator·OctetKeyPairGenerator·Curve.P_256 등(X20), 문자열 잇기("R" + "SA")를 한 이름으로(X57).
 """암호 사용처 목록(CBOM) 행을 만든다(PQ-Proof scan.py에 Java BC/JCA를 보탬).
 
 오프라인판 추가분:
@@ -105,6 +107,11 @@ NIST_MLDSA = "ML-DSA (FIPS 204)"
 NIST_OTHER_PQ = "post-quantum (FIPS 205 SLH-DSA, FN-DSA draft, HQC)"
 NIST_WEAK_PQ = "post-quantum but below NIST security category 3 (ML-KEM-512, ML-DSA-44)"
 SHOR, PQC, WEAK_PQC, INFO, UNKNOWN = "shor", "pqc", "weak-pqc", "info", "unknown"
+COMPOSITE = "composite"  # ML-DSA 와 고전 서명을 한 키로 묶은 복합 서명(교차 리뷰 X26): 막지 않고 검토 필요로 센다
+NIST_KPQC = "post-quantum, Korean KpqC standard (not NIST-approved)"
+NIST_COMPOSITE = "composite ML-DSA with a classical signature (IETF LAMPS draft)"
+# 복합 서명 이름. scan/residue.sh RES_COMPOSITE·scan/cbom-scan.sh COMPRE 와 같은 뜻(tests/test_rule_sync.py 가 대조한다)
+COMPOSITE_NAME = re.compile(r"(?i)ml[-_]?dsa[-_]?(44|65|87)[-_](?:rsa|ecdsa|ed25519|ed448)")
 
 # Go's names for TLS groups, and the names OpenSSL (nginx ssl_ecdh_curve) uses for the same groups.
 GO_CURVES = {"CurveP256": "P-256", "CurveP384": "P-384", "CurveP521": "P-521", "X25519": "X25519",
@@ -306,7 +313,9 @@ J_IDENT = re.compile(r"(?<![\w.\"])([A-Z_][A-Z0-9_]*|[a-z]\w*)(?![\w(\"])")
 PROVIDERS = {"BC", "BCPQC", "BCFIPS", "BCJSSE", "SunJCE", "SunEC", "SunRsaSign", "SunJSSE", "SUN", "SunPKCS11", "SunMSCAPI",
              "XMLDSig", "SunJGSS", "SunSASL", "JdkLDAP", "JdkSASL", "SunPCSC", "Apple"}
 PQ_NAME = re.compile(r"(?i)(?<![A-Za-z0-9])(?:ml[-_]?kem[-_]?(?:512|768|1024)|ml[-_]?dsa[-_]?(?:44|65|87)|kyber(?:512|768|1024)|"
-                     r"dilithium[235]|slh[-_]?dsa[-_A-Za-z0-9]*|sphincs[-_+A-Za-z0-9]*|falcon[-_]?(?:512|1024)?)(?![A-Za-z0-9])")
+                     r"dilithium[235]|slh[-_]?dsa[-_A-Za-z0-9]*|sphincs[-_+A-Za-z0-9]*|falcon[-_]?(?:512|1024)?|"
+                     r"haetae[-_]?(?:2|3|5|120|180|260)?|aimer[-_]?(?:128|192|256)?[fs]?|smaug[-_]?t[-_]?(?:1|3|5)?|ntru[-_]?(?:\+|plus)(?:[-_]?\d+)?)"
+                     r"(?![A-Za-z0-9])")
 BC_PROVIDER = re.compile(r"\bSecurity\s*\.\s*(?:addProvider|insertProviderAt)\s*\(\s*new\s+(BouncyCastle(?:PQC|JSSE|Fips)?Provider)\s*\(")
 NAMED_GROUPS_CALL = re.compile(r"\bsetNamedGroups\s*\(")
 JDK_GROUPS = re.compile(r"jdk\.tls\.namedGroups[\"']?\s*(?:=|:|,)\s*[\"']?([A-Za-z0-9_, -]{1,200})")
@@ -349,6 +358,7 @@ _CLASSIC_CLASSES = {
         "DH": "DHKeyPairGenerator DHBasicKeyPairGenerator DHParametersGenerator DHKeyGenerationParameters DHGenParameterSpec",
         "ElGamal": "ElGamalKeyPairGenerator", "Ed25519": "Ed25519KeyPairGenerator", "Ed448": "Ed448KeyPairGenerator",
         "X25519": "X25519KeyPairGenerator", "X448": "X448KeyPairGenerator",
+        "EC(Nimbus)": "ECKeyGenerator", "RSA(Nimbus)": "RSAKeyGenerator", "EdDSA·XDH(Nimbus OKP)": "OctetKeyPairGenerator",
     },
     "key-encoding": {
         "RSA": "RSAKeyParameters RSAPrivateCrtKeyParameters RSAPublicKeySpec RSAPrivateKeySpec RSAPrivateCrtKeySpec "
@@ -388,6 +398,8 @@ J_STATIC = [
     (re.compile(r"\bSECObjectIdentifiers\s*\.\s*(sec[pt]\d+[rk]\d)\b"), "OID {1}", "key-encoding"),
     (re.compile(r"\bEdECObjectIdentifiers\s*\.\s*(id_Ed25519|id_Ed448|id_X25519|id_X448)\b"), "OID {1}", "key-encoding"),
     (re.compile(r"\bNISTObjectIdentifiers\s*\.\s*(\w*dsa_with_\w+|id_rsassa_\w+)\b"), "OID {1}", "key-encoding"),
+    # Nimbus JOSE+JWT 곡선 상수(교차 리뷰 X20)
+    (re.compile(r"\bCurve\s*\.\s*(P_256|P_384|P_521|SECP256K1|Ed25519|Ed448|X25519|X448)\b"), "Nimbus Curve {1}", "key-encoding"),
 ]
 # 고전 키 형(캐스트·instanceof·선언). BC 구현 클래스(BCECPublicKey 등)도 같다
 J_KEYTYPE = re.compile(r"\b((?:BC)?(?:RSA(?:Public|Private|PrivateCrt|MultiPrimePrivateCrt)?|EC(?:Public|Private)?|DSA(?:Public|Private)?|"
@@ -400,6 +412,13 @@ KEYTYPE_ALG = [("RSA", "RSA"), ("EdEC", "EdDSA"), ("EdDSA", "EdDSA"), ("XEC", "X
 def _classify(name):
     """알고리즘 이름 → (보이는 이름, threat, nist, 비고). 비대칭이 아니면 None."""
     low = name.lower()
+    c = COMPOSITE_NAME.search(low)
+    if c:  # 복합 서명: ML-DSA-44 를 묶은 것은 보안레벨 3 미만이라 그대로 막는다
+        if c[1] == "44":
+            return name, WEAK_PQC, NIST_WEAK_PQ, "보안레벨 2(ML-DSA-44)를 묶은 복합 서명"
+        return name, COMPOSITE, NIST_COMPOSITE, "복합 서명(ML-DSA+고전), 허용 여부는 사람이 확인"
+    if re.search(r"haetae|aimer|smaug|ntru[-_]?(?:\+|plus)", low):
+        return name, PQC, NIST_KPQC, "양자내성(국내 KpqC, NIST 비승인)"
     m = re.search(r"ml[-_]?kem(?:[-_]?(512|768|1024))?|kyber(512|768|1024)?", low)
     if m:
         size = m[1] or m[2]
@@ -420,6 +439,14 @@ def _classify(name):
     if SHOR_ALG.search(name.strip()):
         return name, SHOR, NIST_PK, "양자 컴퓨터로 깨지는 공개키 알고리즘"
     return None
+
+
+J_CONCAT = re.compile(r"(?:\"(?:\\.|[^\"\\\n])*\"\s*\+\s*)+\"(?:\\.|[^\"\\\n])*\"")
+
+
+def _concat(expr):
+    """식 속 리터럴 조각 잇기("R" + "SA")를 한 이름으로(교차 리뷰 X57). 조각마다의 이름은 부르는 쪽이 따로 읽는다."""
+    return ["".join(J_STR.findall(m[0])) for m in J_CONCAT.finditer(expr)]
 
 
 def _call_span(bare, open_paren):
@@ -536,7 +563,7 @@ class _JavaValues:
                     continue
                 seen.add((ident, a))
                 pure = "(" not in J_STR.sub(" ", rhs)
-                out += [(v, pure) for v in J_STR.findall(rhs)]
+                out += [(v, pure) for v in _concat(rhs) + J_STR.findall(rhs)]
                 out += [(v, pure and p) for v, p in self.trace(rhs, a, depth + 1, seen)]
         return out
 
@@ -581,7 +608,7 @@ def scan_java(path, text, xconsts=None):
     def names_at(open_paren):
         """호출 인자 속 이름: (문자열 리터럴, 따라간 [(값, 순수)], 공급자)."""
         args = code[open_paren + 1:_call_span(bare, open_paren)]
-        literals, traced = J_STR.findall(args), vals.trace(args, open_paren + 1)
+        literals, traced = _concat(args) + J_STR.findall(args), vals.trace(args, open_paren + 1)
         provider = next((s for s in literals + [v for v, _ in traced] if s in PROVIDERS), None)
         if provider is None and re.search(r"\bBouncyCastle(?:PQC)?Provider\b", args):
             provider = "BC"

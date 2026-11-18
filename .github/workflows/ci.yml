@@ -39,8 +39,6 @@ env:
   # OASIS SARIF 2.1.0 errata01 OS 스키마. 내려받은 뒤 SHA-256 을 맞춰야 쓴다
   SARIF_SCHEMA_URL: https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json
   SARIF_SCHEMA_SHA256: c3b4bb2d6093897483348925aaa73af03b3e3f4bd4ca38cef26dcb4212a2682e
-  # cbom-scan.sh --selftest 의 단언 수(도구가 다 있을 때). 단언을 더하거나 빼면 같이 고친다
-  SCANNER_ASSERTIONS: "140"
 
 jobs:
   test:
@@ -176,26 +174,24 @@ jobs:
           cp -R . "$RUNNER_TEMP/scan-copy"
           if [ "$RUNNER_OS" = macOS ]; then OPENSSL="$(brew --prefix openssl@3)/bin/openssl"; export OPENSSL; fi
           (cd "$RUNNER_TEMP/scan-copy" && bash scan/cbom-scan.sh --selftest) 2>&1 | tee scanner.log
-          # cbom-scan.sh 는 도구가 없으면 그 단언을 말없이 빼고 'PASS n · FAIL m' 만 찍는다. 규칙 파일이라 여기서 센다(DESIGN.md Limits).
-          # 빠진 단언은 건너뜀이고 통과로 세지 않는다. 허용하는 건너뜀은 OpenSSL 3.5 미만(ubuntu-latest 3.0)의 ML-KEM·ML-DSA 4개뿐이다
+          # cbom-scan.sh --selftest 는 도구가 없어 못 돈 단언을 SKIP 으로 세고 전체 단언 수와 함께 찍는다('PASS n · FAIL m · SKIP k of t').
+          # 건너뛴 단언은 통과로 세지 않는다. 허용하는 건너뜀은 OpenSSL 3.5 미만(ubuntu-latest 3.0)의 ML-KEM·ML-DSA 4개뿐이다
           # (ML-DSA-65 인증서·ML-KEM-768 키 2, ML-KEM TLS 서버 2). macOS 는 Homebrew OpenSSL 3.5 이상이라 0개여야 한다.
           # ssh-keygen·keytool·Ed25519 가 없어 빠진 단언(7개)은 러너에 있어야 하는 도구라 실패로 본다
           python3 - scanner.log "$RUNNER_OS" <<'EOF'
-          import os, re, sys
-          total = int(os.environ["SCANNER_ASSERTIONS"])
+          import re, sys
           text = open(sys.argv[1], encoding="utf-8").read()
-          m = re.search(r"^selftest: PASS (\d+) · FAIL (\d+) \(OpenSSL: (.*), ML-KEM ([01]), keytool (.*)\)$", text, re.M)
+          m = re.search(r"^selftest: PASS (\d+) · FAIL (\d+) · SKIP (\d+) of (\d+) \(OpenSSL: (.*), ML-KEM ([01]), keytool (.*), ssh-keygen (.*)\)$",
+                        text, re.M)
           assert m, "cbom-scan.sh --selftest printed no summary line"
-          passed, failed, mlkem = int(m[1]), int(m[2]), m[4] == "1"
-          skipped = total - passed - failed
+          passed, failed, skipped, total, mlkem = int(m[1]), int(m[2]), int(m[3]), int(m[4]), m[6] == "1"
+          assert passed + failed + skipped == total, "the summary line does not add up"
           allowed = 0 if mlkem else 4
-          print(f"scanner self-test: {passed} 통과 · {skipped} 건너뜀 · {failed} 실패 (건너뛴 것은 통과로 세지 않는다), "
-                f"ML-KEM {int(mlkem)}, keytool {m[5]}, {m[3]}")
+          print(f"scanner self-test: {passed} 통과 · {skipped} 건너뜀 · {failed} 실패 / {total} (건너뛴 것은 통과로 세지 않는다), "
+                f"ML-KEM {int(mlkem)}, keytool {m[7]}, ssh-keygen {m[8]}, {m[5]}")
           assert failed == 0, f"{failed} scanner assertions failed"
           assert sys.argv[2] != "macOS" or mlkem, "macOS must run the ML-KEM assertions (Homebrew OpenSSL 3.5 or later)"
-          assert skipped >= 0, f"{passed + failed} assertions ran, more than SCANNER_ASSERTIONS={total}: update SCANNER_ASSERTIONS"
-          assert skipped == allowed, (f"{skipped} scanner assertions skipped, {allowed} allowed: ssh-keygen, keytool or Ed25519 "
-                                      "is missing on this runner, or SCANNER_ASSERTIONS is out of date")
+          assert skipped == allowed, f"{skipped} scanner assertions skipped, {allowed} allowed: ssh-keygen, keytool or Ed25519 is missing on this runner"
           EOF
 
       - name: Keep logs

@@ -12,9 +12,9 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 ## [Unreleased]
 
-Planned as 0.2.0: ruleset 2 (new name and hash), evidence format 3. Bypasses from the November review (X01 to X10) are closed. `--verify` still reads evidence formats 1 and 2 (ruleset 1).
+Planned as 0.2.0: ruleset 2 (new name and hash), evidence format 3. Bypasses from the November review (X01 to X10) are closed, and the rule gaps X11, X18 to X26, X28 and X59 with them. `--verify` still reads evidence formats 1 and 2 (ruleset 1).
 
-**Verdict impact (판정 영향): yes.** The 14 golden tree cases of 0.1.1 give the same verdicts, check statuses and counts. Eight new golden cases plant one bypass each; 0.1.1 passed every one of them (exit 0). Trees that used one of these bypasses get a different verdict, and a tree hash changes when the tree holds a folder that the skip rules now treat differently.
+**Verdict impact (판정 영향): yes.** The 14 golden tree cases of 0.1.1 give the same verdicts and check statuses. Their counts move in three places: `E-MLKEM768` drops from 3 to 2 in the migrated example because a trailing `#` comment no longer counts as code, lower-case `ecdsa` now counts under `G-EC`, and `m04` gets one more weakening hit (its TLS 1.0 protocol list also leaves out TLS 1.3); the four new `EXPECT` rules appear with 0. Nineteen new golden cases plant one bypass or false positive each, and 0.1.1 gives a different verdict or check status on every one of them. Trees that used one of these bypasses get a different verdict, and a tree hash changes when the tree holds a folder that the skip rules now treat differently.
 
 | Change | 0.1.1 (ruleset 1) | Now (ruleset 2) |
 |---|---|---|
@@ -30,6 +30,20 @@ Planned as 0.2.0: ruleset 2 (new name and hash), evidence format 3. Bypasses fro
 | X08: a tree whose file paths exceed the argument limit | `c-classic` undecided | judged |
 | X09: `build`, `target` and `vendor` under `src/main/`; `.hg`, `.svn`, `.tox`, `.terraform`; `dist` next to a build file; top-level `data/` | judged by some scanners only, or outside the tree hash | one rule for the tree hash and all scanners (see DESIGN, Skipped folders) |
 | X58 (found again here): ML-KEM named only in a comment on an X25519 line | `c-classic` allowed it as hybrid | counted |
+| X11: a migration to ML-KEM-1024 and ML-DSA-87 (`m25`) | `c-expect` fail | pass (`PROFILE=nist-cat3`, the default) |
+| X11: `PROFILE=cnsa2` on an ML-KEM-768 tree (`m25b`) | setting unknown, pass | `c-expect` fail |
+| X18: `MaxVersion: tls.VersionTLS12` in Go (`m22`); `maxVersion: 'TLSv1.2'`, `OP_NO_TLSv1_3`, a Java or Spring protocol list without TLS 1.3 | pass | fail (`a-cbom`, and `b-weakening` when a change adds it) |
+| X19: lower-case `ed25519`, `x25519`, `secp384r1`, `ecdsa`, `diffie-hellman`, `ssh-dss` (`m17`) | `c-classic` pass | `c-classic` fail |
+| X20: PyNaCl `Box`, tweetnacl, libsodium, Go `x/crypto/nacl`, wolfSSL, Nimbus (`m23`) | pass | fail (`a-cbom`) |
+| X22: RSA in a Python docstring or a trailing `#` comment (`m24`) | fail | pass (comment) |
+| X22: `#include <openssl/rsa.h>` in C | `a-cbom` comment | blocks like other code |
+| X23: `AWS::EC2`, CSS `#EC4899`, `0x00EC` (`m18`) | `c-classic` fail | pass |
+| X24: `.test.tsx`, Django `tests.py`, `__mocks__`, `src/integrationTest`, `*_spec.rb` (`m19`) | fail | counted as tests |
+| X25: Node `crypto.sign(null, ...)` with an ML-DSA-65 key (`m20`) | `a-cbom` fail | pass (a "check" row; the key generation decides) |
+| X26: composite signature `MLDSA65-ECDSA-P256-SHA512` (`m21`) | `a-cbom` pass, `c-classic` fail | both need review, verdict pass |
+| X28: HAETAE, AIMer, SMAUG-T, NTRU+ in Java | `scan.py` "check" row | post-quantum row; counted by `c-expect` under `PROFILE=kpqc` |
+| X59: an `ssh-ed25519` host key in `known_hosts`, `HostKeyAlgorithms` in `~/.ssh/config` (`m26`) | pass | fail (`a-cbom`, `c-classic`) |
+| N1: `-Djdk.internal.httpclient.disableHostnameVerification` as a JVM option | pass | `b-weakening` fail |
 
 ### Added
 
@@ -38,6 +52,10 @@ Planned as 0.2.0: ruleset 2 (new name and hash), evidence format 3. Bypasses fro
 - Evidence format 3 (`schemas/receipt-v3.schema.json`): `skip_dirs` (the copied list), tree hashes taken with the skip rules, `r-allow` and the verdict line count lines allowed by the name rule alone, and the note says `pqproof --verify`. SARIF reports those lines under `r-allow`.
 - Eight mutation cases with golden entries (`m12` to `m16`), behaviour tests for links, out-of-tree files and the argument limit, a format 2 fixture from 0.1.1 (`tests/golden/evidence/f2-v0.1.1`), and eight more code mutants (30 in all).
 - `HOST_FILES=1` for `cbom-scan.sh` run on its own: read the certificates and host keys a setting points to outside the tree. `prove.sh` never passes it.
+- `PROFILE` and `scan/profiles.json` (X11, X28): `nist-cat3` (default), `cnsa2` and `kpqc`. `receipt.json` records `params.profile`; `b-tls` offers the profile's hybrid group and `EXPECT=cert` accepts its certificate keys.
+- `residue.sh` rules `E-MLKEM1024`, `E-MLDSA87`, `E-KPQC-KEM` and `E-KPQC-SIG`, and composite signatures counted apart (`allowlist.composite`, format 3).
+- Weakening rules for code that turns TLS 1.3 off in Go, Node, Python, Java and Spring (X18), and scanner rows for the same settings.
+- Eleven mutation cases with golden entries (`m17` to `m26`), and 20 scanner assertions (160 in all) under `scan/fixtures/r2/`.
 
 ### Changed
 
@@ -47,6 +65,12 @@ Planned as 0.2.0: ruleset 2 (new name and hash), evidence format 3. Bypasses fro
 - Symbolic links (X04): links in the fixed tree that point outside the tree or into a skipped folder are listed in `inputs.*.skipped` and in `a-input`, for folders and zips alike.
 - `cbom-scan.sh` never opens files outside the tree it scans (X05). `G-WEAK-PQC` and the scanner match ML-KEM-512, ML-DSA-44, Kyber512 and Dilithium2 in any case and separator (X07). The comment and test flags are read only at the start of a CBOM note (X06). `residue.sh` passes its file list in a temporary file (X08).
 - `cbom-scan.sh` is in the CI shellcheck job; three warnings in it are gone without a change in behaviour.
+- Ruleset 2 now hashes eleven files: `scan/profiles.json` joined it.
+- `residue.sh` reads comments by language (Python docstrings and trailing `#`, `#` in shell, YAML, Terraform and `sshd_config`, more C-family extensions) and matches lower-case names (X19, X22). `cbom-scan.sh` reads a leading `#`, `--` or `;` as a comment only in the languages that use it, and `pqlite/rules.py` checks Go, JavaScript, Python and Java rows with the language tokenizer (X22). `G-EC` needs `EC` as its own word (X23). The test-path rule covers more frameworks, and keystores in test paths carry the flag (X24).
+- `crypto.sign`/`crypto.verify` in Node is a "check" row (X25). `known_hosts` and `~/.ssh/config` are scanned (X59). PyNaCl, tweetnacl, libsodium, Go `x/crypto/nacl`, wolfSSL and Nimbus are matched by API (X20).
+- A file name with a control character (newline, tab) is an input error (exit 2) for folders too, not only for zips (X21): the line-based scanners would miss the file.
+- The verdict line names the checks that need review besides those it already counts (`needs review: a-input`), and counts composite signatures (format 3, X30).
+- `cbom-scan.sh` masks password-like values in its own excerpts and passes keystore passwords through environment variables, not the command line (X33). `--selftest` counts skipped assertions and prints the total, so CI no longer keeps the number.
 - `tests/version_policy.py --base`: when the version was bumped but shipped the base's ruleset, and the current ruleset's `since` is a later release, the verdict change counts toward that later release and `[Unreleased]` has to say yes. Before, every commit after the 0.1.1 bump that changed a rule failed the check against `v0.1.0`.
 
 ## [0.1.1] - 2026-11-19
