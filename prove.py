@@ -27,6 +27,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import unicodedata
 import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -160,20 +161,58 @@ def parse_target(spec):
 
 # ---------------------------------------------------------------------------------------------
 # 입력
+MAX_ZIP_ENTRIES = 500_000
+ZIP_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def zip_names_problem(names):
+    """zip 항목 이름 목록에서 풀면 기계마다 트리가 달라지는 꼴을 찾는다(없으면 None): 같은 이름 두 번, 대소문자·유니코드 정규화만
+    다른 이름(macOS·Windows 에서 한 파일로 겹친다), 제어 문자, 항목 수 상한."""
+    if len(names) > MAX_ZIP_ENTRIES:
+        return f"zip 항목이 {len(names)}개로 상한 {MAX_ZIP_ENTRIES}개를 넘는다"
+    seen, folded = set(), {}
+    for name in names:
+        if ZIP_CONTROL.search(name):
+            return f"zip 안 이름에 제어 문자가 있다: {name!r}"
+        key = name.rstrip("/")
+        if key in seen:
+            return f"zip 안에 같은 이름이 두 번 있다: {name!r}(어느 쪽을 풀지 도구마다 다르다)"
+        seen.add(key)
+        fold = unicodedata.normalize("NFC", key).casefold()
+        if fold in folded:
+            return (f"zip 안 두 이름이 대소문자나 유니코드 정규화만 다르다: {folded[fold]!r}, {name!r}"
+                    "(macOS·Windows 에서는 한 파일로 겹쳐 기계마다 트리가 달라진다)")
+        folded[fold] = name
+    return None
+
+
 def unzip_safe(path, dest):
-    """zip을 dest에 푼다. 절대 경로·..·역슬래시 이름은 거부, 심볼릭 링크는 풀지 않고 이름만 남긴다."""
+    """zip을 dest에 푼다. 절대 경로·..·역슬래시 이름은 거부, 심볼릭 링크는 풀지 않고 이름만 남긴다. 같은 이름·대소문자만 다른 이름·
+    제어 문자·항목 수 상한과 풀 수 없는 꼴(파일 아래 파일)은 입력 오류(종료 2)다."""
+    try:
+        with zipfile.ZipFile(path) as z:
+            infos = z.infolist()
+            problem = zip_names_problem([i.filename for i in infos])
+            if problem:
+                raise UsageError(problem)
+            return _unzip_entries(z, infos, dest)
+    except zipfile.BadZipFile as e:
+        raise UsageError(f"zip 을 읽을 수 없다({e}): {path}") from e
+
+
+def _unzip_entries(z, infos, dest):
     links = []
     total = 0
-    with zipfile.ZipFile(path) as z:
-        for info in z.infolist():
-            name = info.filename
-            parts = name.rstrip("/").split("/")
-            if name.startswith("/") or "\\" in name or ".." in parts or re.match(r"^[A-Za-z]:", name):
-                raise UsageError(f"zip 안 위험한 경로: {name!r}")
-            if stat.S_ISLNK(info.external_attr >> 16):
-                links.append(name)
-                continue
-            target = os.path.join(dest, *[p for p in parts if p])
+    for info in infos:
+        name = info.filename
+        parts = name.rstrip("/").split("/")
+        if name.startswith("/") or "\\" in name or ".." in parts or re.match(r"^[A-Za-z]:", name):
+            raise UsageError(f"zip 안 위험한 경로: {name!r}")
+        if stat.S_ISLNK(info.external_attr >> 16):
+            links.append(name)
+            continue
+        target = os.path.join(dest, *[p for p in parts if p])
+        try:
             if info.is_dir():
                 os.makedirs(target, exist_ok=True)
                 continue
@@ -183,6 +222,8 @@ def unzip_safe(path, dest):
             os.makedirs(os.path.dirname(target), exist_ok=True)
             with z.open(info) as src, open(target, "xb") as dst:
                 shutil.copyfileobj(src, dst)
+        except (FileExistsError, NotADirectoryError, IsADirectoryError) as e:
+            raise UsageError(f"zip 안 이름끼리 겹쳐 풀 수 없다(파일과 폴더가 같은 이름 등): {name!r} ({type(e).__name__})") from e
     return links
 
 

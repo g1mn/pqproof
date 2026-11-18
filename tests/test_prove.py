@@ -4,6 +4,8 @@ import pathlib
 import sys
 import tempfile
 import unittest
+from unittest import mock
+import warnings
 import zipfile
 
 PROOF = pathlib.Path(__file__).resolve().parent.parent
@@ -88,6 +90,36 @@ class Inputs(unittest.TestCase):
             self.assertEqual(prove.unzip_safe(good, dest), ["app/link"])
             self.assertEqual(prove.unwrap(dest), os.path.join(dest, "app"))
             self.assertFalse(os.path.lexists(os.path.join(dest, "app", "link")))
+
+    def test_ambiguous_zip_names_are_input_errors(self):
+        """같은 이름 두 번, 대소문자·정규화만 다른 이름, 제어 문자, 파일 아래 파일은 기계마다 트리가 달라지거나 풀리지 않는다(X62)."""
+        cases = {
+            "duplicate": [("app/A.java", "class A {}"), ("app/A.java", "class A { int rsa; }")],
+            "case": [("app/Crypto.java", "a"), ("app/crypto.java", "b")],
+            "normalization": [("app/caf\u00e9.py", "a"), ("app/cafe\u0301.py", "b")],
+            "control": [("app/a\nb.py", "a")],
+            "file-under-file": [("app/x", "a"), ("app/x/y.py", "b")],
+        }
+        with tempfile.TemporaryDirectory() as d:
+            for label, entries in cases.items():
+                with self.subTest(label):
+                    zp = os.path.join(d, f"{label}.zip")
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore")  # zipfile 은 같은 이름에 UserWarning 을 낸다
+                        with zipfile.ZipFile(zp, "w") as z:
+                            for name, text in entries:
+                                z.writestr(name, text)
+                    dest = os.path.join(d, label)
+                    os.makedirs(dest)
+                    with self.assertRaises(prove.UsageError):
+                        prove.unzip_safe(zp, dest)
+            notzip = os.path.join(d, "broken.zip")
+            pathlib.Path(notzip).write_bytes(b"PK\x03\x04 not really a zip")
+            with self.assertRaises(prove.UsageError):
+                prove.unzip_safe(notzip, os.path.join(d, "broken"))
+            self.assertIsNone(prove.zip_names_problem(["app/", "app/A.java", "app/B.java", "__MACOSX/app/._A.java"]))
+            with mock.patch.object(prove, "MAX_ZIP_ENTRIES", 2):
+                self.assertIn("상한", prove.zip_names_problem(["a", "b", "c"]))
 
     def test_params(self):
         with self.assertRaises(prove.UsageError):

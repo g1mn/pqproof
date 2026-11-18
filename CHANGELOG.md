@@ -32,6 +32,7 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 - `--verify` and `pqproof sarif` read `receipt.json` strictly. A duplicate key, a byte order mark, `NaN` or `Infinity`, or bytes after the object fail, and so does any file whose bytes differ from the tool's own serialization of its values. Before, a second `"verdict"` key inserted at the top passed `--verify` with the same `receipt_id`, while a parser that keeps the first value read another verdict.
 - The RFC 8785 form sorts object keys by UTF-16 code units, as the RFC says, and refuses integers beyond 2^53. Every key so far is ASCII, so no existing `receipt_id` changes. A test recomputes the golden receipts with a second implementation and, when Node.js is there, in JavaScript.
 - `--verify` on a folder that does not exist, or one without `receipt.json`, exits 2 (input error) instead of 1.
+- A zip input that would unpack differently on another machine is an input error (exit 2) with a one-line reason: a name that appears twice, names that differ only in case or Unicode normalization, control characters, a file and a folder with the same name, or more than 500,000 entries. Before, a repeated name stopped the run with a Python traceback and exit 1, and a case-only pair unpacked as one file on macOS. Well-formed zips and folders get the same verdicts as before.
 - SARIF rule help links (`helpUri`) pointed to `#checks`, an anchor the site does not have, so they opened the top of the page. They now point to `#sec-checks`, the checks section.
 
 ## [0.1.0] - 2026-11-18
