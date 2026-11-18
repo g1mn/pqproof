@@ -127,6 +127,7 @@ if(t==='light'||t==='dark')d.setAttribute('data-theme',t);if(l==='en'||l==='ko')
   .tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .tbtn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; color: var(--ink); font-family: var(--mono); font-size: 12px; font-weight: 600; }
   .tbtn:hover { border-color: var(--accent); }
+  a.tbtn { text-decoration: none; }
   .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--surface); }
   .seg button { padding: 7px 12px; border: 0; background: transparent; color: var(--muted); font-family: var(--mono); font-size: 12px; font-weight: 700; cursor: pointer; }
   .seg button + button { border-left: 1px solid var(--line); }
@@ -394,6 +395,7 @@ if(t==='light'||t==='dark')d.setAttribute('data-theme',t);if(l==='en'||l==='ko')
         <button type="button" data-setlang="ko" aria-pressed="true">KO</button>
         <button type="button" data-setlang="en" aria-pressed="false">EN</button>
       </div>
+      <a class="tbtn" href="https://github.com/g1mn/pqproof" aria-label="GitHub g1mn/pqproof"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" stroke="none" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
       <button type="button" class="tbtn" id="themeBtn"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/></svg><span class="ko">테마</span><span class="en">Theme</span></button>
     </div>
   </header>
