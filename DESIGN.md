@@ -301,6 +301,8 @@ bash scan/cbom-scan.sh --selftest    # scanner assertions
 
 `tests/golden/verdicts.json` keeps the verdict, the check statuses and the main counts (blocking locations, classical lines per family, ML-KEM and ML-DSA lines, weakening hits, allowlist counts) of every tree case above, including the two plain example runs. `run_mutations.py --golden tests/golden/verdicts.json` fails when any of them moves. After an intended rule change, rewrite the file with `--write-golden` and record the change under "Verdict impact" in `CHANGELOG.md`.
 
+A different ruleset name alone (`1+modified` while rule files are being edited) fails no case. It is reported once, at the top of the golden summary, and a case fails only when its verdict, a check status or a count moves. `--diff-golden FILE` writes the moved cases and fields as a Markdown table, a draft for the verdict-impact entry. `--write-golden` prints the same comparison against the file it replaces, then writes it.
+
 ### Rule tests
 
 `tests/test_rules.py` pins what each rule does today, one row per alternative. Every pattern alternative in `residue.sh` has a line it catches and a near miss it must not catch, along with the comment, test-path, `legacy`, `Legacy*.java`, same-line ML-KEM and write-operation cases. Every rule in `pqlite/verify.py` has a change it flags and one it does not. The allow rules in `prove.py` are tested at their edges: an ML-KEM line 12 lines away counts as hybrid and 13 does not, a write operation 3 lines below an allowed line counts and 4 does not, and `a-input` passes at exactly half the original files in common and is undecided one file below. A rule or an alternative with no row fails the test.

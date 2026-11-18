@@ -20,6 +20,10 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 - Code mutants (`tests/code_mutants.py`, weekly workflow): 22 small changes to the rule code, each of which must fail a behaviour or sync test. All 22 do. Before these tests, three of the reviewer's seven mutants passed every test and three more failed only the ruleset hash check.
 - Sync tests (`tests/test_rule_sync.py`) for rule values that live in more than one file: the residue rule IDs against the nine families in `prove.py` and the rules SARIF reports, the write operations, the `legacy` word, the `Legacy*.java` name rule, and the order in which `prove.py` and `pqproof doctor` pick OpenSSL. The four skip-folder lists differ today; the test pins them as a known gap.
 
+### Changed
+
+- Golden comparison in `run_mutations.py`: a different ruleset name alone no longer fails every tree case. It is reported in one line at the top of the golden summary, and a case fails only when its verdict, a check status or a count moves. `--diff-golden FILE` writes the moved cases and fields as a Markdown table for the verdict-impact entry, and `--write-golden` prints what moved against the file it replaces before writing it.
+
 ### Fixed
 
 - SARIF rule help links (`helpUri`) pointed to `#checks`, an anchor the site does not have, so they opened the top of the page. They now point to `#sec-checks`, the checks section.

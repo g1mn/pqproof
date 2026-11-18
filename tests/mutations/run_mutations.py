@@ -8,7 +8,11 @@
 #   --root DIR: 도구 루트(prove.sh·examples/ 가 있는 곳). --sarif FILE: sarif.py(기본 <root>/src/pqproof/sarif.py)
 #   --spec selfcheck.json: 이 실행기 자체 점검(틀린 기대값은 FAIL, 낡은 고정물은 SKIP 으로 나와 종료 코드 1이어야 한다)
 #   --golden tests/golden/verdicts.json: 트리 항목마다 판정·검사 칸·숫자(golden_view)를 고정 기록과 맞춘다. 규칙을 바꿔 하나라도
-#     움직이면 FAIL 이다. 일부러 바꾼 것이면 --write-golden 으로 다시 쓰고 CHANGELOG.md 의 '판정 영향' 칸에 같이 적는다
+#     움직이면 FAIL 이다. 일부러 바꾼 것이면 --write-golden 으로 다시 쓰고 CHANGELOG.md 의 '판정 영향' 칸에 같이 적는다.
+#     규칙 묶음 이름(ruleset_version)만 다른 것은 사례별 FAIL 이 아니다. golden 요약 맨 위에 한 줄로 알린다(규칙 파일을 고치는 동안
+#     모든 사례가 '1+modified' 한 칸 때문에 FAIL 이 되어 진짜 판정 이동이 묻히지 않게)
+#   --diff-golden FILE(- 는 화면): golden 과 다른 사례·칸을 Markdown 표로 쓴다. CHANGELOG '판정 영향' 칸의 초안이다
+#   --write-golden FILE: 이번 실행으로 고정 기록을 다시 쓴다. 쓰기 전에 그 파일의 지금 내용과 비교한 요약을 먼저 찍는다
 # 상태: PASS · FAIL · SKIP(준비 못 함: 고정물이 낡았거나 의존 도구 없음) · PENDING(고치는 중인 결함, --strict 가 아니면 종료 코드에 안 셈)
 # 건너뛴 것은 통과로 세지 않는다: SKIP 이 하나라도 있으면 종료 코드는 1이다.
 # 종료: 0 전부 통과 · 1 실패·건너뜀 있음 · 2 사용법 오류
@@ -151,13 +155,100 @@ def golden_view(code, rec):
             "ruleset_version": rec.get("ruleset_version")}
 
 
-def golden_diff(want, got, where=""):
+RULESET_FIELD = "ruleset_version"
+
+
+def golden_changes(want, got, where=""):
+    """바뀐 칸 [(칸 경로, golden 값 JSON, 지금 값 JSON)]."""
     if isinstance(want, dict) and isinstance(got, dict):
         out = []
         for k in sorted(set(want) | set(got)):
-            out += golden_diff(want.get(k, "<missing>"), got.get(k, "<missing>"), f"{where}.{k}" if where else k)
+            out += golden_changes(want.get(k, "<missing>"), got.get(k, "<missing>"), f"{where}.{k}" if where else k)
         return out
-    return [] if want == got else [f"{where}: golden {json.dumps(want, ensure_ascii=False)}, now {json.dumps(got, ensure_ascii=False)}"]
+    return [] if want == got else [(where, json.dumps(want, ensure_ascii=False), json.dumps(got, ensure_ascii=False))]
+
+
+def golden_diff(want, got, where=""):
+    return [f"{k}: golden {g}, now {n}" for k, g, n in golden_changes(want, got, where)]
+
+
+def split_ruleset(view):
+    """golden 칸에서 규칙 묶음 이름을 떼어 낸다: (이름, 나머지 칸). 사례별 비교는 나머지(판정·검사 상태·숫자)만 한다."""
+    if not isinstance(view, dict):
+        return None, view
+    return view.get(RULESET_FIELD), {k: v for k, v in view.items() if k != RULESET_FIELD}
+
+
+def golden_compare(golden, views):
+    """(옮겨 간 사례 {id: 바뀐 칸 목록}, golden 의 묶음 이름들, 지금 묶음 이름들, golden 에 없는 사례)."""
+    moved, rs_gold, rs_now, missing = {}, set(), set(), []
+    for cid in sorted(views):
+        if cid not in golden:
+            missing.append(cid)
+            continue
+        g_rs, g = split_ruleset(golden[cid])
+        n_rs, n = split_ruleset(views[cid])
+        rs_gold.add(str(g_rs))
+        rs_now.add(str(n_rs))
+        rows = golden_changes(g, n)
+        if rows:
+            moved[cid] = rows
+    return moved, rs_gold, rs_now, missing
+
+
+def golden_summary(golden, views, label="golden"):
+    """화면 요약: 묶음 이름 차이는 맨 위 한 줄, 그다음 옮겨 간 사례 수와 사례 x 바뀐 칸."""
+    moved, rs_gold, rs_now, missing = golden_compare(golden, views)
+    out = []
+    if rs_gold != rs_now:
+        out.append(f"{label}: ruleset {', '.join(sorted(rs_gold))} in the golden file, {', '.join(sorted(rs_now))} now (rule files changed). "
+                   "Cases are compared on verdict, checks and counts only")
+    out.append(f"{label}: {len(moved)} of {len(views) - len(missing)} cases moved"
+               + (f", {len(missing)} new (no golden entry): {', '.join(missing)}" if missing else ""))
+    for cid, rows in moved.items():
+        out += [f"  {cid}  {k}: {g} -> {n}" for k, g, n in rows]
+    return out
+
+
+def golden_markdown(golden, views):
+    """CHANGELOG '판정 영향' 칸 초안(Markdown): 옮겨 간 사례 x 바뀐 칸 표."""
+    moved, rs_gold, rs_now, missing = golden_compare(golden, views)
+    n = len(views) - len(missing)
+    head = f"**Verdict impact (판정 영향) draft: {'yes' if moved else 'none'}.** {len(moved)} of {n} golden cases moved"
+    if rs_gold != rs_now:
+        head += f" (ruleset {', '.join(sorted(rs_gold))} in the golden file, {', '.join(sorted(rs_now))} now)"
+    lines = [head + ".", ""]
+    if moved:
+        lines += ["| Case | Field | Golden | Now |", "|---|---|---|---|"]
+        esc = lambda x: x.replace("|", "\\|")  # noqa: E731
+        for cid, rows in moved.items():
+            lines += [f"| `{cid}` | `{k}` | {esc(g)} | {esc(v)} |" for k, g, v in rows]
+    if missing:
+        lines += ["", "New cases without a golden entry: " + ", ".join(f"`{c}`" for c in missing)]
+    return "\n".join(lines) + "\n"
+
+
+GOLDEN_ABOUT = ("Verdict, check statuses and counts of every tree case in tests/mutations/mutations.json (the two c0x controls are the "
+                "plain examples). run_mutations.py --golden fails when any of them moves. Rewrite with --write-golden only for an intended "
+                "rule change, and record it in CHANGELOG.md with its verdict impact.")
+
+
+def write_golden(path, views):
+    """고정 기록을 다시 쓴다. 먼저 그 파일의 지금 내용과 비교한 요약을 찍고, 그 뒤에 쓴다."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            old = json.load(f).get("runs", {})
+    except (OSError, ValueError):
+        old = None
+    if old is None:
+        print(f"write-golden: {path} is new ({len(views)} tree cases)")
+    else:
+        for line in golden_summary(old, views, label="write-golden"):
+            print(line)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(json.dumps({"format": "pqproof golden verdicts 1", "about": GOLDEN_ABOUT, "runs": dict(sorted(views.items()))},
+                           indent=1, ensure_ascii=False, sort_keys=True) + "\n")
+    print(f"wrote {path} ({len(views)} tree cases)")
 
 
 # ---------------------------------------------------------------------------------------------
@@ -479,9 +570,15 @@ def main(argv=None):
     ap.add_argument("--json", default=None, help="write the results as JSON")
     ap.add_argument("--timeout", type=int, default=600)
     ap.add_argument("--golden", default=None, help="compare each tree case with this golden file (verdict, checks, counts)")
-    ap.add_argument("--write-golden", default=None, help="write the golden file from this run (after an intended rule change)")
+    ap.add_argument("--write-golden", default=None, help="write the golden file from this run (after an intended rule change); "
+                                                        "prints what moved against the file's current content first")
+    ap.add_argument("--diff-golden", default=None, help="write the cases and fields that differ from --golden as a Markdown table "
+                                                       "(the CHANGELOG verdict-impact draft); - for the screen")
     ap.add_argument("-v", "--verbose", action="store_true")
     a = ap.parse_args(argv)
+    if a.diff_golden and not a.golden:
+        print("--diff-golden needs --golden", file=sys.stderr)
+        return 2
     golden = None
     if a.golden:
         with open(a.golden, encoding="utf-8") as f:
@@ -512,7 +609,7 @@ def main(argv=None):
                 if m["id"] not in golden:
                     bad = bad + [f"no golden entry for {m['id']} in {a.golden} (run with --write-golden after checking it)"]
                 else:
-                    gd = golden_diff(golden[m["id"]], run.views.get(m["id"]))
+                    gd = golden_diff(split_ruleset(golden[m["id"]])[1], split_ruleset(run.views.get(m["id"]))[1])
                     bad = bad + [f"golden {x}" for x in gd[:8]] + ([f"golden: {len(gd) - 8} more differences"] if len(gd) > 8 else [])
             if not bad:
                 status = "PASS"
@@ -536,15 +633,18 @@ def main(argv=None):
           + f" · {time.time() - t0:.1f}s")
     if golden is not None:
         print(f"golden: compared {sum(1 for m in muts if m['kind'] == 'tree')} tree cases with {a.golden}")
+        for line in golden_summary(golden, run.views):
+            print(line)
+        if a.diff_golden:
+            md = golden_markdown(golden, run.views)
+            if a.diff_golden == "-":
+                print(md, end="")
+            else:
+                with open(a.diff_golden, "w", encoding="utf-8") as f:
+                    f.write(md)
+                print(f"wrote {a.diff_golden} (verdict-impact draft)")
     if a.write_golden:
-        with open(a.write_golden, "w", encoding="utf-8") as f:
-            f.write(json.dumps({"format": "pqproof golden verdicts 1",
-                                "about": "Verdict, check statuses and counts of every tree case in tests/mutations/mutations.json "
-                                         "(the two c0x controls are the plain examples). run_mutations.py --golden fails when any "
-                                         "of them moves. Rewrite with --write-golden only for an intended rule change, and record "
-                                         "it in CHANGELOG.md with its verdict impact.",
-                                "runs": dict(sorted(run.views.items()))}, indent=1, ensure_ascii=False, sort_keys=True) + "\n")
-        print(f"wrote {a.write_golden} ({len(run.views)} tree cases)")
+        write_golden(a.write_golden, run.views)
     if a.json:
         with open(a.json, "w", encoding="utf-8") as f:
             json.dump({"format": "pqproof mutation results 1", "tool": run.cmd, "strict": a.strict, "sarif_checked": bool(run.sarif),
