@@ -14,6 +14,12 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 **Verdict impact (판정 영향): none.**
 
+## [0.1.1] - 2026-11-19
+
+Tool 0.1.1, ruleset 1 (unchanged, same hash), evidence format 2 (unchanged). Fixes, tests, CI and documentation from the November review; no rule file changed.
+
+**Verdict impact (판정 영향): none.** On the 14 golden tree cases every verdict, check status and count is the same as in 0.1.0, and 0.1.0 evidence still verifies. Exit codes moved in two places that never had a sound verdict: a zip whose entry names repeat or differ only in case or Unicode normalization is now an input error (exit 2; before, a repeated name ended in a traceback and a case-only pair unpacked as one file on macOS), and `--verify` on a missing folder exits 2 instead of 1.
+
 ### Added
 
 - `CONTRIBUTING.md` (local checks, layout, a checklist for changing a rule or adding a language, site rules, evidence format changes) and a pull request template that asks for the verdict impact.
@@ -94,5 +100,6 @@ First public release: tool 0.1.0, ruleset 1, evidence format 2. The comparison p
 - Every TLS target in `receipt.json` now has `openssl_agrees`. Without OpenSSL 3.5 (Ubuntu's 3.0, macOS LibreSSL) it is `null` and `openssl_note` says 교차 확인 불가 (cross-check not possible). Before, the field was missing and code that read it failed.
 - `--verify` checks that the residue script hash in `tools[]` matches the copy in `artifacts/` (`java.script_sha256`). Before, the two could differ and the evidence still verified.
 
-[Unreleased]: https://github.com/g1mn/pqproof/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/g1mn/pqproof/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/g1mn/pqproof/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/g1mn/pqproof/releases/tag/v0.1.0
