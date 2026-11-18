@@ -178,14 +178,14 @@ Each run gets its own evidence hash. The evidence holds the run times, the absol
 
 **Tree hash.** List every regular file under the root (skipping the folders above and `.DS_Store`) as `(relative path, SHA-256 of the content)`; a symlink is recorded as `symlink:<target>`. Sort the list, then hash the concatenation of `path + "\0" + digest + "\n"` with SHA-256.
 
-**Evidence hash.** Take `receipt.json` without the `receipt_id` field and write it in RFC 8785 canonical form: object keys sorted, no whitespace, UTF-8, numbers in ECMAScript notation. SHA-256 of those bytes is the evidence hash, stored as `receipt_id`. All keys in the file are ASCII, so code-point order and the UTF-16 order that RFC 8785 asks for give the same result. Values may contain Korean text, which does not affect key order. The number formatting follows the test vectors in `tests/test_receipt.py`, which come from PQ-Proof so that a verifier in another language gets the same hash.
+**Evidence hash.** Take `receipt.json` without the `receipt_id` field and write it in RFC 8785 canonical form: object keys sorted by UTF-16 code units, no whitespace, UTF-8, numbers in ECMAScript notation. SHA-256 of those bytes is the evidence hash, stored as `receipt_id`. All keys in the file are ASCII today. Values may contain Korean text, which does not affect key order. An integer above 2^53 in absolute value has no exact double, so the tool refuses to hash it rather than give a hash other verifiers cannot reproduce. `tests/test_evidence_strict.py` checks the sort and number vectors of RFC 8785 and recomputes every receipt under `tests/golden/evidence/` with a second implementation in `sarif.py` and, when Node.js is installed, in JavaScript.
 
 The evidence hash names one run. `receipt.json` also holds the run times (`started_at`, `finished_at`, `timeline`), the absolute input and tool paths and CBOM file names with a time stamp, so two runs on the same inputs give different evidence hashes. The verdict and the check results come out the same.
 
 
 **Recheck.** `bash prove.sh --verify <folder>` (or `python3 -I -B pqlite/receipt.py verify <folder>`) checks:
 
-1. `receipt.json` fits the schema, and its format is one this tool reads (1 or 2);
+1. `receipt.json` is strict JSON (UTF-8 without a byte order mark, no duplicate keys, no `NaN` or `Infinity`, nothing after the object) and byte for byte the tool's own serialization of its values, so every parser reads the same verdict; it fits the schema, and its format is one this tool reads (1 or 2);
 2. `receipt_id` equals the recomputed evidence hash, and in format 2 `ruleset_sha256` equals the hash recomputed from the rule files in `tools`, with a `ruleset_version` that `scan/ruleset.json` gives that hash;
 3. every listed file has the recorded size and SHA-256, and the folder holds no other file (apart from `receipt.json`, `receipt.html`, `deck.json` and the unpacked inputs under `in/`);
 4. every `*_sha256` partner names a listed file with that hash, and the `residue` entry in `tools` has the hash of the residue copy under `artifacts/` (`java.script_sha256`);
@@ -194,6 +194,8 @@ The evidence hash names one run. `receipt.json` also holds the run times (`start
 7. each allowlist entry's `reviewed_by`, `reviewed_at` and `reviewed_via` match what the copy of the allowlist under `artifacts/` gives;
 8. `receipt.html` and `deck.json` are byte-for-byte what the evidence renders to;
 9. for newer evidence, `evidence-fragment.json` and `tables/report.md` give the same verdict (and, in the fragment, the same check statuses) as `receipt.json`. `--verify` does not rebuild those two files, so editing only `receipt.json` to change the verdict shows up here.
+
+`--verify` exits 0 when every check passes, 1 when one fails, and 2 when the folder or its `receipt.json` does not exist.
 
 A hash shows that a file is the one the evidence describes. It does not show who produced it: anyone can change a file and write new hashes. Compare `receipt_id` with a value from a place you trust, such as the console output of the run or a submission record.
 

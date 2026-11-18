@@ -1482,7 +1482,7 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
     r["finished_at"] = rc.iso(now())
     r["receipt_id"] = rc.compute_id(r)
     with open(os.path.join(out, "receipt.json"), "x", encoding="utf-8") as f:
-        f.write(json.dumps(r, indent=2, sort_keys=True, ensure_ascii=False) + "\n")
+        f.write(rc.dumps(r))  # verify 가 이 바이트 그대로인지 본다
     with open(os.path.join(out, "receipt.html"), "x", encoding="utf-8") as f:
         f.write(rc.render_html(r))
     with open(os.path.join(out, "deck.json"), "x", encoding="utf-8") as f:

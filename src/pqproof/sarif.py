@@ -87,6 +87,8 @@ def _es_number(x):
     if isinstance(x, bool):
         return "true" if x else "false"
     if isinstance(x, int):
+        if abs(x) > 1 << 53:
+            raise EvidenceError(f"receipt.json has an integer beyond 2^53 ({x}); RFC 8785 cannot hash it exactly")
         return str(x)
     if not math.isfinite(x):
         raise EvidenceError("receipt.json has a non-finite number")
@@ -109,9 +111,38 @@ def jcs(v):
     if isinstance(v, list):
         return "[" + ",".join(jcs(x) for x in v) + "]"
     if isinstance(v, dict):
-        keys = sorted(v, key=lambda k: k.encode("utf-16-be"))
+        keys = sorted(v, key=lambda k: k.encode("utf-16-be", "surrogatepass"))
         return "{" + ",".join(json.dumps(k, ensure_ascii=False) + ":" + jcs(v[k]) for k in keys) + "}"
     raise EvidenceError(f"unexpected JSON value {type(v).__name__}")
+
+
+def _unique(pairs):
+    out = {}
+    for k, v in pairs:
+        if k in out:
+            raise EvidenceError(f"receipt.json has the key {k!r} twice; parsers would disagree on its value")
+        out[k] = v
+    return out
+
+
+def _constant(name):
+    raise EvidenceError(f"receipt.json has {name}, which is not a JSON number")
+
+
+def load_receipt(raw):
+    """receipt.json 바이트를 엄격하게 읽는다(pqlite/receipt.py loads_strict·dumps 와 같은 규칙): BOM·중복 키·NaN 을 거부하고,
+    바이트가 도구 직렬화와 같아야 한다."""
+    if raw.startswith(b"\xef\xbb\xbf"):
+        raise EvidenceError("receipt.json starts with a byte order mark")
+    try:
+        r = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique, parse_constant=_constant)
+    except (UnicodeDecodeError, json.JSONDecodeError) as e:
+        raise EvidenceError(f"receipt.json is not valid JSON: {e}") from e
+    if not isinstance(r, dict):
+        raise EvidenceError("receipt.json is not a JSON object")
+    if raw != (json.dumps(r, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8"):
+        raise EvidenceError("receipt.json is not byte for byte what PQ-Proof writes (spacing, key order or bytes after the object)")
+    return r
 
 
 def receipt_id(receipt):
@@ -130,10 +161,7 @@ class Evidence:
             raise EvidenceError(f"no receipt.json in {self.dir}")
         with open(path, "rb") as f:
             raw = f.read()
-        try:
-            self.r = json.loads(raw.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as e:
-            raise EvidenceError(f"receipt.json is not valid JSON: {e}") from e
+        self.r = load_receipt(raw)
         fmt = str(self.r.get("format", ""))
         if not (fmt.startswith("pqc-proof receipt") or fmt.startswith("pqproof receipt")):
             raise EvidenceError(f"not a PQ-Proof receipt (format {fmt!r})")

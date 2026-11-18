@@ -29,6 +29,9 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 ### Fixed
 
+- `--verify` and `pqproof sarif` read `receipt.json` strictly. A duplicate key, a byte order mark, `NaN` or `Infinity`, or bytes after the object fail, and so does any file whose bytes differ from the tool's own serialization of its values. Before, a second `"verdict"` key inserted at the top passed `--verify` with the same `receipt_id`, while a parser that keeps the first value read another verdict.
+- The RFC 8785 form sorts object keys by UTF-16 code units, as the RFC says, and refuses integers beyond 2^53. Every key so far is ASCII, so no existing `receipt_id` changes. A test recomputes the golden receipts with a second implementation and, when Node.js is there, in JavaScript.
+- `--verify` on a folder that does not exist, or one without `receipt.json`, exits 2 (input error) instead of 1.
 - SARIF rule help links (`helpUri`) pointed to `#checks`, an anchor the site does not have, so they opened the top of the page. They now point to `#sec-checks`, the checks section.
 
 ## [0.1.0] - 2026-11-18

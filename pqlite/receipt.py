@@ -15,6 +15,10 @@
 #       해시를 tools[] 해시로 다시 계산해 맞춘다. format_version 이 없는 증적은 형식 1(0.1.0 이전 공개본)로 읽는다: 첫 공개본의 옛 NOTE 를
 #       받고 receipt.html 은 그 판의 낱말(영수증)로 다시 그려 비교한다(tests/golden/evidence 고정물). 형식 2부터 판정 옆 표시에
 #       '검증 호출 제거 n건 검토 필요'(r-review)를 더한다. 형식 1 증적은 예전 표시 그대로 그린다.
+# 수정(0.1.1): receipt.json 을 엄격하게 읽는다(loads_strict: BOM·중복 키·NaN·Infinity 거부) 그리고 파일 바이트가 도구 직렬화(dumps)와
+#       같은지 본다. 정규화는 키를 UTF-16 코드 단위 순서로 정렬하고(RFC 8785 3.2.3) 절댓값 2^53 을 넘는 정수는 거부한다.
+#       verify 에서 폴더나 receipt.json 이 없으면 main 이 2(입력 오류)로 끝낸다. 열기는 O_NOFOLLOW·dir_fd 가 없는 플랫폼(Windows)에서
+#       경로 조각마다 lstat 으로 링크를 거른 뒤 연다.
 # 수정: 축소판. RFC 8785 정규화(_number·_jcs·canonical)·compute_id·validate·obj·strict·iso·_Artifacts·_read_nofollow·
 #       _hash_refs·_listed_files·verify 뼈대·STYLE·SCRIPT(테마 토글)는 가져오고, microVM 증적용 build·_sandbox·_network·
 #       _proofs·_steps·POLICY·consistency·SCHEMA·render_html은 이 오프라인판용으로 새로 썼다. loop._open_nofollow도 옮겨 왔다.
@@ -38,6 +42,7 @@ import hashlib
 import html
 import json
 import os
+import posixpath
 import re
 import stat
 import sys
@@ -205,9 +210,15 @@ def validate(value, schema, where="receipt"):
 
 
 # ---------------------------------------------------------------------------------------------
+MAX_EXACT_INT = 1 << 53  # IEEE 754 double 이 정확히 나타내는 정수의 끝(I-JSON, RFC 7493 2.2)
+
+
 def _number(x):
-    """ECMAScript Number::toString 표기(RFC 8785, 3.2.2.3)."""
+    """ECMAScript Number::toString 표기(RFC 8785, 3.2.2.3). 절댓값 2^53 을 넘는 정수는 다른 언어 검증기가 double 로 읽어 값이
+    바뀌므로 거부한다."""
     if isinstance(x, int):
+        if abs(x) > MAX_EXACT_INT:
+            raise ValueError(f"integer {x} is beyond 2^53: RFC 8785 verifiers read it as a double and get another value")
         return str(x)
     if x != x or x in (float("inf"), float("-inf")):
         raise ValueError("NaN and infinity have no JSON form")
@@ -241,14 +252,41 @@ def _jcs(value):
     if isinstance(value, list):
         return "[" + ",".join(_jcs(v) for v in value) + "]"
     if isinstance(value, dict):
-        return "{" + ",".join(json.dumps(k, ensure_ascii=False) + ":" + _jcs(value[k]) for k in sorted(value)) + "}"
+        keys = sorted(value, key=lambda k: k.encode("utf-16-be", "surrogatepass"))  # RFC 8785 3.2.3: UTF-16 코드 단위 순서
+        return "{" + ",".join(json.dumps(k, ensure_ascii=False) + ":" + _jcs(value[k]) for k in keys) + "}"
     raise TypeError(f"{type(value).__name__} has no JSON form")
 
 
 def canonical(value):
-    """value의 JSON 정규형(RFC 8785) UTF-8 바이트. 키는 코드 포인트 순으로 정렬한다. 증적의 키는 모두 ASCII라
-    RFC 8785의 UTF-16 순서와 같다(값 속 한글은 정렬과 무관)."""
+    """value의 JSON 정규형(RFC 8785) UTF-8 바이트. 키는 UTF-16 코드 단위 순서로 정렬한다(BMP 안 문자만 쓴 키는 코드 포인트 순서와 같다.
+    지금 증적의 키는 모두 ASCII 다). 절댓값 2^53 을 넘는 정수는 ValueError."""
     return _jcs(value).encode("utf-8")
+
+
+def dumps(receipt):
+    """receipt.json 을 쓰는 단 하나의 꼴(prove.py 가 쓰고 verify 가 바이트로 맞춰 본다)."""
+    return json.dumps(receipt, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+
+
+def _unique_keys(pairs):
+    out = {}
+    for key, value in pairs:
+        if key in out:
+            raise ValueError(f"duplicate key {key!r}: parsers that keep the first value and parsers that keep the last see "
+                             "different evidence")
+        out[key] = value
+    return out
+
+
+def _no_constant(name):
+    raise ValueError(f"{name} is not a JSON number (RFC 8259)")
+
+
+def loads_strict(data):
+    """증적 JSON 바이트를 엄격하게 읽는다: UTF-8(BOM 없음), 중복 키·NaN·Infinity 거부, 값 뒤에 다른 바이트가 오면 거부(json 이 막는다)."""
+    if data.startswith(b"\xef\xbb\xbf"):
+        raise ValueError("starts with a UTF-8 byte order mark")
+    return json.loads(data.decode("utf-8"), object_pairs_hook=_unique_keys, parse_constant=_no_constant)
 
 
 def compute_id(receipt):
@@ -263,8 +301,26 @@ def iso(t):
     return time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(ms // 1000)) + f".{ms % 1000:03d}Z"
 
 
+NOFOLLOW_FD = all(hasattr(os, n) for n in ("O_NOFOLLOW", "O_DIRECTORY")) and os.open in os.supports_dir_fd
+_REPARSE = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+
+
+def _open_checked(root, rel, flags):
+    """O_NOFOLLOW·dir_fd 가 없는 플랫폼(Windows)용: 경로 조각마다 lstat 으로 링크·재분석 지점을 거른 뒤 연다. 거른 뒤 여는 사이에
+    바뀌는 경쟁은 막지 못한다(재검증만 하는 쪽이라 받아들인다). fd를 돌려준다."""
+    cur = root
+    for part in rel.split("/"):
+        cur = os.path.join(cur, part)
+        st = os.lstat(cur)
+        if stat.S_ISLNK(st.st_mode) or getattr(st, "st_file_attributes", 0) & _REPARSE:
+            raise OSError(f"{rel}: a link inside the receipt directory")
+    return os.open(cur, (flags & ~getattr(os, "O_NONBLOCK", 0)) | getattr(os, "O_BINARY", 0))
+
+
 def _open_nofollow(root, rel, flags):
     """root/rel을 어느 단계에서도 심볼릭 링크를 따라가지 않고 연다(from pq-proof loop.py). fd를 돌려준다."""
+    if not NOFOLLOW_FD:
+        return _open_checked(root, rel, flags)
     parts = rel.split("/")
     fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
     try:
@@ -280,7 +336,7 @@ def _open_nofollow(root, rel, flags):
 def _read_nofollow(root, rel, limit=MAX_ARTIFACT):
     if any(part in ("", ".", "..") for part in rel.split("/")):
         raise ValueError(f"{rel}: not a plain path inside the receipt")
-    fd = _open_nofollow(os.path.realpath(root), rel, os.O_RDONLY | os.O_NONBLOCK)
+    fd = _open_nofollow(os.path.realpath(root), rel, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0))
     with os.fdopen(fd, "rb") as f:
         st = os.fstat(f.fileno())
         if not stat.S_ISREG(st.st_mode):
@@ -620,7 +676,7 @@ def _copies_agree(root, r, listed):
     want_checks = {c["id"]: c["status"] for c in r["checks"]}
     if "evidence-fragment.json" in listed:
         try:
-            frag = json.loads(_read_nofollow(root, "evidence-fragment.json").decode("utf-8")).get("proof") or {}
+            frag = loads_strict(_read_nofollow(root, "evidence-fragment.json")).get("proof") or {}
             same = (frag.get("verdict"), frag.get("checks"), frag.get("verdict_text")) == (r["verdict"], want_checks, verdict_text(r))
             out.append((same, "evidence-fragment.json gives the same verdict and checks" if same else
                         f"evidence-fragment.json says {frag.get('verdict_text')!r} with checks {frag.get('checks')}, "
@@ -643,14 +699,21 @@ def verify(root):
     in/ 트리 해시, 판정과 검사 칸의 일치, receipt.html 재생성 비교."""
     out = []
     try:
-        receipt = json.loads(_read_nofollow(root, "receipt.json").decode("utf-8"))
+        raw = _read_nofollow(root, "receipt.json")
+        receipt = loads_strict(raw)
     except (OSError, ValueError) as e:
         return [(False, f"receipt.json cannot be read: {e}")]
+    if not isinstance(receipt, dict):
+        return [(False, "receipt.json is not a JSON object")]
+    same = raw == dumps(receipt).encode("utf-8")
+    out.append((same, "receipt.json is byte for byte the tool's own serialization of its values" if same else
+                "receipt.json bytes differ from the tool's own serialization of the same values (spacing, key order, escapes or "
+                "bytes after the object), so another parser could read other values"))
     reads = _version_module().FORMAT_READS
     fv = receipt.get("format_version", 1) if isinstance(receipt, dict) else None
     if fv not in reads:
-        return [(False, f"receipt.json has format_version {fv!r}; this tool reads {', '.join(map(str, reads))}. "
-                        "Check it with the pqproof version that wrote it, or a newer one")]
+        return out + [(False, f"receipt.json has format_version {fv!r}; this tool reads {', '.join(map(str, reads))}. "
+                              "Check it with the pqproof version that wrote it, or a newer one")]
     problems = validate(receipt, SCHEMA)
     out.append((not problems, "receipt.json fits the schema" if not problems else
                 "receipt.json does not fit the schema:\n  " + "\n  ".join(problems[:20])))
@@ -665,9 +728,14 @@ def verify(root):
         msg = (f"evidence format {fv}: pqproof {receipt.get('tool_version')}, ruleset {receipt.get('ruleset_version')} "
                f"(ruleset_sha256 matches the rule files in tools[])")
     out.append((not vp, msg if not vp else "version fields disagree with the record:\n  " + "\n  ".join(vp)))
-    got = compute_id(receipt)
-    out.append((got == receipt["receipt_id"], f"receipt_id {receipt['receipt_id']}" if got == receipt["receipt_id"]
-                else f"receipt_id is {receipt['receipt_id']}, but the receipt hashes to {got}"))
+    try:
+        got = compute_id(receipt)
+    except ValueError as e:
+        got = None
+        out.append((False, f"receipt_id cannot be recomputed: {e}"))
+    if got is not None:
+        out.append((got == receipt["receipt_id"], f"receipt_id {receipt['receipt_id']}" if got == receipt["receipt_id"]
+                    else f"receipt_id is {receipt['receipt_id']}, but the receipt hashes to {got}"))
     listed = {}
     for item in receipt["artifacts"]:
         path = item["path"]
@@ -1057,7 +1125,7 @@ def _short_where(e):
     if len(files) == 1:
         out.append(files[0])
     elif files:
-        top = os.path.commonpath(files) if len(files) > 1 else files[0]
+        top = posixpath.commonpath(files) if len(files) > 1 else files[0]  # 증적 경로는 늘 '/'(Windows 에서도 같은 deck.json)
         out.append(f"{top}/ 파일 {len(files)}개")
     return ", ".join(out) or e["where"]
 
@@ -1154,6 +1222,15 @@ def main(argv):
     """verify DIR: 검사마다 한 줄, 모두 통과일 때만 0."""
     if len(argv) != 2 or argv[0] != "verify":
         print("usage: python3 -I -B pqlite/receipt.py verify RECEIPT_DIR")
+        return 2
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")  # 한국어를 못 찍는 콘솔(Windows cp1252 등)에서도 죽지 않게
+    if not os.path.isdir(argv[1]):
+        print(f"verify: no such folder: {argv[1]} (usage or input error, exit 2)", file=sys.stderr)
+        return 2
+    if not os.path.lexists(os.path.join(argv[1], "receipt.json")):
+        print(f"verify: {argv[1]} has no receipt.json; give the folder a PQ-Proof run wrote (usage or input error, exit 2)",
+              file=sys.stderr)
         return 2
     results = verify(argv[1])
     for ok, what in results:
