@@ -7,11 +7,14 @@
 # 액션은 모두 커밋 SHA 로 고정한다(주석은 그 SHA 의 태그). Dependabot 이 갱신 PR 을 연다(.github/dependabot.yml).
 name: CI
 
+# 사이트(docs/)와 Pages 워크플로만 바뀐 push 는 CI 를 돌리지 않는다(코드가 같아 결과가 같고, 연달아 올리면 앞 실행이 취소돼 배지가 실패로 보인다)
 on:
   push:
     branches: [main]
+    paths-ignore: ['docs/**', '.github/workflows/pages.yml']
   pull_request:
     branches: [main]
+    paths-ignore: ['docs/**', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:
