@@ -1244,7 +1244,10 @@ def next_steps(r, fixed_items, out):
         if st.get("b-weakening") == "fail":
             lines.append("  약화 수정: artifacts/weakening.json 의 deny. 되돌리거나 같은 강도로 다시 쓴다")
         if st.get("c-expect") == "fail":
-            lines.append("  c-expect: EXPECT 로 요구한 PQC(ML-KEM-768·ML-DSA-65 등)가 고친 판 코드에 없다")
+            prof = r["params"].get("profile") or rules.DEFAULT_PROFILE
+            names = " · ".join(f"{k} {'/'.join(rules.PROFILES[prof][k])}" for k in ("kem", "sig") if k in r["params"]["expect"])
+            lines.append(f"  c-expect: EXPECT 로 요구한 PQC 가 고친 판 코드에 없다(프로필 {prof}" + (f": {names}" if names else "")
+                         + "). 다른 크기를 쓰면 PROFILE 을 맞춘다")
         if st.get("r-allow") == "fail":
             lines.append("  r-allow: 허용 항목마다 사람이 읽고 reviewed_by·reviewed_at 을 적거나, 안 쓰인 항목을 지운다")
         if st.get("a-cbom") == "fail" or st.get("c-classic") == "fail":
