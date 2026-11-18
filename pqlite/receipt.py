@@ -833,7 +833,7 @@ def verify(root):
                 continue
             try:
                 rules = _tree_rules(root, receipt)
-            except (OSError, ValueError) as e:
+            except (OSError, ValueError, KeyError, TypeError) as e:
                 out.append((False, f"inputs.{side}: the skip-dirs copy cannot be read ({e})"))
                 continue
             got = tree_sha256(tree_files(tree, rules))

@@ -654,12 +654,14 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
         in_act += (f" · 건너뛴 폴더 {len(skip_code)}곳에 코드 파일 {sum(x['code'] for x in skip_code)}개(빌드 산출물·받아 둔 의존성으로 보고 "
                    "검사하지 않음, scan/skip-dirs): " + ", ".join(f"{x['path']}/ {x['code']}개" for x in skip_code[:4])
                    + (" 외" if len(skip_code) > 4 else ""))
-    if in_st == "pass" or (in_st == "review" and code_links):
-        if code_links:
-            in_st = "fail" if params.require_review else "undecided"
-            in_act += " · 코드·폴더 링크는 내용을 보지 못해 판정할 수 없다(대상을 트리에 넣거나 링크를 지운다)"
-        elif out_links or skip_code:
-            in_st = "review"
+    if code_links:
+        in_act += " · 코드·폴더 링크는 내용을 보지 못해 판정할 수 없다(대상을 트리에 넣거나 링크를 지운다)"
+        if params.require_review:
+            in_st = "fail"
+        elif in_st in ("pass", "review"):
+            in_st = "undecided"
+    elif (out_links or skip_code) and in_st == "pass":
+        in_st = "review"
     check("a-input", "입력 확인(같은 서비스의 전·후, 원본에서 전환 대상을 찾음)", in_st,
           f"공통 파일 {int(MIN_COMMON * 100)}% 이상, 원본 막는 위치·공개키 code·TLS 실측 중 하나 이상, "
           "검사 밖을 가리키는 링크와 코드 파일이 든 건너뛴 폴더 없음", in_act)
@@ -734,6 +736,8 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
               + (f" · SITE LEFT {sites}" if sites is not None else "")
               + (f" · residue code {raw}에서 허용 목록 {lst.get('allowed', 0)}·하이브리드 {lst.get('hybrid', 0)}"
                  f"·검토 필요 {lst.get('review', 0)}줄 뺌" if moved else "")
+              + (f" · residue 가 허용했지만 이름 규칙·같은 줄 ML-KEM 에 안 맞는 {lst['relisted']}줄(주석에만 legacy·ML-KEM, 쓰기 경로)을 다시 셈"
+                 if lst.get("relisted") else "")
               + (": 남은 LEFT " + ", ".join(lst.get("left", [])[:6]) + (" 외" if left > 6 else "") if left and lst.get("left") else "")
               + (f" · 시험 경로 코드 {jf['tests']['count']}줄(판정에 안 넣고 따로 셈: "
                  + ", ".join(jf["tests"]["lines"][:3]) + (" 외" if jf["tests"]["count"] > 3 else "") + ")"

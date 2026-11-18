@@ -595,6 +595,9 @@
     "checks": {
      "a-cbom": "fail",
      "c-classic": "fail"
+    },
+    "contains": {
+     "checks[c-classic].actual": "다시 셈"
     }
    },
    "sarif": {
