@@ -39,7 +39,7 @@ VERSION = _tool_version()
 
 SARIF_SCHEMA = "https://json.schemastore.org/sarif-2.1.0.json"
 INFO_URI = "https://github.com/g1mn/pqproof"
-HELP_URI = "https://g1mn.github.io/pqproof/#checks"
+HELP_URI = "https://g1mn.github.io/pqproof/#sec-checks"
 FINGERPRINT = "pqproof/v1"
 LEVEL = {"fail": "error", "review": "warning", "undecided": "warning", "check": "note"}
 NOT_PASSED = ("na", "undecided", "skip", "skipped")  # 통과로 세지 않는 상태

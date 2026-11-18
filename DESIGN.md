@@ -312,7 +312,7 @@ bash scan/cbom-scan.sh --selftest    # scanner assertions
 
 ## Use in the finals
 
-In the finals, `prove.sh` was the completion check at the end of my migration pipeline. On all five tasks the first run failed and listed the classical lines still left, and the last run passed. On four of them the fixed code did not change between those runs: the agent added or widened allowlist entries, each with a reason, and the verdict turned to pass. None of those entries had a review record, because the review fields came after the finals. That is why `r-allow` exists. The organizers' own grading made the final call.
+In the finals, `prove.sh` was the completion check at the end of my migration pipeline. On all five tasks the first run failed and the last run passed. On four of them the fixed code did not change between those runs: the agent added or widened allowlist entries, each with a reason, and the verdict turned to pass. None of those entries had a review record, because the review fields came after the finals. That is why `r-allow` exists. The organizers' own grading made the final call.
 
 I wanted the fixing and the judging kept apart. A coding agent changes code quickly, and it can also write changes that look finished when they are not. So the step that says "finished" has no model in it: the same inputs give the same verdict. The evidence hash still changes from run to run, because the evidence also records when and where the run happened.
 

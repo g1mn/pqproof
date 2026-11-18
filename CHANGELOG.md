@@ -12,6 +12,12 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 ## [Unreleased]
 
+**Verdict impact (판정 영향): none.**
+
+### Fixed
+
+- SARIF rule help links (`helpUri`) pointed to `#checks`, an anchor the site does not have, so they opened the top of the page. They now point to `#sec-checks`, the checks section.
+
 ## [0.1.0] - 2026-11-18
 
 First public release: tool 0.1.0, ruleset 1, evidence format 2. The comparison point is the version that ran in the finals of the 2026 PQC Transition Hackathon on 2026-11-16 ("the finals version" below).
