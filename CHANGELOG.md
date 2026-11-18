@@ -44,6 +44,10 @@ Planned as 0.2.0: ruleset 2 (new name and hash), evidence format 3. Bypasses fro
 | X28: HAETAE, AIMer, SMAUG-T, NTRU+ in Java | `scan.py` "check" row | post-quantum row; counted by `c-expect` under `PROFILE=kpqc` |
 | X59: an `ssh-ed25519` host key in `known_hosts`, `HostKeyAlgorithms` in `~/.ssh/config` (`m26`) | pass | fail (`a-cbom`, `c-classic`) |
 | N1: `-Djdk.internal.httpclient.disableHostnameVerification` as a JVM option | pass | `b-weakening` fail |
+| X27: an encrypted PKCS#8 key, a keystore that does not open, a Java public-key API with an unreadable algorithm name | a "check" row | `a-cbom` needs review and the verdict line counts it; `REQUIRE_RESOLVED=1` fails |
+| X31: an allowlist entry past its `expires_at` | the field was dropped, pass | `r-allow` needs review, fails under `REQUIRE_REVIEW=1` |
+| X56: a code file over 1 MiB in the fixed tree | not shown | listed in `inputs.fixed.oversize`, `a-input` needs review |
+| X30: a pass with `a-input` or `b-tls` needing review | `VERDICT=PASS` with no note | the note names the checks; `FAIL_ON_REVIEW=1` exits 5 |
 
 ### Added
 
@@ -56,6 +60,11 @@ Planned as 0.2.0: ruleset 2 (new name and hash), evidence format 3. Bypasses fro
 - `residue.sh` rules `E-MLKEM1024`, `E-MLDSA87`, `E-KPQC-KEM` and `E-KPQC-SIG`, and composite signatures counted apart (`allowlist.composite`, format 3).
 - Weakening rules for code that turns TLS 1.3 off in Go, Node, Python, Java and Spring (X18), and scanner rows for the same settings.
 - Eleven mutation cases with golden entries (`m17` to `m26`), and 20 scanner assertions (160 in all) under `scan/fixtures/r2/`.
+- Settings `FAIL_ON_REVIEW` (exit 5 for a pass that needs review), `REQUIRE_RESOLVED`, `EXPECT_FROM=api` (X30), `REVIEW_MAX_AGE_DAYS` (X31) and `MAX_FILE_MIB` (X56), recorded under `params`. The Action takes `fail-on: review` and gives `review-checks`.
+- Allowlist fields `expires_at` and `approval_ref`, the `kind` words, and warnings for fields the tool does not read (X31).
+- Exit code 4 for an unexpected exception in a run or in `--verify` (X62).
+- Ten more code mutants (40 in all) for the rule changes of this release; every one fails a behaviour or sync test.
+- `tests/test_options.py`: the new settings, exit codes 4 and 5, expiry, review age, the size limit and unresolved key material, each with a re-verified evidence folder.
 
 ### Changed
 

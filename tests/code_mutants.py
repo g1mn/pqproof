@@ -22,8 +22,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 COPY = ("prove.sh", "prove.py", "pqlite", "scan", "src", "tests", "examples", "CHANGELOG.md")
 TESTS = ("test_rules", "test_rule_sync", "test_testpaths")  # 모듈 이름(run_unit.py 에는 "이름.*" 로 넘긴다)
 MUTANTS = [
-    ("m01", "scan/residue.sh", "|brainpool|", "|", "G-CURVE 에서 brainpool 대안 삭제"),
-    ("m02", "scan/residue.sh", '"DSA"|ElGamal|ECIES@@', '"DSA"@@', "G-DH-DSA 에서 ElGamal·ECIES 삭제"),
+    ("m01", "scan/residue.sh", "|[Bb][Rr][Aa][Ii][Nn][Pp][Oo][Oo][Ll]|", "|", "G-CURVE 에서 brainpool 대안 삭제"),
+    ("m02", "scan/residue.sh", '|ssh-dss|ElGamal|ECIES@@', '|ssh-dss@@', "G-DH-DSA 에서 ElGamal·ECIES 삭제"),
     ("m03", "pqlite/rules.py", "HYB_WINDOW = 12", "HYB_WINDOW = 40", "하이브리드 창 12줄을 40줄로"),
     ("m04", "pqlite/rules.py", "MIN_COMMON = 0.5", "MIN_COMMON = 0.05", "a-input 공통 파일 50% 를 5% 로"),
     ("m05", "pqlite/verify.py", r'SECLEVEL\s*=\s*0\b', r'SECLEVEL\s*=\s*00\b', "보안 수준 0 규칙이 00 만 보게"),
@@ -31,7 +31,7 @@ MUTANTS = [
     ("m07", "scan/test-paths.ere", "|/conftest[.]py$", "", "시험 경로에서 conftest.py 삭제"),
     ("m08", "scan/residue.sh", "RES_WRITEOPS='ENCRYPT_MODE|WRAP_MODE|initSign|", "RES_WRITEOPS='ENCRYPT_MODE|WRAP_MODE|",
      "residue 쓰기 연산에서 initSign 삭제"),
-    ("m09", "scan/residue.sh", "같은 줄 ML-KEM 이면 하이브리드 허용)@@ML-?KEM|MLKEM", "같은 줄 ML-KEM 이면 하이브리드 허용)@@",
+    ("m09", "scan/residue.sh", "같은 줄 ML-KEM 이면 하이브리드 허용)@@[Mm][Ll][-_]?[Kk][Ee][Mm]", "같은 줄 ML-KEM 이면 하이브리드 허용)@@",
      "G-X25519 같은 줄 ML-KEM 허용 삭제"),
     ("m10", "scan/residue.sh", 'if (b ~ /\\.sql$/) return "sql"', 'if (b ~ /\\.sqlx$/) return "sql"', "SQL 주석(--)을 코드로"),
     ("m11", "scan/residue.sh", "if ((ISLEG || CODE ~ ALLOWLINE) && CODE !~ ALLOWWR)", "if (ISLEG && CODE !~ ALLOWWR)", "같은 줄 legacy 허용 삭제"),
@@ -58,6 +58,21 @@ MUTANTS = [
     ("m29", "pqlite/rules.py", "                again += 1\n", "                continue\n", "residue 가 허용한 쓰기 경로 줄을 다시 세지 않게(X01)"),
     ("m30", "pqlite/skipdirs.py", "        if not parent_rel or not self.build_files.isdisjoint(sibling_files):",
      "        if True:", "산출물 이름 폴더를 어디서나 건너뛰게(X02·X03·X09)"),
+    # 규칙 묶음 2, 나머지(교차 리뷰 X11·X18·X19·X22·X23·X24·X26·X27·X30)
+    ("m31", "pqlite/rules.py", '    if c and c[1] != "44":\n        return COMPOSITE_REASON', "", "복합 서명을 다른 허용 규칙으로 넘기게(X26)"),
+    ("m32", "scan/residue.sh", "    if (index(substr(t, 4), d) == 0) INDOC = d\n", "", "여러 줄 독스트링을 첫 줄만 주석으로(X22)"),
+    ("m33", "scan/test-paths.ere", "|/tests?[.]py$", "", "시험 경로에서 Django tests.py 삭제(X24)"),
+    ("m34", "pqlite/verify.py", "TLS13 = 0x0304", "TLS13 = 0x0303", "TLS 1.2 상한을 약화로 안 보게(X18)"),
+    ("m35", "pqlite/rules.py", '    if not re.search(r"\\w", cv):\n        return True', '    if not re.search(r"\\w", cv):\n        return False',
+     "cbom 행의 주석·독스트링 판정 끄기(X22)"),
+    ("m36", "scan/residue.sh", "ParameterSpec|Curve|[^A-Za-z0-9:]|$)", "ParameterSpec|Curve|[^A-Za-z]|$)", "G-EC 가 EC2·AWS::EC2 를 다시 잡게(X23)"),
+    ("m37", "scan/profiles.json", '"kem": ["E-MLKEM1024"],', '"kem": ["E-MLKEM768", "E-MLKEM1024"],', "cnsa2 프로필이 ML-KEM-768 도 세게(X11)"),
+    ("m38", "pqlite/rules.py", '(it["tool"] == "cbom-scan" and "일반 패턴" not in it["note"])', '(it["tool"] == "cbom-scan")',
+     "EXPECT_FROM=api 가 이름만 맞은 일반 패턴 행도 세게(X30)"),
+    ("m39", "pqlite/rules.py", '            status, reason = "review", UNRESOLVED_KEY\n', '            status = "check"\n',
+     "열지 못한 키 자료를 다시 '확인'으로(X27)"),
+    ("m40", "scan/residue.sh", "|(^|[^A-Za-z0-9])(ed25519|ed448|eddsa|curve25519|ED25519|ED448)@@", "@@",
+     "G-EDDSA 가 소문자 ed25519 를 놓치게(X19)"),
 ]
 
 

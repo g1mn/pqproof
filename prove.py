@@ -12,7 +12,7 @@
     ML-KEM-768·ML-DSA-65 사용, NIST 보안레벨 3 미만 PQC, 레거시 쓰기를 읽는다.
 (d) 검증 증적: receipt.json(RFC 8785 + SHA-256), receipt.html, tables/*.csv, tables/fragment.html, evidence-fragment.json.
 받은 소스는 믿지 않는 입력이다. 그 안의 코드는 실행하지 않는다(cbom-scan·residue는 grep·awk, scan.py는 읽기만).
-종료 코드: 0 통과 · 1 실패 · 2 사용법·입력 오류 · 3 미판정.
+종료 코드: 0 통과 · 1 실패 · 2 사용법·입력 오류 · 3 미판정 · 4 도구 오류(예상 못 한 예외) · 5 통과지만 검토 필요(FAIL_ON_REVIEW=1).
 """
 import csv
 import hashlib
@@ -61,7 +61,10 @@ class UsageError(Exception):
 
 # 설정 이름(환경 변수). prove.sh 머리 주석과 같아야 한다. 흔한 오타(REQUIRE_REVEIW 등)는 실행 머리에 경고한다(교차 리뷰 X50)
 SETTINGS = ("OUT", "TLS_TARGETS", "TLS_TARGETS_ORIG", "TLS_VIA", "CLASSIC", "EXPECT", "SCOPE", "RESIDUE", "EXTRA_EV", "OPENSSL",
-            "CBOM_SCAN", "ALLOW", "EXCLUDE", "RECON", "EV_NAME", "REQUIRE_REVIEW", "PROBE_BIN_DIR", "PROFILE")
+            "CBOM_SCAN", "ALLOW", "EXCLUDE", "RECON", "EV_NAME", "REQUIRE_REVIEW", "PROBE_BIN_DIR", "PROFILE", "FAIL_ON_REVIEW",
+            "EXPECT_FROM", "REVIEW_MAX_AGE_DAYS", "MAX_FILE_MIB", "REQUIRE_RESOLVED")
+EXIT_TOOL_ERROR = 4  # 예상 못 한 예외(도구 오류, 교차 리뷰 X62). 판정 실패(1)·입력 오류(2)와 가른다
+EXIT_REVIEW = 5  # FAIL_ON_REVIEW=1 이고 판정은 통과인데 검토 필요인 검사가 있다(교차 리뷰 X30)
 OTHER_ENV = ("PYTHON", "STRICT", "SELFTEST_DIR", "KEEP", "ORDERS_EDGE", "TEST_PATHS", "SARIF_SCHEMA", "PQPROOF_HOME",
              "PQPROOF_ENTRY")
 DOCS = "https://github.com/g1mn/pqproof/blob/v{v}/{page}"
@@ -174,10 +177,18 @@ class Params:
         self.recon = (env.get("RECON") or "").strip() or None
         self.ev = (env.get("EV_NAME") or "").strip() or None
         # REQUIRE_REVIEW=1: 허용 항목에 받아들인 사람 확인 칸(reviewed_by·reviewed_at)이 없으면 r-allow 실패(기본은 검토 필요, 판정 그대로)
-        rr = (env.get("REQUIRE_REVIEW") or "").strip().lower()
-        if rr not in ("", "0", "1", "no", "yes", "false", "true"):
-            raise UsageError(f"REQUIRE_REVIEW는 1 또는 0: {rr!r}")
-        self.require_review = rr in ("1", "yes", "true")
+        self.require_review = flag(env, "REQUIRE_REVIEW")
+        # FAIL_ON_REVIEW=1: 통과인데 검토 필요인 검사가 있으면 종료 코드 5(판정은 그대로). REQUIRE_RESOLVED=1: 열지 못한 키 자료·못 읽은
+        # 공개키 API 가 남으면 a-cbom 실패. EXPECT_FROM=api: c-expect 를 PQC API 호출 위치로 센다(교차 리뷰 X27·X30)
+        self.fail_on_review = flag(env, "FAIL_ON_REVIEW")
+        self.require_resolved = flag(env, "REQUIRE_RESOLVED")
+        self.expect_from = (env.get("EXPECT_FROM") or "names").strip().lower()
+        if self.expect_from not in ("names", "api"):
+            raise UsageError(f"EXPECT_FROM은 names 또는 api: {self.expect_from!r}")
+        # REVIEW_MAX_AGE_DAYS=N: 그보다 오래된 reviewed_at 은 사람 확인 전(교차 리뷰 X31). MAX_FILE_MIB: scan.py·약화·허용 검사의 파일 크기
+        # 한도(기본 1, 넘은 코드·설정 파일은 a-input 검토 필요로 적는다, 교차 리뷰 X56)
+        self.review_max_age_days = number(env, "REVIEW_MAX_AGE_DAYS", None, 1, 36500)
+        self.max_file_bytes = number(env, "MAX_FILE_MIB", 1, 1, 64) << 20
         if self.ev and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", self.ev):
             raise UsageError(f"EV_NAME은 evidence/ 안 파일 이름: {self.ev!r}")
         if self.scope not in SCOPES:
@@ -195,6 +206,22 @@ class Params:
             raise UsageError(f"EXPECT에 모르는 값 {bad} (쓸 수 있는 값: kem, sig, tls, cert, none)")
         for t in self.tls_targets + self.tls_targets_orig:
             parse_target(t)
+
+
+def flag(env, name):
+    v = (env.get(name) or "").strip().lower()
+    if v not in ("", "0", "1", "no", "yes", "false", "true"):
+        raise UsageError(f"{name}는 1 또는 0: {v!r}")
+    return v in ("1", "yes", "true")
+
+
+def number(env, name, default, lo, hi):
+    v = (env.get(name) or "").strip()
+    if not v:
+        return default
+    if not v.isdigit() or not lo <= int(v) <= hi:
+        raise UsageError(f"{name}는 {lo}~{hi} 정수: {v!r}")
+    return int(v)
 
 
 TARGET = re.compile(r"(?P<addr>[A-Za-z0-9_.\[\]:-]+:[0-9]{1,5})(?:@(?P<name>[A-Za-z0-9_.-]{1,253}))?(?:#(?P<ca>/.+))?")
@@ -300,7 +327,7 @@ def count_files(top):
 MAX_SKIPPED = 100  # inputs.*.skipped 에 하나씩 적는 건너뛴 폴더·링크 수(넘으면 '외 n곳')
 
 
-def prepare_input(path, out, side, skip_rules=None):
+def prepare_input(path, out, side, skip_rules=None, max_bytes=rules.MAX_TEXT):
     """(receipt 입력 칸, 트리 루트 경로, 파일 목록, 입력 정보 {links, skipped_output}). 건너뛰는 폴더는 scan/skip-dirs(skip_rules).
     links: 트리의 심볼릭 링크와 zip 안 링크(풀지 않음)마다 rules.link_info. skipped_output: 건너뛴 산출물 폴더마다 파일·코드 파일 수."""
     path = os.path.abspath(path)
@@ -338,10 +365,13 @@ def prepare_input(path, out, side, skip_rules=None):
             continue  # 건너뛴 폴더 안 링크는 폴더 입력과 같이 보지 않는다
         links.append(dict(rules.link_info(n, tgt, skipped_rel), zip=True))
     shown = [f"{x['path']}/ 파일 {x['files']} · 코드 {x['code']}" for x in skip_out] + [rules.link_text(x) for x in links]
+    # 크기 한도를 넘어 scan.py·약화·허용 검사가 통째로 건너뛰는 코드·설정 파일(교차 리뷰 X56). 형식 3 inputs.*.oversize
+    big = [f"{r} ({n:,}바이트)" for r, d, n in files if not d.startswith("symlink:") and n > max_bytes and al.KEEP_FILE.search(r)]
     info = {"path": path, "kind": kind, "zip_sha256": zsha, "root": rel, "files": len(files), "tree_sha256": rc.tree_sha256(files),
             "skipped": sorted({r.rsplit("/", 1)[-1] for r, k in skips if k == "any"}) + shown[:MAX_SKIPPED]
-            + ([f"외 {len(shown) - MAX_SKIPPED}곳"] if len(shown) > MAX_SKIPPED else [])}
-    return info, root, files, {"links": links, "skipped_output": skip_out}
+            + ([f"외 {len(shown) - MAX_SKIPPED}곳"] if len(shown) > MAX_SKIPPED else []),
+            "oversize": big[:MAX_SKIPPED] + ([f"외 {len(big) - MAX_SKIPPED}개"] if len(big) > MAX_SKIPPED else [])}
+    return info, root, files, {"links": links, "skipped_output": skip_out, "oversize": big}
 
 
 def changed_files(o_files, f_files):
@@ -727,8 +757,10 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
     t0 = now()
     say(f"[1/{len(steps)}] 준비: 입력 읽기·트리 해시")
     skip_rules = skipdirs.load()  # 건너뛰는 폴더(scan/skip-dirs): 트리 해시·세 스캐너·a-input 이 같은 규칙을 쓴다
-    in_o, root_o, files_o, extra_o = prepare_input(orig, out, "orig", skip_rules)
-    in_f, root_f, files_f, extra_f = prepare_input(fixed, out, "fixed", skip_rules)
+    rules.MAX_TEXT = scanmod.MAX_FILE = params.max_file_bytes  # MAX_FILE_MIB(교차 리뷰 X56): scan.py·약화·허용 검사가 함께 쓴다
+    as_of = rc.iso(started)[:10]  # 허용 항목 만료·REVIEW_MAX_AGE_DAYS 의 기준 날(UTC, --verify 가 started_at 으로 다시 본다)
+    in_o, root_o, files_o, extra_o = prepare_input(orig, out, "orig", skip_rules, params.max_file_bytes)
+    in_f, root_f, files_f, extra_f = prepare_input(fixed, out, "fixed", skip_rules, params.max_file_bytes)
     say(f"  원본 파일 {len(files_o):,} · 고친 판 파일 {len(files_f):,}")
     for side, files in (("원본", files_o), ("고친 판", files_f)):
         if not files:  # 빈 폴더·빈 zip이면 도구가 아무것도 못 찾고 0으로 끝난다(반박 검증에서 찾음)
@@ -786,10 +818,12 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
         if not n:
             raise UsageError(f"EXCLUDE·recon 데이터 폴더를 빼니 고친 판에 남는 파일이 0개다: {excl.patterns}")
     fixed_all = [x[0] for x in files_f if not x[1].startswith("symlink:")]
-    allow = al.AllowList.load(allow_path, fixed_all, lambda rel: text_lines(root_f, rel), app_roots, frozenset(ex_f))
+    allow = al.AllowList.load(allow_path, fixed_all, lambda rel: text_lines(root_f, rel), app_roots, frozenset(ex_f), as_of,
+                              params.review_max_age_days)
     # 같은 목록을 원본 트리로도 푼다(판정에는 안 쓴다). 고친 판에서 안 쓰인 항목이 원본 고전 줄을 덮는지 보려고(결함 D1, note_other)
     orig_all = [x[0] for x in files_o if not x[1].startswith("symlink:")]
-    allow_o = (al.AllowList.load(allow_path, orig_all, lambda rel: text_lines(root_o, rel), app_roots, frozenset(ex_o))
+    allow_o = (al.AllowList.load(allow_path, orig_all, lambda rel: text_lines(root_o, rel), app_roots, frozenset(ex_o), as_of,
+                                 params.review_max_age_days)
                if allow_path and allow.entries else None)
     allow_art = allow_sha = None
     if allow_path and os.path.isfile(allow_path):
@@ -829,7 +863,7 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
         cbom[side] = {"rows": len(items), "locations": nloc, "blocking": counts["block"], "allowed": counts["allow"],
                       "review": counts["review"],
                       "comment_or_test": counts["comment"], "tests": counts["tests"], "check": counts["check"], "info": counts["info"],
-                      "out_of_scope": counts["scope"], "cbom_scan_ok": ok, "csv": p, "csv_sha256": s}
+                      "out_of_scope": counts["scope"], "unresolved": counts["unresolved"], "cbom_scan_ok": ok, "csv": p, "csv_sha256": s}
     phase("(a) CBOM(cbom-scan + scan.py)", t0)
 
     # (c) residue
@@ -994,7 +1028,8 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
         "proof": {"verdict": verdict, "verdict_text": rc.verdict_text({
                       "verdict": verdict, "format_version": ver.FORMAT_VERSION, "weakening": {"review": review}, "checks": checks,
                       "allowlist": {"unreviewed": len(pending), "unused": len(unused), "write_review": len(allow.write_review()),
-                                    "legacy": name_only, "composite": composite_locs}}),
+                                    "legacy": name_only, "composite": composite_locs, "expired": len(allow.expired())},
+                      "cbom": {"fixed": {"unresolved": cbom["fixed"]["unresolved"]}}}),
                   "allow_unreviewed": len(pending), "checks": {c["id"]: c["status"] for c in checks}},
     })
 
@@ -1023,7 +1058,9 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
          "params": {"classic": params.classic, "expect": params.expect, "scope": params.scope, "tls_via": params.tls_via,
                     "tls_targets": params.tls_targets, "tls_targets_orig": params.tls_targets_orig,
                     "residue": res_script or "", "allow": allow_path or "", "exclude": excl.patterns,
-                    "recon": recon_path or "", "require_review": params.require_review, "profile": params.profile},
+                    "recon": recon_path or "", "require_review": params.require_review, "profile": params.profile,
+                    "fail_on_review": params.fail_on_review, "require_resolved": params.require_resolved, "expect_from": params.expect_from,
+                    "review_max_age_days": params.review_max_age_days, "max_file_bytes": params.max_file_bytes},
          "changed": {"added": added, "removed": removed, "modified": modified, "file": ch_path, "file_sha256": ch_sha},
          "cbom": cbom, "java": java_rec, "tls": tls,
          "weakening": {"deny": deny, "review": review, "file": wp, "file_sha256": ws},
@@ -1038,7 +1075,7 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
                       "entries": allow.record(), "warnings": allow.warnings, "unreviewed": len(pending),
                       "top_digest": allow.top_digest,
                       # 결함 D1 뒤에 보탬: 안 쓰인 항목 수, 그 항목들이 원본에서 덮는 고전 줄 수(사람 확인 전), 허용 범위 쓰기 경로 위치 수
-                      "unused": len(unused), "unused_orig_lines": sum(len(e["orig"]) for e in unused),
+                      "unused": len(unused), "unused_orig_lines": sum(len(e["orig"]) for e in unused), "expired": len(allow.expired()),
                       "write_review": len(allow.write_review()),
                       "hybrid": hyb_locs, "legacy": legacy_locs, "composite": composite_locs,
                       "imports": sorted({x["loc"] for x in ((jf or {}).get("listed") or {}).get("lines", []) if x.get("via") == "import"}
@@ -1103,6 +1140,8 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
     for x in review:
         lines.append(f"  review {x['path']}: {x['rule']} ({x['before']}->{x['after']}) {x['detail']}")
     code = {"pass": 0, "fail": 1, "undecided": 3}[verdict]
+    if code == 0 and params.fail_on_review and any(c["status"] == "review" for c in checks):
+        code = EXIT_REVIEW  # FAIL_ON_REVIEW=1: 판정은 통과 그대로, 종료 코드만 5
     # 통과인데 사람이 볼 것(검증 호출 제거 흔적, 사람 확인 전 허용 항목, 허용 범위 쓰기 경로, 안 쓰인 항목)이 남았으면 판정 옆에 적는다
     note = rc.pending_note(r, en=True)
     lines.append(f"VERDICT={verdict.upper()}{f' ({note})' if note else ''}  receipt_id={r['receipt_id']}")
@@ -1468,6 +1507,14 @@ def main(argv):
     except UsageError as e:
         print(f"prove.sh: {e}", file=sys.stderr)
         return 2
+    except KeyboardInterrupt:
+        return 130
+    except Exception as e:  # noqa: BLE001  도구 오류는 판정 실패(1)와 가른다(교차 리뷰 X62)
+        import traceback
+        traceback.print_exc()
+        print(f"pqproof: 도구 오류({type(e).__name__}: {str(e)[:200]}). 판정이 아니다(종료 {EXIT_TOOL_ERROR}). "
+              "https://github.com/g1mn/pqproof/issues 에 위 내용과 함께 알려 주면 고친다", file=sys.stderr)
+        return EXIT_TOOL_ERROR
 
 
 if __name__ == "__main__":

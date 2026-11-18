@@ -43,6 +43,8 @@ The run writes `proof-out-YYYYMMDD-HHMMSS/`. Open `receipt.html` (for people) or
 | 1 | fail |
 | 2 | usage or input error (no verdict) |
 | 3 | undecided, for example a TLS server with no address to measure; never counted as a pass |
+| 4 | tool error: an unexpected exception inside PQ-Proof (no verdict) |
+| 5 | pass with a check that needs review, only with `FAIL_ON_REVIEW=1` |
 
 | System | Judge two trees | `--verify`, `sarif` |
 |---|---|---|

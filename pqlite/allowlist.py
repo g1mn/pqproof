@@ -21,6 +21,10 @@
   제어 문자, 날짜가 아닌 reviewed_at, 맞지 않는 reviewed_digest 는 경고를 남기고 '사람 확인 전'으로 센다(항목은 무효가 아니다:
   허용 판정과 사람 확인 기록을 섞지 않는다). 확인 전 허용 항목은 판정 옆에 '허용 n건 사람 확인 전'으로 적고, REQUIRE_REVIEW=1 이면
   실패다(prove.py r-allow).
+만료·결재(선택, 교차 리뷰 X31): expires_at(YYYY-MM-DD)이 실행한 날(UTC)보다 앞이면 그 항목은 '만료'다. 허용은 그대로 하되
+  r-allow 를 검토 필요로, REQUIRE_REVIEW=1 이면 실패로 만든다. 30일 안에 만료되면 경고한다. approval_ref(티켓·결재 번호)는 그대로
+  증적에 옮긴다. 두 칸은 적혀 있을 때만 reviewed_digest 에 든다(옛 목록의 digest 는 그대로). REVIEW_MAX_AGE_DAYS 를 주면 그보다 오래된
+  reviewed_at 은 사람 확인 전으로 센다. 모르는 칸과 모르는 kind 는 경고한다(예전에는 조용히 버렸다).
 안 쓰인 항목(unused): 고친 판에서 덮은 고전 줄이 0인 유효 항목. 목록은 고친 판 기준으로 쓰지만 어느 트리에 대든 그대로 걸린다.
   그래서 고친 판에서 안 쓰인 항목은 원본 같은 다른 트리에 대면 그 범위의 고전 줄을 가린다(결함 D1).
   note_other()가 같은 목록을 원본 트리로도 풀어 항목마다 원본에서 덮는 고전 줄을 세고(판정에는 안 쓴다), 안 쓰인 항목이 덮는
@@ -57,6 +61,14 @@ CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f​-‏ -‮⁠-⁩﻿]")
 IN_EFFECT = ("allowed", "review")  # 줄을 실제로 판정에서 뺀 항목(사람 확인 전을 세는 대상)
 OTHER_MAX = 400  # 항목마다 증적에 적는 원본 덮은 줄 목록 길이(수는 따로 다 센다)
 DIGEST_FIELDS = ("where", "what", "why", "kind")  # reviewed_digest 가 덮는 칸(사람이 읽은 글)
+DIGEST_OPTIONAL = ("expires_at", "approval_ref")  # 적혀 있을 때만 digest 에 드는 칸(교차 리뷰 X31, 옛 목록의 digest 는 그대로)
+ENTRY_FIELDS = DIGEST_FIELDS + DIGEST_OPTIONAL + ("reviewed_by", "reviewed_at", "reviewed_digest")
+TOP_FIELDS = ("unconverted", "items", "entries", "reviewed_by", "reviewed_at", "reviewed_digest")
+# kind 로 쓰는 낱말. false-positive 는 고전 암호가 아닌데 이름이 걸린 줄(오탐), exception 은 위험을 받아들인 예외, vendored 는 받아 둔
+# 의존성, fallback·boundary·kept 는 옛 데이터 읽기·외부 경계·남겨 둔 코드. 그 밖 낱말은 경고만 한다(허용은 그대로)
+KINDS = ("fallback", "boundary", "kept", "exception", "false-positive", "vendored")
+EXPIRY_WARN_DAYS = 30
+DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 DIGEST_LEN = 16
 DEAD = ("invalid", "excluded", "outside")  # 고친 판에서 아무 줄도 판정에서 빼지 않는 상태
 
@@ -98,7 +110,9 @@ def review_stamp(src):
 def review_digest(items):
     """항목들 → 사람 확인 칸이 덮는 글(where·what·why·kind)의 SHA-256 앞 16자리. reviewed_digest 에 옮겨 적는 값이다.
     칸마다 앞뒤 공백을 떼고(글이 아니면 빈 글) 키 정렬·공백 없는 JSON 배열로 만들어 잰다. 가리킨 코드 줄의 내용은 들어가지 않는다."""
-    rows = [{k: (x[k].strip() if isinstance(x, dict) and isinstance(x.get(k), str) else "") for k in DIGEST_FIELDS} for x in items]
+    rows = [dict({k: (x[k].strip() if isinstance(x, dict) and isinstance(x.get(k), str) else "") for k in DIGEST_FIELDS},
+                 **{k: x[k].strip() for k in DIGEST_OPTIONAL if isinstance(x, dict) and isinstance(x.get(k), str) and x[k].strip()})
+            for x in items]
     text = json.dumps(rows, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:DIGEST_LEN]
 
@@ -110,9 +124,28 @@ def entries_of(data):
     return data if isinstance(data, list) else None
 
 
-def resolve_reviews(data):
+def date_ok(text):
+    """'2026-11-18' 꼴의 실제 날짜인가."""
+    if not isinstance(text, str) or not DATE.fullmatch(text.strip()):
+        return False
+    try:
+        datetime.date.fromisoformat(text.strip())
+    except ValueError:
+        return False
+    return True
+
+
+def stale(at, as_of, max_age):
+    """reviewed_at 이 as_of(YYYY-MM-DD)보다 max_age 일 넘게 앞인가(REVIEW_MAX_AGE_DAYS)."""
+    if not (at and as_of and max_age):
+        return False
+    return (datetime.date.fromisoformat(as_of) - datetime.date.fromisoformat(at[:10])).days > max_age
+
+
+def resolve_reviews(data, as_of=None, max_age=None):
     """허용 목록 JSON(통째) → (항목별 {"by", "at", "via"}, 경고 목록, 맨 위 칸 상태, 자기 칸 없는 항목 번호, 그 항목들의 지금 digest).
     via: 'entry'(항목 자기 칸), 'top'(목록 맨 위 칸, reviewed_digest 가 지금 내용과 맞을 때), None(사람 확인 전).
+    as_of·max_age: REVIEW_MAX_AGE_DAYS. reviewed_at 이 as_of(실행한 날, UTC)보다 max_age 일 넘게 앞이면 사람 확인 전으로 센다.
     맨 위 칸 상태: 'none'(맨 위 칸 없음), 'ok'(물려줌), 'bad'(꼴이 틀리거나 digest 가 없거나 다름).
     고친 판 트리를 보지 않으므로 --verify 가 증적 폴더의 목록 사본(artifacts/allow-list.json)으로 같은 결과를 다시 낸다."""
     items = entries_of(data) or []
@@ -134,6 +167,9 @@ def resolve_reviews(data):
                 warns.append(f"#{i} reviewed_digest 가 지금 항목과 다름(확인 뒤 where·what·why·kind 가 바뀜): 사람 확인 전으로 셈. "
                              f"지금 값 {want}")
                 continue
+        if stale(at, as_of, max_age):
+            warns.append(f"#{i} reviewed_at {at[:10]} 이 REVIEW_MAX_AGE_DAYS={max_age} 보다 오래됨: 사람 확인 전으로 셈")
+            continue
         x.update(by=by, at=at, via="entry")
     top_digest = review_digest([items[i - 1] for i in inherit]) if inherit else None
     by, at, err = review_stamp(data)
@@ -148,6 +184,8 @@ def resolve_reviews(data):
         why = "목록 맨 위 사람 확인 칸에 reviewed_digest 가 없음(어느 항목을 확인했는지 묶이지 않음)"
     elif not (isinstance(given, str) and given.strip().lower() == top_digest):
         why = "목록 맨 위 reviewed_digest 가 지금 목록과 다름(확인 뒤 항목을 더하거나 고침)"
+    elif stale(at, as_of, max_age):
+        why = f"목록 맨 위 reviewed_at {at[:10]} 이 REVIEW_MAX_AGE_DAYS={max_age} 보다 오래됨"
     else:
         for i in inherit:
             out[i - 1].update(by=by, at=at, via="top")
@@ -299,11 +337,13 @@ class AllowList:
         self.index = {}  # 상대 경로 → [(항목, 범위 목록 또는 None)]
         self.top_state, self.inherit, self.top_digest = "none", [], None  # 목록 맨 위 사람 확인 칸(resolve_reviews)
         self.other_checked = False  # note_other()로 원본 트리에서도 풀어 봤나
+        self.as_of, self.max_age = None, None  # 만료·REVIEW_MAX_AGE_DAYS 의 기준 날(load 가 정한다)
 
     @classmethod
-    def load(cls, path, files, line_count, app_roots=(), excluded=frozenset()):
+    def load(cls, path, files, line_count, app_roots=(), excluded=frozenset(), as_of=None, max_age=None):
         """path(JSON) → AllowList. files: 고친 판 전체 상대 경로, line_count(rel) → 줄 수(못 읽으면 None),
-        excluded: 검사에서 뺀 상대 경로(그 파일만 가리키는 항목은 '검사 범위 밖')."""
+        excluded: 검사에서 뺀 상대 경로(그 파일만 가리키는 항목은 '검사 범위 밖'). as_of: 실행한 날(UTC, YYYY-MM-DD, 만료와
+        REVIEW_MAX_AGE_DAYS 의 기준, 비우면 오늘), max_age: REVIEW_MAX_AGE_DAYS."""
         al = cls(path)
         if not path:
             return al
@@ -320,9 +360,15 @@ class AllowList:
         if items is None:
             al.warnings.append("허용 목록이 배열이 아님(항목 배열 또는 {\"unconverted\": [...]})")
             return al
-        reviews, review_warns, al.top_state, al.inherit, al.top_digest = resolve_reviews(data)
+        as_of = as_of or datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+        al.as_of, al.max_age = as_of, max_age
+        reviews, review_warns, al.top_state, al.inherit, al.top_digest = resolve_reviews(data, as_of, max_age)
+        if isinstance(data, dict):
+            extra = sorted(k for k in data if k not in TOP_FIELDS)
+            if extra:
+                al.warnings.append(f"목록 맨 위의 모르는 칸 {', '.join(map(str, extra))[:120]} 은 읽지 않는다(guide/allowlist.md)")
         fileset = sorted(files)
-        soon = (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
+        soon = (datetime.date.fromisoformat(as_of) + datetime.timedelta(days=1)).isoformat()
         for i, raw in enumerate(items, 1):
             e = al._resolve(i, raw, fileset, line_count, app_roots, excluded)
             x = reviews[i - 1]
@@ -330,6 +376,7 @@ class AllowList:
             e["digest"] = review_digest([raw])
             if x["at"] and x["at"][:10] > soon:  # 받기는 하되 알린다(시계·오타 확인)
                 review_warns.append(f"#{i} reviewed_at 이 미래 날짜({x['at'][:10]})")
+            al._terms(i, raw, e, review_warns)
             al.entries.append(e)
         al.warnings += review_warns
         for e in al.entries:
@@ -337,6 +384,36 @@ class AllowList:
                 for t in e["targets"]:
                     al.index.setdefault(t["path"], []).append((e, t["ranges"]))
         return al
+
+    def _terms(self, n, raw, e, warns):
+        """만료·결재 칸과 모르는 칸·kind(교차 리뷰 X31). 칸 꼴이 틀려도 항목은 그대로 두고 경고한다."""
+        e["expires_at"], e["approval_ref"], e["expired"] = None, None, False
+        if not isinstance(raw, dict):
+            return
+        extra = sorted(k for k in raw if k not in ENTRY_FIELDS)
+        if extra:
+            warns.append(f"#{n} 모르는 칸 {', '.join(map(str, extra))[:120]} 은 읽지 않는다(guide/allowlist.md)")
+        if e["kind"] and e["kind"] not in KINDS:
+            warns.append(f"#{n} kind {CONTROL.sub(' ', e['kind'])[:40]!r} 은 정해 둔 낱말이 아니다({', '.join(KINDS)})")
+        ref = raw.get("approval_ref")
+        if ref is not None:
+            if isinstance(ref, str) and ref.strip() and not CONTROL.search(ref):
+                e["approval_ref"] = ref.strip()[:200]
+            else:
+                warns.append(f"#{n} approval_ref 가 비었거나 글이 아니거나 제어 문자가 있다: 읽지 않는다")
+        exp = raw.get("expires_at")
+        if exp is None:
+            return
+        if not date_ok(exp):
+            warns.append(f"#{n} expires_at 이 YYYY-MM-DD 날짜가 아니다({CONTROL.sub(' ', str(exp))[:40]!r}): 만료를 보지 않는다")
+            return
+        e["expires_at"] = exp.strip()
+        days = (datetime.date.fromisoformat(e["expires_at"]) - datetime.date.fromisoformat(self.as_of)).days
+        if days < 0:
+            e["expired"] = True
+            warns.append(f"#{n} {CONTROL.sub(' ', e['where'])[:60]}: {e['expires_at']} 에 만료됨(r-allow 검토 필요, REQUIRE_REVIEW=1 이면 실패)")
+        elif days <= EXPIRY_WARN_DAYS:
+            warns.append(f"#{n} {CONTROL.sub(' ', e['where'])[:60]}: {days}일 뒤({e['expires_at']}) 만료")
 
     def _resolve(self, n, raw, files, line_count, app_roots, excluded):
         e = {"n": n, "where": "", "what": "", "why": "", "kind": "", "targets": [], "status": "pending", "note": "",
@@ -471,11 +548,16 @@ class AllowList:
                                           if t["ranges"] else "") for t in e["targets"]],
                  "status": e["status"], "note": e["note"], "allowed": e["allowed"], "review": e["review"],
                  "reviewed_by": e["reviewed_by"], "reviewed_at": e["reviewed_at"], "reviewed_via": e["reviewed_via"],
-                 "digest": e["digest"], "lines_fixed": len(set(e["allowed"]) | set(e["review"]))}
+                 "digest": e["digest"], "lines_fixed": len(set(e["allowed"]) | set(e["review"])),
+                 "expires_at": e.get("expires_at"), "approval_ref": e.get("approval_ref"), "expired": bool(e.get("expired"))}
             if self.other_checked:
                 x["lines_orig"], x["orig"] = len(e.get("orig", [])), e.get("orig", [])[:OTHER_MAX]
             out.append(x)
         return out
+
+    def expired(self):
+        """줄을 판정에서 뺀 항목(허용·검토 필요) 중 expires_at 이 지난 것. finish() 뒤에 부른다."""
+        return [e for e in self.entries if e["status"] in IN_EFFECT and e.get("expired")]
 
     def unreviewed(self):
         """줄을 판정에서 뺀 항목(허용·검토 필요) 중 받아들인 사람 확인 칸이 없는 것. finish() 뒤에 부른다."""

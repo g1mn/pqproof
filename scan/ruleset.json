@@ -34,17 +34,17 @@
    ]
   },
   "2": {
-   "sha256": "debc7ed276209059bdae94353807fb512510ff43ac8c2acd77be3f1c8199b19c",
+   "sha256": "80d2cceed30c230cf809da4515f87032cdbe8a1c389965dc00acd77cdadc1883",
    "since": "0.2.0",
    "verdict_impact": "yes",
    "files": [
     {
      "path": "pqlite/allowlist.py",
-     "sha256": "cf2867665cb1d33c5451e11ceb9827bc640e22cca6c163988ba3af48fe15005b"
+     "sha256": "440e8c9cf43ee2272138e13587c8bb26361bbe036515e5b55d323a2f67a49aa3"
     },
     {
      "path": "pqlite/rules.py",
-     "sha256": "d620022600cea362a1f49349b1b348adbb865bdcd963b7cb57c51967a3e2d3ad"
+     "sha256": "91fefbf98f647820c673a0be6960ed3c9dd9ab1cb8750b786b6377ed55679ce6"
     },
     {
      "path": "pqlite/scan.py",

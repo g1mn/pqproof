@@ -155,7 +155,8 @@ class Settings(unittest.TestCase):
         documented = set(re.findall(r"(?m)^#   ([A-Z][A-Z_]+)=", head))
         src = pathlib.Path(prove.HERE, "prove.py").read_text(encoding="utf-8")
         params_src = src[src.index("class Params:"):src.index("TARGET = re.compile")]
-        read = set(re.findall(r'env\.get\("([A-Z_]+)"', params_src))
+        read = set(re.findall(r'env\.get\("([A-Z_]+)"|(?:flag|number)\(env, "([A-Z_]+)"', params_src))
+        read = {a or b for a, b in read}
         self.assertEqual(documented, set(prove.SETTINGS))
         self.assertLessEqual(read, set(prove.SETTINGS))
         self.assertEqual(set(prove.SETTINGS) - read, {"PROBE_BIN_DIR"})  # prove.sh·cli.py·tlsprobe.py 가 읽는다

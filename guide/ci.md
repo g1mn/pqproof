@@ -6,8 +6,8 @@ PQ-Proof fits a pipeline as one step: judge the change against its base commit, 
 
 `action.yml` is a composite Action.
 
-- Inputs: `original`, `converted`, `allow-list`, `require-review`, `expect`, `scope`, `classic`, `exclude`, `tls-targets`, `probe-bin-dir`, `output-dir`, `sarif-file`, `sarif-anchor`, `fail-on` (`not-pass`, `fail` or `never`) and `python`.
-- Outputs: `verdict` (`pass`, `fail`, `undecided`, or `error` when no evidence was written), `evidence-hash`, `exit-code`, `output-dir` and `sarif-file`.
+- Inputs: `original`, `converted`, `allow-list`, `require-review`, `expect`, `scope`, `classic`, `exclude`, `tls-targets`, `probe-bin-dir`, `output-dir`, `sarif-file`, `sarif-anchor`, `fail-on` (`not-pass`, `review`, `fail` or `never`; `review` also stops a pass that has a check needing review) and `python`.
+- Outputs: `verdict` (`pass`, `fail`, `undecided`, or `error` when no evidence was written), `evidence-hash`, `exit-code`, `output-dir`, `sarif-file` and `review-checks` (the ids of the checks that need review).
 
 Inputs reach the scripts only through environment variables. The Action runs `--verify` on the evidence it wrote and reports `error` if that fails. Its job summary lists the checks and the ones not counted as passed.
 

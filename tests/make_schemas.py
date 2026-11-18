@@ -31,9 +31,12 @@ def receipt_schema(fv):
     for key, since in R.FORMAT_ONLY.items():
         if fv < since:
             del body["properties"][key]
-    for (outer, key), since in R.FORMAT_ONLY_NESTED.items():
+    for path, since in R.FORMAT_ONLY_NESTED.items():
         if fv < since:
-            del body["properties"][outer]["properties"][key]
+            node = body
+            for seg in path[:-1]:
+                node = node["properties"][seg[:-2]]["items"] if seg.endswith("[]") else node["properties"][seg]
+            node["properties"].pop(path[-1], None)  # 같은 꼴을 나눠 쓰는 칸(inputs.orig·fixed)은 한 번 지우면 둘 다 빠진다
     body["required"] = sorted(set(body["required"]) | set(V2_REQUIRED) | {k for k, s in R.FORMAT_ONLY.items() if fv >= s})
     body["properties"]["format_version"] = {"const": fv}
     body["properties"]["note"] = {"const": ABOUT[fv][1]}

@@ -55,6 +55,19 @@ class ResidueAndProve(unittest.TestCase):
                         self.assertIn(rid, group)
         self.assertEqual(rules.DEFAULT_PROFILE, "nist-cat3")
         self.assertEqual(rules.PROFILES["nist-cat3"]["tls_group"], "X25519MLKEM768")
+        self.assertEqual((rules.PROFILES["cnsa2"]["kem"], rules.PROFILES["cnsa2"]["sig"], rules.PROFILES["cnsa2"]["tls_group"]),
+                         (["E-MLKEM1024"], ["E-MLDSA87"], "SecP384r1MLKEM1024"))
+        self.assertEqual(rules.PROFILES["nist-cat3"]["kem"], ["E-MLKEM768", "E-MLKEM1024"])
+        self.assertTrue(set(rules.PROFILES["kpqc"]["kem"]) >= {"E-MLKEM768", "E-KPQC-KEM"})
+        # EXPECT_FROM=api 의 파이썬 정규식이 residue.sh EXPECT 규칙과 같은 이름을 잡는다
+        res = {r["id"]: r["re"] for r in rulesrc.residue_rules() if r["kind"] == "EXPECT"}
+        samples = ["ML-KEM-768", "mlkem768", "ML_KEM_1024", "ml-dsa-65", "MLDSA87", "SMAUG-T3", "NTRU+576", "ntruplus", "HAETAE3",
+                   "AIMer128f", "disclaimer", "ML-KEM-512", "MLDSA44"]
+        self.assertEqual(set(res), set(rules.EXPECT_RE))
+        for rid in res:
+            for s in samples:
+                with self.subTest(rule=rid, name=s):
+                    self.assertEqual(bool(re.search(res[rid], s)), bool(re.search(rules.EXPECT_RE[rid], s)))
 
     def test_composite_names(self):
         # 복합 서명 이름표: residue.sh RES_COMPOSITE(ML-DSA-65·87 만), pqlite/scan.py COMPOSITE_NAME, cbom-scan.sh COMPRE 가 같은 이름을 잡는다

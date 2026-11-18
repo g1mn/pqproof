@@ -485,10 +485,59 @@ class AllowRules(unittest.TestCase):
             ("src/Box.java", 'KeyAgreement.getInstance("X25519"); // ML-KEM-768 later', "X25519", None),  # 주석 속 ML-KEM 은 아니다
             ("src/Box.java", 'Signature.getInstance("SHA256withRSA"); String g = "MLKEM768";', "RSA", None),
             ("src/Box.kt", 'val f = KeyFactory.getInstance("RSA")', "RSA", None),
+            # 규칙 묶음 2: 복합 서명은 '복합 서명'(검토 필요), ML-DSA-44 를 묶은 것은 허용하지 않는다(X26)
+            ("src/Box.java", 'Signature.getInstance("MLDSA65-ECDSA-P256-SHA512");', "ECDSA", rules.COMPOSITE_REASON),
+            ("src/Box.java", 'Signature.getInstance("MLDSA44-RSA2048-PSS-SHA256");', "RSA", None),
+            ("src/Box.java", 'Signature.getInstance("SHA256withECDSA"); // MLDSA65-ECDSA-P256-SHA512 later', "ECDSA", None),
         ]
         for path, text, alg, want in rows:
             with self.subTest(path=path, text=text):
                 self.assertEqual(rules.allow_reason(path, text, alg), want)
+
+    def test_comment_rows_by_language(self):
+        # X22: cbom-scan 행이 주석·독스트링 안이면 주석(언어 토크나이저), 언어를 모르는 파일은 아니라고 본다
+        tmp = tempfile.mkdtemp(prefix="pqproof-incomment-")
+        try:
+            write_tree(tmp, {"a.py": '"""Uses RSA-OAEP."""\nx = 1  # RSA-2048\nk = rsa.generate_private_key()\n',
+                             "A.java": "/* RSA */\nint n = 1; // RSA\nObject k = KeyFactory.getInstance(\"RSA\");\n",
+                             "a.c": "#include <openssl/rsa.h>\n"})
+            lines = rules.Lines(tmp)
+            generic = "일반 패턴: 문맥 확인"
+            rows = [("a.py", 1, "RSA", generic, True), ("a.py", 2, "RSA", generic, True), ("a.py", 3, "RSA", generic, False),
+                    ("a.py", 2, "RSA", "", False), ("A.java", 1, "RSA", generic, True), ("A.java", 2, "RSA", generic, True),
+                    ("A.java", 3, "RSA", "", False), ("a.c", 1, "rsa", generic, False), ("a.py", 2, "ML-KEM-768,RSA", generic, True)]
+            for path, line, alg, note, want in rows:
+                with self.subTest(path=path, line=line, note=note):
+                    self.assertEqual(rules.in_comment(lines, path, line, alg, note), want)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)  # 이 시험이 만든 자기 폴더만
+
+    def test_expect_from_api_counts_calls_only(self):
+        # X30: EXPECT_FROM=api 는 PQC API 호출 행만 센다(이름 상수 pqc-parameter, '일반 패턴' 행은 아니다)
+        items = [{"loc": "A.java:3", "tool": "scan.py", "use": "key-generation", "alg": "ML-KEM-768", "threat": "pqc", "note": ""},
+                 {"loc": "A.java:1", "tool": "scan.py", "use": "pqc-parameter", "alg": "ML-KEM-768", "threat": "pqc", "note": ""},
+                 {"loc": "a.py:2", "tool": "cbom-scan", "use": "키교환", "alg": "ML-KEM-768", "threat": "안전(PQC)",
+                  "note": "일반 패턴: 문맥 확인"},
+                 {"loc": "w.js:4", "tool": "cbom-scan", "use": "키교환", "alg": "ml-kem-1024", "threat": "안전(PQC)", "note": ""}]
+        self.assertEqual(rules.expect_api(items, ["E-MLKEM768"])[0], 1)
+        self.assertEqual(rules.expect_api(items, ["E-MLKEM768", "E-MLKEM1024"])[0], 2)
+        self.assertEqual(rules.expect_api(items, ["E-MLDSA65"])[0], 0)
+
+    def test_unresolved_rows_need_review(self):
+        # X27: 열지 못한 키 자료와 알고리즘을 못 읽은 공개키 API 는 검토 필요, PQC 로 끝까지 추적한 '확인' 행은 참고
+        tmp = tempfile.mkdtemp(prefix="pqproof-unresolved-")
+        try:
+            rows = [{"위치": "keys/a.key:1", "용도": "개인키", "알고리즘·키 길이": "암호화된 PKCS#8(알고리즘 미확인)", "양자 위협": "미확인",
+                     "근거·비고": ""},
+                    {"위치": "keys/b.pem", "용도": "인증서(신뢰 저장소 묶음)", "알고리즘·키 길이": "인증서 12개", "양자 위협": "미확인(묶음: 개별 파싱 생략)",
+                     "근거·비고": ""},
+                    {"위치": "test/k.key:1", "용도": "개인키", "알고리즘·키 길이": "RSA(파싱 실패: 암호화·형식 확인)", "양자 위협": "미확인",
+                     "근거·비고": "테스트·예제"}]
+            items, counts, _ = rules.merge_cbom(rows, [], rules.Lines(tmp), False)
+            self.assertEqual([it["status"] for it in items], ["review", "info", "check"])
+            self.assertEqual(counts["unresolved"], 1)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)  # 이 시험이 만든 자기 폴더만
 
 
 class InputPair(unittest.TestCase):

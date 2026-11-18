@@ -27,7 +27,8 @@ USAGE = """usage:
   pqproof build-probe                              build tls_probe into the user cache (Go 1.27+, offline)
   pqproof mutations [--strict] [--only ids]        planted-defect suite
   pqproof --version | --help | --env               (--env prints the environment variables prove.sh reads)
-exit codes: 0 pass, 1 fail, 2 usage or input error, 3 undecided. A skipped check is never counted as passed.
+exit codes: 0 pass, 1 fail, 2 usage or input error, 3 undecided, 4 tool error, 5 pass with checks that need review
+(only with FAIL_ON_REVIEW=1). A skipped check is never counted as passed.
 --verify, sarif, --env and --version need only Python; judging needs bash, grep, awk and OpenSSL (on Windows, use WSL)."""
 
 WINDOWS = ("pqproof: judging two trees runs bash, grep, awk and OpenSSL, so on Windows run it inside WSL: `wsl --install`, then "

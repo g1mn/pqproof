@@ -31,12 +31,18 @@
 #                          지금 목록과 맞을 때만 센다(확인 뒤 더하거나 고친 항목은 확인 전으로 돌아간다). 실무 검토에서는 1을 권한다
 # 시험·예제 경로는 scan/test-paths.ere 한 곳에 있다(두 스캐너가 같이 쓴다). 그 경로의 고전 줄은 판정에 안 넣고 따로 센다
 #   PROBE_BIN_DIR=<폴더>   tls_probe 바이너리 폴더. 기본 bin/(build-probe.sh가 만든다)
+#   FAIL_ON_REVIEW=1       판정이 통과여도 검토 필요인 검사가 있으면 종료 코드 5(판정은 그대로). CI 에서 사람이 보게 할 때
+#   REQUIRE_RESOLVED=1     열지 못한 키 자료(암호화된 PKCS#8·못 연 키스토어)와 알고리즘을 못 읽은 공개키 API 가 남으면 a-cbom 실패
+#   EXPECT_FROM=names | api   c-expect 를 이름 줄(기본)로 셀지, PQC API 호출 위치(JCA·Node·Go)로 셀지. api 면 상수만 남긴 판이 실패한다
+#   REVIEW_MAX_AGE_DAYS=N  허용 목록의 reviewed_at 이 N일보다 오래되면 사람 확인 전으로 센다
+#   MAX_FILE_MIB=N         scan.py·약화·허용 검사가 읽는 파일 크기 한도(기본 1). 넘은 코드·설정 파일은 a-input 검토 필요로 적는다
 #   PROFILE=nist-cat3 | cnsa2 | kpqc   알고리즘 프로필(scan/profiles.json). 기본 nist-cat3: c-expect 가 ML-KEM-768·1024, ML-DSA-65·87 을 센다.
 #                          cnsa2 는 ML-KEM-1024·ML-DSA-87 만 세고 b-tls 가 SecP384r1MLKEM1024 를 홀로 제시한다. kpqc 는 국내 KpqC 도 센다
 # 출력 폴더의 deck.json 은 발표 자료·대시보드용 요약이다(receipt.json에서 결정적으로 만든다)
 # 진행: 단계마다 stderr 에 'pqproof: [n/6] ...' 줄과 걸린 시간을 찍는다. 맨 앞 줄은 적용 설정이고, 설정 이름 오타(REQUIRE_REVEIW 등)와
 #   모르는 PQPROOF_ 이름은 경고한다. 설정 설명(영어): guide/configuration.md
-# 종료: 0 통과 · 1 실패 · 2 사용법·입력 오류 · 3 미판정(TLS 신호가 있는데 TLS_TARGETS 없음, 대조 실패 등)
+# 종료: 0 통과 · 1 실패 · 2 사용법·입력 오류 · 3 미판정(TLS 신호가 있는데 TLS_TARGETS 없음, 대조 실패 등) · 4 도구 오류(예상 못 한 예외)
+#       · 5 통과지만 검토 필요(FAIL_ON_REVIEW=1 일 때만)
 # 작업 폴더 꼴(선택): <W>/orig(원본) · <W>/repo(고친 판) · <W>/notes/unconverted.json(허용 목록) · <W>/notes/recon.json · <W>/evidence/
 #   W=<작업 폴더>; ALLOW=$W/notes/unconverted.json EXCLUDE='data/** *.db *.sqlite3 *.log' bash prove.sh $W/orig $W/repo
 # 오프라인: 인터넷·종량제 API·서버를 쓰지 않는다. 받은 소스의 코드는 실행하지 않는다. 지우는 명령 없음. bash 3.2 호환.

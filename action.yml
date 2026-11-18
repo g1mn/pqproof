@@ -60,7 +60,7 @@ inputs:
     required: false
     default: ""
   fail-on:
-    description: "not-pass (default: fail, undecided or error stop the job), fail (only fail or error), never"
+    description: "not-pass (default: fail, undecided or error stop the job), review (also a pass with a check that needs review), fail (only fail or error), never"
     required: false
     default: "not-pass"
   python:
@@ -76,8 +76,11 @@ outputs:
     description: "receipt_id: SHA-256 of the RFC 8785 form of receipt.json"
     value: ${{ steps.run.outputs.evidence-hash }}
   exit-code:
-    description: "prove.sh exit code (0 pass, 1 fail, 2 usage or input error, 3 undecided)"
+    description: "prove.sh exit code (0 pass, 1 fail, 2 usage or input error, 3 undecided, 4 tool error)"
     value: ${{ steps.run.outputs.exit-code }}
+  review-checks:
+    description: "comma-separated ids of the checks that need review (empty when none)"
+    value: ${{ steps.run.outputs.review-checks }}
   output-dir:
     description: "Evidence folder (receipt.json, receipt.html, tables/, artifacts/)"
     value: ${{ steps.run.outputs.output-dir }}
@@ -114,9 +117,10 @@ runs:
         [ -n "$IN_PROBE" ] && export PROBE_BIN_DIR="$IN_PROBE"
         code=0
         bash "$GITHUB_ACTION_PATH/prove.sh" "$IN_ORIGINAL" "$IN_CONVERTED" || code=$?
-        verdict=error rid=""
+        verdict=error rid="" review=""
         if [ -f "$out/receipt.json" ]; then
           read -r verdict rid < <("$PYTHON" -I -c 'import json,sys; r=json.load(open(sys.argv[1], encoding="utf-8")); print(r.get("verdict") or "error", r.get("receipt_id") or "")' "$out/receipt.json")
+          review=$("$PYTHON" -I -c 'import json,sys; r=json.load(open(sys.argv[1], encoding="utf-8")); print(",".join(c["id"] for c in r["checks"] if c["status"] == "review"))' "$out/receipt.json")
           if ! bash "$GITHUB_ACTION_PATH/prove.sh" --verify "$out" > "$RUNNER_TEMP/pqproof-verify.txt" 2>&1; then
             echo "::error::PQ-Proof evidence did not re-verify (see $RUNNER_TEMP/pqproof-verify.txt)"
             verdict=error
@@ -141,6 +145,7 @@ runs:
           echo "evidence-hash=$rid"
           echo "exit-code=$code"
           echo "output-dir=$out"
+          echo "review-checks=$review"
         } >> "$GITHUB_OUTPUT"
         echo "PQ-Proof verdict: $verdict  evidence hash: ${rid:-none}  exit: $code"
 
@@ -170,10 +175,12 @@ runs:
       env:
         IN_FAIL_ON: ${{ inputs.fail-on }}
         VERDICT: ${{ steps.run.outputs.verdict }}
+        REVIEW: ${{ steps.run.outputs.review-checks }}
       run: |
         case "$IN_FAIL_ON:$VERDICT" in
+          review:pass) if [ -n "$REVIEW" ]; then echo "::error::PQ-Proof pass with checks that need review: $REVIEW"; exit 1; fi; exit 0;;
           never:*|*:pass) exit 0;;
           fail:undecided) echo "::warning::PQ-Proof undecided (not counted as pass)"; exit 0;;
-          not-pass:*|fail:*) echo "::error::PQ-Proof verdict: $VERDICT"; exit 1;;
-          *) echo "::error::fail-on must be not-pass, fail or never (got $IN_FAIL_ON)"; exit 1;;
+          not-pass:*|fail:*|review:*) echo "::error::PQ-Proof verdict: $VERDICT"; exit 1;;
+          *) echo "::error::fail-on must be not-pass, review, fail or never (got $IN_FAIL_ON)"; exit 1;;
         esac

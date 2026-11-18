@@ -100,8 +100,9 @@ def strict(**props):
     return obj(props, **props)
 
 
-INPUT = strict(path=STR, kind={"enum": ["dir", "zip"]}, zip_sha256=SHA_OR_NULL, root=STR, files=INT, tree_sha256=SHA,
-               skipped=STRS)
+INPUT = obj(["path", "kind", "zip_sha256", "root", "files", "tree_sha256", "skipped"],
+            path=STR, kind={"enum": ["dir", "zip"]}, zip_sha256=SHA_OR_NULL, root=STR, files=INT, tree_sha256=SHA, skipped=STRS,
+            oversize=STRS)
 TOOL = strict(name=STR, path=STR, sha256=SHA_OR_NULL, version=STR)
 CHECK = strict(id=STR, title=STR, status={"enum": STATUS}, expected=STR, actual=STR)
 _CBOM_REQ = ["rows", "locations", "blocking", "allowed", "comment_or_test", "check", "info", "cbom_scan_ok", "csv", "csv_sha256"]
@@ -109,7 +110,7 @@ _CBOM_REQ = ["rows", "locations", "blocking", "allowed", "comment_or_test", "che
 # review(허용 목록의 쓰기 경로 줄 수)도 나중에 보탰다(필수 아님).
 # tests(주석·테스트 중 시험·예제 경로 위치 수)는 결함 D2 뒤에 보탰다(필수 아님).
 CBOM_SIDE = obj(_CBOM_REQ, rows=INT, locations=INT, blocking=INT, allowed=INT, comment_or_test=INT, check=INT, info=INT,
-                out_of_scope=INT, review=INT, tests=INT, cbom_scan_ok=BOOL, csv=PATH, csv_sha256=SHA)
+                out_of_scope=INT, review=INT, tests=INT, unresolved=INT, cbom_scan_ok=BOOL, csv=PATH, csv_sha256=SHA)
 JAVA_SIDE = {"type": ["object", "null"], "additionalProperties": False,
              "required": ["families", "expect", "weak_pqc", "legacy_write", "sites_left", "verdict", "output", "output_sha256"],
              "properties": {"families": {"type": "object",
@@ -129,11 +130,12 @@ DIGEST16 = {"type": ["string", "null"], "pattern": "^[0-9a-f]{16}$"}
 ALLOW_ENTRY = obj(["n", "where", "what", "why", "kind", "targets", "status", "note", "allowed", "review"],
                   n=INT, where=STR, what=STR, why=STR, kind=STR, targets=STRS, status={"enum": ALLOW_STATUS}, note=STR,
                   allowed=STRS, review=STRS, reviewed_by=STR_OR_NULL, reviewed_at=REVIEW_AT,
-                  reviewed_via={"enum": ["entry", "top", None]}, digest=DIGEST16, lines_fixed=INT, lines_orig=INT, orig=STRS)
+                  reviewed_via={"enum": ["entry", "top", None]}, digest=DIGEST16, lines_fixed=INT, lines_orig=INT, orig=STRS,
+                  expires_at={"type": ["string", "null"], "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"}, approval_ref=STR_OR_NULL, expired=BOOL)
 ALLOWLIST = obj(["source", "auto", "file", "file_sha256", "entries", "warnings", "hybrid", "legacy", "imports"],
                 source=STR_OR_NULL, auto=BOOL, file=PATH_OR_NULL, file_sha256=SHA_OR_NULL,
                 entries={"type": "array", "items": ALLOW_ENTRY}, warnings=STRS, unreviewed=INT, top_digest=DIGEST16,
-                hybrid=STRS, legacy=STRS, imports=STRS, unused=INT, unused_orig_lines=INT, write_review=INT, composite=STRS)
+                hybrid=STRS, legacy=STRS, imports=STRS, unused=INT, unused_orig_lines=INT, write_review=INT, composite=STRS, expired=INT)
 EXCLUDED = strict(items={"type": "array", "items": strict(pattern=STR, **{"from": STR}, why=STR)}, notes=STRS, app_roots=STRS,
                   recon_file=STR_OR_NULL, recon_digest=SHA_OR_NULL, count_orig=INT, count_fixed=INT, files_orig=STRS,
                   files_fixed=STRS)
@@ -153,7 +155,9 @@ SCHEMA = obj(_TOP_REQ,
     tools={"type": "array", "minItems": 1, "items": TOOL},
     params=obj(["classic", "expect", "tls_via", "tls_targets", "tls_targets_orig", "residue"],
                classic={"enum": ["allow", "deny"]}, expect=STRS, scope={"enum": ["all", "kex"]}, tls_via=STR, tls_targets=STRS,
-               tls_targets_orig=STRS, residue=STR, allow=STR, exclude=STRS, recon=STR, require_review=BOOL, profile=STR),
+               tls_targets_orig=STRS, residue=STR, allow=STR, exclude=STRS, recon=STR, require_review=BOOL, profile=STR,
+               fail_on_review=BOOL, require_resolved=BOOL, expect_from={"enum": ["names", "api"]}, review_max_age_days=INT_OR_NULL,
+               max_file_bytes=INT),
     changed=strict(added=STRS, removed=STRS, modified=STRS, file=PATH, file_sha256=SHA),
     cbom=strict(orig=CBOM_SIDE, fixed=CBOM_SIDE),
     java=strict(residue_kind={"enum": ["custom", "generic", "none"]}, script=PATH_OR_NULL, script_sha256=SHA_OR_NULL,
@@ -175,7 +179,12 @@ SCHEMA = obj(_TOP_REQ,
 # 형식마다 꼭 있어야 하는 칸과 있으면 안 되는 칸(스키마는 모든 형식을 한 번에 읽는다). skip_dirs 는 형식 3에서 보탰다
 FORMAT_ONLY = {"skip_dirs": 3}
 # 형식 3에서 보탠 안쪽 칸(선택). 형식 2 스키마(schemas/receipt-v2.schema.json)에는 없다: tests/make_schemas.py 가 뺀다
-FORMAT_ONLY_NESTED = {("params", "profile"): 3, ("allowlist", "composite"): 3}
+FORMAT_ONLY_NESTED = {("params", "profile"): 3, ("params", "fail_on_review"): 3, ("params", "require_resolved"): 3,
+                      ("params", "expect_from"): 3, ("params", "review_max_age_days"): 3, ("params", "max_file_bytes"): 3,
+                      ("allowlist", "composite"): 3, ("allowlist", "expired"): 3, ("allowlist", "entries[]", "expires_at"): 3,
+                      ("allowlist", "entries[]", "approval_ref"): 3, ("allowlist", "entries[]", "expired"): 3,
+                      ("cbom", "orig", "unresolved"): 3, ("cbom", "fixed", "unresolved"): 3, ("inputs", "orig", "oversize"): 3,
+                      ("inputs", "fixed", "oversize"): 3}
 
 TYPES = {"string": str, "integer": int, "number": (int, float), "boolean": bool, "array": list, "object": dict,
          "null": type(None)}
@@ -519,9 +528,11 @@ def consistency(r):
         out.append("check ids repeat")
     by = {c["id"]: c["status"] for c in r["checks"]}
     fixed = r["cbom"]["fixed"]
+    resolved_fail = bool(r["params"].get("require_resolved")) and bool(fixed.get("unresolved")) and fixed["blocking"] == 0
     if "a-cbom" in by and by["a-cbom"] != "undecided":
-        if (by["a-cbom"] in ("pass", "review")) != (fixed["blocking"] == 0 and fixed["cbom_scan_ok"]):
-            out.append(f"a-cbom is {by['a-cbom']}, but cbom.fixed.blocking is {fixed['blocking']}")
+        if (by["a-cbom"] == "fail") != (fixed["blocking"] > 0 or not fixed["cbom_scan_ok"] or resolved_fail):
+            out.append(f"a-cbom is {by['a-cbom']}, but cbom.fixed.blocking is {fixed['blocking']}"
+                       + (f" and {fixed.get('unresolved')} unresolved locations with require_resolved" if resolved_fail else ""))
         if by["a-cbom"] == "review" and not fixed.get("review"):
             out.append("a-cbom is review, but cbom.fixed.review is 0")
     if format_version(r) >= 2 and "r-review" in by and (by["r-review"] == "review") != bool(r["weakening"]["review"]):
@@ -563,12 +574,22 @@ def consistency(r):
         unused = [e for e in a["entries"] if _counts_unused(e)]
         u = len(unused) if "unused" in a else 0  # 안 쓰인 항목 칸이 없는 옛 증적은 예전 식 그대로
         nm = len(a.get("legacy") or []) if format_version(r) >= 3 else 0  # 형식 3: 이름 규칙으로만 허용한 곳도 r-allow 가 본다
-        want = ("fail" if strict_ else "review") if (n or u or nm) else ("pass" if live else "na")
+        ex = [e for e in live if e.get("expired")] if format_version(r) >= 3 else []  # 형식 3: 만료된 허용 항목(교차 리뷰 X31)
+        if format_version(r) >= 3:
+            day = r["started_at"][:10]
+            for e in a["entries"]:
+                if bool(e.get("expired")) != bool(e.get("expires_at") and e["expires_at"] < day):
+                    out.append(f"allowlist entry {e['n']}: expired is {e.get('expired')}, but expires_at {e.get('expires_at')} and the run "
+                               f"date {day} say otherwise")
+            if a.get("expired", 0) != len(ex):
+                out.append(f"allowlist.expired is {a.get('expired')}, but {len(ex)} allowing entries are expired")
+        want = ("fail" if strict_ else "review") if (n or u or nm or ex) else ("pass" if live else "na")
         if "r-allow" not in by:
             out.append("allowlist.unreviewed is recorded, but there is no r-allow check")
         elif by["r-allow"] != want:
             out.append(f"r-allow is {by['r-allow']}, but {n} of {len(live)} allowing entries are not reviewed"
                        + (f" and {u} entries are unused" if u else "") + (f" and {nm} lines pass on the name rule alone" if nm else "")
+                       + (f" and {len(ex)} entries are expired" if ex else "")
                        + (" and require_review is on" if strict_ else ""))
         out += _coverage_problems(a, unused)
     if a and _new_format(r):  # 새 형식인데 결함 D1 뒤 칸이 없다: 칸을 지워 옛 증적처럼 보이게 한 것으로 본다
@@ -724,7 +745,10 @@ def review_record(root, r):
         data = json.loads(_read_nofollow(root, a["file"]).decode("utf-8"))
     except (OSError, ValueError) as e:
         return (False, f"{a['file']}: cannot be read as JSON ({e})")
-    got = _allowlist_module().resolve_reviews(data)[0]
+    if format_version(r) >= 3:  # 형식 3: REVIEW_MAX_AGE_DAYS 는 실행한 날(started_at, UTC)을 기준으로 다시 본다
+        got = _allowlist_module().resolve_reviews(data, r["started_at"][:10], r["params"].get("review_max_age_days"))[0]
+    else:
+        got = _allowlist_module().resolve_reviews(data)[0]
     if len(got) != len(a["entries"]):
         return (False, f"{a['file']} has {len(got)} entries, but allowlist.entries has {len(a['entries'])}")
     bad = []
@@ -914,11 +938,13 @@ def pending_note(r, en=False):
     v = len((r.get("weakening") or {}).get("review") or []) if format_version(r) >= 2 else 0
     m = len(a.get("legacy") or []) if format_version(r) >= 3 else 0  # 이름 규칙으로만 허용한 곳(형식 3부터)
     c = len(a.get("composite") or []) if format_version(r) >= 3 else 0  # 복합 서명 위치(형식 3부터, 교차 리뷰 X26)
+    x = (a.get("expired") or 0) if format_version(r) >= 3 else 0  # 만료된 허용 항목(형식 3부터, 교차 리뷰 X31)
+    k = ((r.get("cbom") or {}).get("fixed") or {}).get("unresolved") or 0 if format_version(r) >= 3 else 0  # 열지 못한 키 자료(X27)
     # 형식 3: 검토 필요인 검사 이름을 적는다(교차 리뷰 X30: a-input·b-tls 의 검토 필요가 판정 줄에 안 보였다). r-review·r-allow·a-cbom·
     # c-classic 의 검토 필요는 앞의 수(검증 호출 제거, 허용 항목, 쓰기 경로, 복합 서명)가 이미 말한다
     rv = ([x["id"] for x in r.get("checks") or [] if x["status"] == "review" and x["id"] not in ("r-review", "r-allow", "a-cbom", "c-classic")]
           if format_version(r) >= 3 else [])
-    if r["verdict"] != "pass" or not (v or n or w or u or m or c or rv):
+    if r["verdict"] != "pass" or not (v or n or w or u or m or c or x or k or rv):
         return ""
     if en:
         parts = ([f"{v} removed {'verification needs' if v == 1 else 'verifications need'} review"] if v else []) \
@@ -927,11 +953,14 @@ def pending_note(r, en=False):
             + ([f"{u} allowlist {'entry' if u == 1 else 'entries'} unused in the fixed tree"] if u else []) \
             + ([f"{m} {'line' if m == 1 else 'lines'} allowed by the name rule alone"] if m else []) \
             + ([f"{c} composite {'signature needs' if c == 1 else 'signatures need'} review"] if c else []) \
+            + ([f"{x} allowlist {'entry' if x == 1 else 'entries'} expired"] if x else []) \
+            + ([f"{k} unresolved key or algorithm {'name' if k == 1 else 'names'}"] if k else []) \
             + ([f"needs review: {', '.join(rv)}"] if rv else [])
         return "; ".join(parts)
     parts = ([f"검증 호출 제거 {v}건 검토 필요"] if v else []) + ([f"허용 {n}건 사람 확인 전"] if n else []) \
         + ([f"허용 범위 쓰기 경로 {w}곳 검토 필요"] if w else []) + ([f"안 쓰인 항목 {u}건"] if u else []) \
         + ([f"이름 규칙으로만 허용 {m}곳"] if m else []) + ([f"복합 서명 {c}곳 검토 필요"] if c else []) \
+        + ([f"만료된 허용 항목 {x}건"] if x else []) + ([f"열지 못한 키 자료·못 읽은 알고리즘 {k}곳"] if k else []) \
         + ([f"검토 필요 검사 {', '.join(rv)}"] if rv else [])
     return " · ".join(parts)
 
@@ -1322,7 +1351,13 @@ def main(argv):
         print(f"verify: {argv[1]} has no receipt.json; give the folder a PQ-Proof run wrote (usage or input error, exit 2)",
               file=sys.stderr)
         return 2
-    results = verify(argv[1])
+    try:
+        results = verify(argv[1])
+    except Exception as e:  # noqa: BLE001  도구 오류는 변조(1)와 가른다(교차 리뷰 X62)
+        import traceback
+        traceback.print_exc()
+        print(f"verify: tool error ({type(e).__name__}: {str(e)[:200]}), not a verdict on the evidence (exit 4)", file=sys.stderr)
+        return 4
     for ok, what in results:
         print(f"{'ok  ' if ok else 'FAIL'} {what}")
     bad = sum(1 for ok, _ in results if not ok)

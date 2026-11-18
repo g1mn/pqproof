@@ -38,6 +38,6 @@ Re-check with `pqproof --verify <folder>`. It fails on any file that is not list
 - `checks[].id`, `checks[].status` (the values the schema lists; only `pass` counts as passed)
 - `inputs.*.tree_sha256`, `inputs.*.zip_sha256`, `artifacts[].path`, `artifacts[].sha256`
 - the counts under `cbom`, `java` and `allowlist`
-- the exit codes (0 pass, 1 fail, 2 usage or input error, 3 undecided) and the Action outputs (`verdict`, `evidence-hash`, `exit-code`, `output-dir`, `sarif-file`)
+- the exit codes (0 pass, 1 fail, 2 usage or input error, 3 undecided, 4 tool error, 5 pass that needs review under `FAIL_ON_REVIEW=1`) and the Action outputs (`verdict`, `evidence-hash`, `exit-code`, `output-dir`, `sarif-file`, `review-checks`)
 
 Text meant for people (`checks[].title`, `expected`, `actual`, `note`, warnings, the Korean words in tables) can change in any release. Do not parse it. `format` is the fixed string `pqc-proof receipt 1` from the first public copy; read `format_version`. The schema is closed, so adding, removing or renaming a field, or changing its type or meaning, raises `format_version`, and `--verify` keeps reading the older formats.

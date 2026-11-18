@@ -17,7 +17,11 @@ A migration often keeps a few classical lines on purpose: a reader for data seal
 
 - `where`: `file:line`, `file:start-end`, `file:15,24-40`, a path, or a glob, in the fixed tree. A bare file name must match exactly one file. A line range past the end of the file, a missing file or a glob over several code files makes the whole entry invalid, so shifted line numbers are never trusted.
 - `why`: required. Say why the line stays and when it goes.
-- `kind` and `what`: free text.
+- `kind`: one of `fallback` (reads data from before the change), `boundary` (a partner or system outside the migration), `kept`, `exception` (an accepted risk), `false-positive` (the name matched but it is not classical cryptography) or `vendored`. Another word gets a warning and the entry still counts.
+- `what`: free text.
+- `expires_at` (optional, `YYYY-MM-DD`): after this date the entry still allows its lines, but `r-allow` needs review, or fails under `REQUIRE_REVIEW=1`, and the verdict line counts it. Thirty days before, the run warns.
+- `approval_ref` (optional): a ticket or approval number, copied to the evidence.
+- Any other field gets a warning, because the tool does not read it.
 
 Some lines never need an entry and some never get one. An X25519 or ECDH line in the same function as ML-KEM code counts as the classical half of a hybrid. A line in a `Legacy*.java` file, or one that contains `legacy`, is allowed when it does not write (no key generation, signing or encryption). ML-KEM-512 and ML-DSA-44 are never allowed.
 
@@ -34,7 +38,7 @@ A person who read an entry adds `reviewed_by` (a name or account) and `reviewed_
  "unconverted": [ ... ]}
 ```
 
-Adding or editing an entry changes the digest, and every entry under the top pair then counts as not reviewed again.
+Adding or editing an entry changes the digest, and every entry under the top pair then counts as not reviewed again. `expires_at` and `approval_ref` are part of the digest when they are set, so moving a date needs a new review. With `REVIEW_MAX_AGE_DAYS=N`, a review older than N days counts as missing.
 
 Without `REQUIRE_REVIEW=1`, unreviewed entries keep the pass and show on the verdict line (`VERDICT=PASS (2 allowed entries not yet reviewed by a person)`). With `REQUIRE_REVIEW=1` they fail `r-allow`. Use `1` for real reviews.
 

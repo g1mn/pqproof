@@ -153,6 +153,12 @@ FUNC_START = re.compile(r"^\s*(?:async\s+def|def|func|fn|fun|function)\b|^\s*(?:
 HYB_WINDOW = 12
 HYBRID_REASON = "같은 함수 안 ML-KEM 결합(하이브리드 고전 성분)"
 RANK = {"block": 7, "review": 6, "allow": 5, "comment": 4, "check": 3, "scope": 2, "info": 1}
+# 열지 못한 키 자료와 알고리즘을 못 읽은 공개키 API(교차 리뷰 X27·X57): '확인' 수에 묻히지 않게 검토 필요로 올리고 따로 센다.
+# REQUIRE_RESOLVED=1 이면 a-cbom 실패. 키·인증서 행(cbom-scan 용도 칸)의 이런 알고리즘 글, scan.py 의 unknown 행이 대상이다
+UNRESOLVED_USE = re.compile(r"개인키|공개키|인증서|키스토어")
+UNRESOLVED_ALG = re.compile(r"파싱 실패|열지 못함|암호화된 PKCS#8|형식 미확인|읽기 권한 없음|알고리즘 미확인")
+UNRESOLVED_KEY = "열지 못한 키 자료(알고리즘을 모름, 사람이 확인)"
+UNRESOLVED_API = "알고리즘 이름을 못 읽은 공개키 API(변수·잇기·설정 값, 사람이 확인)"
 STATUS_LABEL = {"block": "막음", "review": "검토 필요", "allow": "허용", "comment": "주석·테스트", "check": "확인", "scope": "범위 밖",
                 "info": "참고"}
 SCOPE_REASON = "범위 밖(SCOPE=kex, 키 교환만 본다)"
@@ -441,6 +447,8 @@ def merge_cbom(cbom_rows, scan_rows, lines, terminator, scope="all", allow=None)
             else:
                 reason = allow_reason(path, lines.get(path, line) if line else None, alg, lines, line)
                 status = "allow" if reason else "block"
+        elif threat == "미확인" and UNRESOLVED_USE.search(r.get("용도", "")) and UNRESOLVED_ALG.search(alg) and not cbom_flags(note):
+            status, reason = "review", UNRESOLVED_KEY
         elif threat == "미확인":
             status = "check"
         else:
@@ -461,7 +469,7 @@ def merge_cbom(cbom_rows, scan_rows, lines, terminator, scope="all", allow=None)
         elif r.threat == scanmod.COMPOSITE:
             status, reason = "review", COMPOSITE_REASON
         elif r.threat == scanmod.UNKNOWN:
-            status = "check"
+            status, reason = "review", UNRESOLVED_API
         else:
             status = "info"
         items.append({"loc": loc, "tool": "scan.py", "use": r.kind, "alg": r.algorithm, "threat": r.threat,
@@ -522,9 +530,15 @@ def merge_cbom(cbom_rows, scan_rows, lines, terminator, scope="all", allow=None)
     for r in scan_rows:
         if r.threat in (scanmod.PQC, scanmod.WEAK_PQC, scanmod.SHOR, scanmod.COMPOSITE) and ("(상수)" in r.detail or "(변수 추적)" in r.detail):
             traced.setdefault(f"{r.path}:{r.line}", []).append(r.algorithm)
+    pqc_only = {loc for loc in traced if not any(r.threat != scanmod.PQC for r in scan_rows if f"{r.path}:{r.line}" == loc
+                                                    and ("(상수)" in r.detail or "(변수 추적)" in r.detail))}
     for it in items:
         if it["tool"] == "cbom-scan" and it["status"] == "check" and not it["reason"] and it["loc"] in traced:
-            it["reason"] = "scan.py 대입 추적 값: " + ", ".join(dict.fromkeys(traced[it["loc"]])) + "(사람이 확인)"
+            if it["loc"] in pqc_only:  # 끝까지 PQC 로 추적한 자리는 참고로 내린다(교차 리뷰 X27: '확인' 수에 늘 묻혀 있었다)
+                it["status"] = "info"
+                it["reason"] = "scan.py 대입 추적 값: " + ", ".join(dict.fromkeys(traced[it["loc"]])) + "(PQC)"
+            else:
+                it["reason"] = "scan.py 대입 추적 값: " + ", ".join(dict.fromkeys(traced[it["loc"]])) + "(사람이 확인)"
     worst = {}
     for it in items:
         if RANK[it["status"]] > RANK.get(worst.get(it["loc"]), 0):
@@ -533,6 +547,8 @@ def merge_cbom(cbom_rows, scan_rows, lines, terminator, scope="all", allow=None)
     # 주석·테스트 중 시험·예제 경로(scan/test-paths.ere) 위치: 판정에 안 넣지만 따로 세어 보인다
     counts["tests"] = len({it["loc"] for it in items if it["status"] == "comment" and "테스트·예제" in cbom_flags(it["note"])
                            and worst[it["loc"]] == "comment"})
+    counts["unresolved"] = len({it["loc"] for it in items if it["status"] == "review" and it["reason"] in (UNRESOLVED_KEY, UNRESOLVED_API)
+                                and worst[it["loc"]] == "review"})
     return items, counts, len(worst)
 
 
@@ -683,13 +699,32 @@ def expect_count(jf, ids):
     return n, shown + (f" = {n}" if len(got) > 1 else "")
 
 
+# EXPECT 규칙 이름 → 같은 뜻의 파이썬 정규식(EXPECT_FROM=api 가 CBOM 행 알고리즘에 맞춘다. residue.sh EXPECT 와 tests/test_rule_sync.py 가 대조)
+EXPECT_RE = {"E-MLKEM768": r"(?i)ml[-_]?kem[-_]?768", "E-MLKEM1024": r"(?i)ml[-_]?kem[-_]?1024",
+             "E-MLDSA65": r"(?i)ml[-_]?dsa[-_]?65", "E-MLDSA87": r"(?i)ml[-_]?dsa[-_]?87",
+             "E-KPQC-KEM": r"(?i)smaug-?t|ntru\+|ntru_?plus", "E-KPQC-SIG": r"(?i)haetae|(?<![a-z])aimer(?![a-z])"}
+API_KINDS = {"key-generation", "signature", "key-encapsulation", "key-exchange", "key-encryption"}  # scan.py 의 API 행(이름 상수 pqc-parameter 는 뺀다)
+
+
+def expect_api(items, ids):
+    """EXPECT_FROM=api(교차 리뷰 X30): 프로필 이름을 쓰는 PQC API 호출 위치 수. scan.py 의 JCA·BC 호출 행과 cbom-scan 의 API 규칙 행
+    (Node generateKeyPair, Go crypto/mlkem 등, '일반 패턴' 행은 뺀다)만 센다. 상수만 남기고 호출을 지운 판은 0이다."""
+    rx = [re.compile(EXPECT_RE[i]) for i in ids]
+    locs = {it["loc"] for it in items if it["threat"] in (scanmod.PQC, "안전(PQC)")
+            and ((it["tool"] == "scan.py" and it["use"] in API_KINDS) or (it["tool"] == "cbom-scan" and "일반 패턴" not in it["note"]))
+            and any(x.search(it["alg"]) for x in rx)}
+    return len(locs), f"API {'·'.join(ids)} {len(locs)}곳"
+
+
 def review_kinds(items):
-    """CBOM 검토 필요 위치를 까닭별로: 허용 목록의 쓰기 경로, 복합 서명."""
+    """CBOM 검토 필요 위치를 까닭별로: 허용 목록의 쓰기 경로, 복합 서명, 열지 못한 키 자료·못 읽은 공개키 API."""
     rev = [it for it in items if it["status"] == "review"]
     comp = sorted({it["loc"] for it in rev if it["reason"] == COMPOSITE_REASON})
-    wr = sorted({it["loc"] for it in rev if it["reason"] != COMPOSITE_REASON})
+    unres = sorted({it["loc"] for it in rev if it["reason"] in (UNRESOLVED_KEY, UNRESOLVED_API)})
+    wr = sorted({it["loc"] for it in rev if it["reason"] not in (COMPOSITE_REASON, UNRESOLVED_KEY, UNRESOLVED_API)})
     return " · ".join(x for x in (("허용 목록의 쓰기 경로: " + ", ".join(wr[:4]) if wr else ""),
-                                  (f"복합 서명 {len(comp)}곳: " + ", ".join(comp[:4]) if comp else "")) if x)
+                                  (f"복합 서명 {len(comp)}곳: " + ", ".join(comp[:4]) if comp else ""),
+                                  (f"열지 못한 키 자료·못 읽은 공개키 API {len(unres)}곳: " + ", ".join(unres[:4]) if unres else "")) if x)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -709,6 +744,8 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
     prof = PROFILES[getattr(params, "profile", DEFAULT_PROFILE)]
     # review(검토 필요): 막는 위치는 0인데 허용 목록에 쓰기 경로 줄이 있다(허용 규칙). 판정은 바꾸지 않고 줄·사유를 남긴다
     a_status = "fail" if cf["blocking"] else ("undecided" if not cf["cbom_scan_ok"] else ("review" if cf["review"] else "pass"))
+    if a_status == "review" and cf.get("unresolved") and getattr(params, "require_resolved", False):
+        a_status = "fail"  # REQUIRE_RESOLVED=1: 열지 못한 키 자료·못 읽은 공개키 API 가 남으면 실패(교차 리뷰 X27)
     kex = params.scope == "kex"
     # a-input: 두 입력이 같은 서비스의 전·후인지, 판정 근거가 있는지. 도구가 원본에서 아무것도 못 찾으면 고친 판 0은
     # 증거가 아니다(못 보는 언어·프레임워크, 잘못 준 폴더). 반박 검증에서 Netty·Flask TLS 서비스가 그대로 통과했다.
@@ -739,6 +776,7 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
     out_links = [x for x in fx["links"] if x["outside"]]
     code_links = [x for x in out_links if x["code"]]
     skip_code = [x for x in fx["skipped_output"] if x["code"]]
+    oversize = fx.get("oversize") or []  # 크기 한도를 넘어 정밀 검사에서 빠진 코드·설정 파일(교차 리뷰 X56)
     if out_links:
         in_act += (f" · 검사 밖을 가리키는 링크 {len(out_links)}개(이 도구는 따라가지 않고 빌드 도구는 따라간다): "
                    + ", ".join(f"{x['path']} -> {x['target'][:60]}({x['why']})" for x in out_links[:4]) + (" 외" if len(out_links) > 4 else ""))
@@ -746,17 +784,20 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
         in_act += (f" · 건너뛴 폴더 {len(skip_code)}곳에 코드 파일 {sum(x['code'] for x in skip_code)}개(빌드 산출물·받아 둔 의존성으로 보고 "
                    "검사하지 않음, scan/skip-dirs): " + ", ".join(f"{x['path']}/ {x['code']}개" for x in skip_code[:4])
                    + (" 외" if len(skip_code) > 4 else ""))
+    if oversize:
+        in_act += (f" · 크기 한도({MAX_TEXT:,}바이트)를 넘어 scan.py·약화·허용 검사가 건너뛴 코드·설정 파일 {len(oversize)}개"
+                   "(cbom-scan.sh·residue.sh 는 읽음, MAX_FILE_MIB 로 한도를 올린다): " + ", ".join(oversize[:4]) + (" 외" if len(oversize) > 4 else ""))
     if code_links:
         in_act += " · 코드·폴더 링크는 내용을 보지 못해 판정할 수 없다(대상을 트리에 넣거나 링크를 지운다)"
         if params.require_review:
             in_st = "fail"
         elif in_st in ("pass", "review"):
             in_st = "undecided"
-    elif (out_links or skip_code) and in_st == "pass":
+    elif (out_links or skip_code or oversize) and in_st == "pass":
         in_st = "review"
     check("a-input", "입력 확인(같은 서비스의 전·후, 원본에서 전환 대상을 찾음)", in_st,
           f"공통 파일 {int(MIN_COMMON * 100)}% 이상, 원본 막는 위치·공개키 code·TLS 실측 중 하나 이상, "
-          "검사 밖을 가리키는 링크와 코드 파일이 든 건너뛴 폴더 없음", in_act)
+          "검사 밖을 가리키는 링크, 코드 파일이 든 건너뛴 폴더, 크기 한도를 넘은 코드 파일 없음", in_act)
     block_locs = sorted({it["loc"] for it in cbom_items["fixed"] if it["status"] == "block"})
     what = "남은 고전 키 교환" if kex else "막는 위치"
     check("a-cbom", "고친 판에 남은 고전 키 교환 0(SCOPE=kex)" if kex else "고친 판 CBOM에 막는 위치 0", a_status,
@@ -766,7 +807,8 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
           + f" · 허용 {cf['allowed']} · 주석·테스트 {cf['comment_or_test']}" + (f"(시험 {cf['tests']})" if cf.get("tests") else "")
           + f" · 확인 {cf['check']}"
           + (f" · 검토 필요 {cf['review']}(" + review_kinds(cbom_items["fixed"]) + ")" if cf["review"] else "")
-          + (f" · 범위 밖 {cf['out_of_scope']}" if kex else "") + ("" if cf["cbom_scan_ok"] else " · cbom-scan 실패"))
+          + (f" · 범위 밖 {cf['out_of_scope']}" if kex else "") + ("" if cf["cbom_scan_ok"] else " · cbom-scan 실패")
+          + (" · REQUIRE_RESOLVED=1" if cf.get("unresolved") and getattr(params, "require_resolved", False) else ""))
     check("b-weakening", "TLS 약화 수정 없음", "fail" if deny else "pass", "deny 0",
           f"deny {len(deny)}" + (": " + "; ".join(deny[:3]) if deny else "") + f" · 본 파일 {len(changed)}")
     if not tls["applicable"] and sig_o[0]:  # TLS를 걷어 내고 평문으로 바꾼 판이 '해당 없음'으로 통과하지 않게(반박 검증에서 찾음)
@@ -841,7 +883,12 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
     else:
         parts, st = [], "pass"
         for e in params.expect:
-            if e in ("kem", "sig"):
+            if e in ("kem", "sig") and getattr(params, "expect_from", "names") == "api":
+                n, shown = expect_api(cbom_items["fixed"], prof[e])
+                parts.append(shown)
+                if n < 1:
+                    st = "fail"
+            elif e in ("kem", "sig"):
                 n, shown = expect_count(jf, prof[e])
                 parts.append(shown)
                 if n is None:
@@ -856,7 +903,9 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
                 elif b in ("undecided", "review") and st == "pass":  # review = 클라이언트 TLS만, 잰 것이 없다
                     st = "undecided"
         check("c-expect", "EXPECT PQC 사용", st, "EXPECT=" + ",".join(params.expect) + " 마다 1줄 이상(tls·cert는 b-tls 통과)"
-              + f", 프로필 {getattr(params, 'profile', DEFAULT_PROFILE)}", " · ".join(parts))
+              + f", 프로필 {getattr(params, 'profile', DEFAULT_PROFILE)}"
+              + (", EXPECT_FROM=api(이름만 있는 상수는 세지 않음)" if getattr(params, "expect_from", "names") == "api" else ""),
+              " · ".join(parts))
     check("r-review", "검증 생략 흔적(검토 등급, 실패 아님)", "review" if review else "pass", "0 또는 줄마다 사유",
           f"{len(review)}건" + (": " + "; ".join(f"{x['path']} {x['rule']}" for x in review[:3]) if review else ""))
     # r-allow: 허용 목록이 판정에서 뺀 줄을 사람이 확인했다는 기록(reviewed_by·reviewed_at)이 있는가. 도구는 사유가 맞는지
@@ -870,10 +919,11 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
     live = [e for e in allow.entries if e["status"] in al.IN_EFFECT]
     pending = allow.unreviewed()
     unused = allow.unused()
+    expired = allow.expired() if hasattr(allow, "expired") else []  # expires_at 이 지난 허용 항목(교차 리뷰 X31)
     jfx = java_rec["fixed"] or {}
     name_only = sorted({it["loc"] for it in cbom_items["fixed"] if it["status"] == "allow" and it["reason"] in LEGACY_REASONS}
                        | (set((jfx.get("listed") or {}).get("name_rule") or []) if not kex else set()), key=al._loc_key)
-    need = "허용 항목마다 reviewed_by·reviewed_at(목록 맨 위 칸은 reviewed_digest 도), 고친 판에서 안 쓰인 항목 0, 이름 규칙으로만 허용한 줄 0" + (
+    need = "허용 항목마다 reviewed_by·reviewed_at(목록 맨 위 칸은 reviewed_digest 도), 고친 판에서 안 쓰인 항목 0, 만료된 항목 0, 이름 규칙으로만 허용한 줄 0" + (
         "(REQUIRE_REVIEW=1: 아니면 실패)" if params.require_review else "(아니면 검토 필요, 실패 아님)")
     title = "허용 항목 사람 확인(검토 등급, REQUIRE_REVIEW=1이면 실패)"
     dead_ko = {"invalid": " (고친 판에서 무효)", "excluded": " (고친 판에서 제외 파일)", "outside": " (고친 판에서 트리 밖)"}
@@ -882,15 +932,17 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
                   + (" 외" if len(unused) > 4 else "") if unused else "")
     name_txt = (f"이름 규칙(legacy)으로만 허용한 곳 {len(name_only)}곳(허용 목록 항목·사람 확인 없음): " + ", ".join(name_only[:4])
                 + (" 외" if len(name_only) > 4 else "") if name_only else "")
+    exp_txt = (f"만료된 항목 {len(expired)}건: " + ", ".join(f"#{e['n']} {e['expires_at']}" for e in expired[:4])
+               + (" 외" if len(expired) > 4 else "") if expired else "")
     if not live and not unused and not name_only:
         check("r-allow", title, "na", need, "줄을 허용한 항목 0" if allow_path else "허용 목록 없음")
-    elif not pending and not unused and not name_only:
+    elif not pending and not unused and not name_only and not expired:
         check("r-allow", title, "pass", need, f"허용 항목 {len(live)}건 모두 사람 확인")
     else:
         head = (f"허용 항목 {len(live)}건 중 사람 확인 전 {len(pending)}건: "
                 + ", ".join(f"#{e['n']} {al.CONTROL.sub(' ', e['where'])[:48]}" for e in pending[:4]) + (" 외" if len(pending) > 4 else "")
                 if pending else (f"허용 항목 {len(live)}건 모두 사람 확인" if live else ""))
         check("r-allow", title, "fail" if params.require_review else "review", need,
-              " · ".join(x for x in (head, unused_txt, name_txt) if x))
+              " · ".join(x for x in (head, unused_txt, exp_txt, name_txt) if x))
     verdict = derive_verdict(checks)
     return checks, verdict, pending, unused, live, name_only
