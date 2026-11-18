@@ -242,6 +242,12 @@ class CliTest(unittest.TestCase):
             rep = deps.check(env={}, bin_dir=None)
         self.assertTrue(rep.errors and "WSL" in rep.errors[0], rep.errors)
 
+    def test_entry_marker_only_for_judging(self):
+        root = cli.tool_root()
+        with mock.patch.dict(os.environ, {"PQPROOF_ENTRY": "pqproof"}):
+            self.assertNotIn("PQPROOF_ENTRY", cli.child_env(root))  # --unit·--selftest·mutations 는 기본 진입점으로
+        self.assertEqual(cli.child_env(root, entry=True)["PQPROOF_ENTRY"], "pqproof")
+
     def test_env_lists_settings_without_bash(self):
         out = io.StringIO()
         with contextlib.redirect_stdout(out):

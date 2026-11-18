@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 PROOF = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROOF))
@@ -329,8 +330,10 @@ class EndToEnd(unittest.TestCase):
         write(w, {"notes/unconverted.json": json.dumps(OK_LIST, ensure_ascii=False)})
         os.makedirs(os.path.join(w, "evidence"))
         out = os.path.join(w, "evidence", "proof-101500")
-        r, code, _ = prove.run(os.path.join(w, "orig"), os.path.join(w, "repo"), prove.Params({"EXPECT": "kem,sig"}), out, self.cache,
-                               quiet=True)
+        with mock.patch.dict(os.environ):
+            os.environ.pop("PQPROOF_ENTRY", None)
+            r, code, _ = prove.run(os.path.join(w, "orig"), os.path.join(w, "repo"), prove.Params({"EXPECT": "kem,sig"}), out,
+                                   self.cache, quiet=True)
         self.assertEqual(code, 0)
         deck = json.loads(prove.slurp(os.path.join(out, "deck.json")))
         need = {"verdict", "receipt", "receipt_file", "cbom", "classic_lines", "pqc_lines", "allowed", "checks", "excluded", "tls",

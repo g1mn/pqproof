@@ -90,11 +90,15 @@ def probe_dir(root):
     return cache_bin()
 
 
-def child_env(root):
+def child_env(root, entry=False):
+    """prove.sh 에 넘길 환경. entry 면 PQPROOF_ENTRY=pqproof(판정 출력의 다시 확인 안내가 pqproof 로 나오게, 판정 실행에만)."""
     env = dict(os.environ)
     env.setdefault("PYTHON", sys.executable)
     env["PROBE_BIN_DIR"] = probe_dir(root)
-    env["PQPROOF_ENTRY"] = "pqproof"
+    if entry:
+        env["PQPROOF_ENTRY"] = "pqproof"
+    else:
+        env.pop("PQPROOF_ENTRY", None)
     return env
 
 
@@ -204,7 +208,7 @@ def main(argv=None):
         return 2
     if not preflight(root, inputs=argv):
         return 2
-    return run(prove + argv, child_env(root))
+    return run(prove + argv, child_env(root, entry=True))
 
 
 if __name__ == "__main__":

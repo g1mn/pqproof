@@ -245,7 +245,9 @@ class EndToEnd(unittest.TestCase):
         cls.tmp.cleanup()
 
     def run_(self, name, fixed, **kw):
-        return prove.run(self.orig, fixed, params(**kw), os.path.join(self.tmp.name, "out-" + name), self.cache, quiet=True)
+        with mock.patch.dict(os.environ):
+            os.environ.pop("PQPROOF_ENTRY", None)  # pqproof --unit 으로 돌아도 기본 진입점(bash prove.sh)을 본다
+            return prove.run(self.orig, fixed, params(**kw), os.path.join(self.tmp.name, "out-" + name), self.cache, quiet=True)
 
     def test_pass(self):
         r, code, lines = self.run_("pass", self.fixed)
@@ -300,7 +302,8 @@ class EndToEnd(unittest.TestCase):
         self.assertNotIn("다음 할 일", text)
         self.assertTrue(lines[0].startswith("== PQ-Proof "), lines[0])
         with mock.patch.dict(os.environ, {"PQPROOF_ENTRY": "pqproof"}):
-            r, code, lines = self.run_("entry", self.fixed)
+            r, code, lines = prove.run(self.orig, self.fixed, params(), os.path.join(self.tmp.name, "out-entry"), self.cache,
+                                       quiet=True)
         self.assertIn("pqproof --verify " + os.path.join(self.tmp.name, "out-entry"), "\n".join(lines))
         self.assertTrue(r["deck_meta"]["verify_cmd"].startswith("pqproof --verify "))
         md = prove.slurp(os.path.join(self.tmp.name, "out-entry", "tables", "report.md"))
