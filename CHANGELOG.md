@@ -14,7 +14,7 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 **Verdict impact (판정 영향): none.**
 
-## [0.3.0] - 2026-11-19
+## [0.3.0] - 2026-11-20
 
 Tool 0.3.0, ruleset 3 (new name and hash, fourteen rule files), evidence format 4. New command `pqproof impl` (`prove.sh --impl`): it checks a KpqC implementation (SMAUG-T, NTRU+, HAETAE, AIMer) against pinned reference KAT versions without building or running it, and with `--pq-verify` it also runs pq-verify, a separate tool you install, on a NIST PQC library and puts that audit in the same receipt. `--verify` still reads evidence formats 1, 2 and 3.
 
