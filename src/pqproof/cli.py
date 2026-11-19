@@ -203,6 +203,8 @@ def main(argv=None):
         if len(argv) != 2:
             print(f"usage: pqproof {first} <dir|zip>", file=sys.stderr)
             return 2
+        if os.path.isdir(first):  # 원본 폴더 이름이 check·inventory 이면 두 트리 판정이 아니라 이 명령으로 읽힌다
+            print(f"pqproof: '{first}' is a command here; to compare a folder named {first}, pass ./{first}", file=sys.stderr)
         if not preflight(root, inputs=argv[1:]):
             return 2
         return run(prove + ["--" + first, argv[1]], child_env(root, entry=True))

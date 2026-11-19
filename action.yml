@@ -85,7 +85,7 @@ outputs:
     description: "receipt_id: SHA-256 of the RFC 8785 form of receipt.json"
     value: ${{ steps.run.outputs.evidence-hash }}
   exit-code:
-    description: "prove.sh exit code (0 pass, 1 fail, 2 usage or input error, 3 undecided, 4 tool error)"
+    description: "prove.sh exit code (0 pass, 1 fail, 2 usage or input error, 3 undecided, 4 tool error, 5 pass that needs review with FAIL_ON_REVIEW=1)"
     value: ${{ steps.run.outputs.exit-code }}
   review-checks:
     description: "comma-separated ids of the checks that need review (empty when none)"

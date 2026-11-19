@@ -4,4 +4,4 @@
 - Jenkins: `../jenkins/Jenkinsfile` records the SARIF file with the Warnings Next Generation plugin.
 - SonarQube: import the SARIF file as external issues with `sonar.sarifReportPaths=pqproof.sarif` in the scanner properties.
 
-All three read the allowlist from the base commit, as the GitHub example does, and keep the evidence folder as a build artifact. Exit codes: 0 pass, 1 fail, 2 usage or input error, 3 undecided. More in [guide/ci.md](https://github.com/g1mn/pqproof/blob/main/guide/ci.md).
+All three read the allowlist from the base commit, as the GitHub example does, and keep the evidence folder as a build artifact. Exit codes: 0 pass, 1 fail, 2 usage or input error, 3 undecided, 4 tool error, 5 pass that needs review (only with `FAIL_ON_REVIEW=1`). More in [guide/ci.md](https://github.com/g1mn/pqproof/blob/main/guide/ci.md).

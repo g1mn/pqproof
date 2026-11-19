@@ -30,7 +30,7 @@ pqproof:
     - pqproof sarif pqproof-evidence -o pqproof.sarif
     - tool=$(python3 -c 'import os, pqproof; print(os.path.join(os.path.dirname(pqproof.__file__), "_tool"))')
     - python3 -I "$tool/examples/gitlab/sarif_to_codequality.py" pqproof.sarif gl-code-quality-report.json
-    - exit "$code"   # 0 pass, 1 fail, 2 usage or input error, 3 undecided
+    - exit "$code"   # 0 pass, 1 fail, 2 usage or input error, 3 undecided, 4 tool error, 5 pass that needs review (FAIL_ON_REVIEW=1)
   artifacts:
     when: always
     paths:

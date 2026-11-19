@@ -34,7 +34,7 @@ Code comments and tool output are in Korean; documentation is in English, with a
 
 ## Changing a rule
 
-The ruleset is the files in `RULESET_FILES` of `pqlite/version.py`: `scan/cbom-scan.sh`, `scan/residue.sh`, `scan/test-paths.ere`, `scan/skip-dirs`, `pqlite/scan.py`, `pqlite/verify.py`, `pqlite/allowlist.py`, `pqlite/rules.py`, `pqlite/skipdirs.py` and `pqlite/tlsprobe.py`. A folder to skip goes in `scan/skip-dirs`, nowhere else. A verdict constant or pattern belongs in `pqlite/rules.py`, not in `prove.py`; a test fails when `prove.py` gets a new pattern constant. Changing any byte of them, a comment included, changes the ruleset hash, and a run with a changed file is named `<current>+modified` until the change has its own ruleset name. That is why lint warnings in these files wait for the next ruleset.
+The ruleset is the files in `RULESET_FILES` of `pqlite/version.py`: `scan/cbom-scan.sh`, `scan/residue.sh`, `scan/test-paths.ere`, `scan/skip-dirs`, `scan/profiles.json`, `pqlite/scan.py`, `pqlite/verify.py`, `pqlite/allowlist.py`, `pqlite/rules.py`, `pqlite/skipdirs.py` and `pqlite/tlsprobe.py` (eleven files). A folder to skip goes in `scan/skip-dirs`, nowhere else. A verdict constant or pattern belongs in `pqlite/rules.py`, not in `prove.py`; a test fails when `prove.py` gets a new pattern constant. Changing any byte of them, a comment included, changes the ruleset hash, and a run with a changed file is named `<current>+modified` until the change has its own ruleset name. So a lint fix in these files (CI runs shellcheck on `scan/cbom-scan.sh` and `scan/residue.sh`) goes in with a ruleset change.
 
 A rule ID or a value can live in more than one file. For a new or changed rule:
 
@@ -47,7 +47,7 @@ A rule ID or a value can live in more than one file. For a new or changed rule:
 
 ## Adding a language
 
-Detection lives in three places: name patterns in `scan/residue.sh` (the classical-line count), CBOM rows in `scan/cbom-scan.sh`, and the structural scanner `pqlite/scan.py` (Java, Go). Start with `residue.sh` patterns and their behaviour rows, then check the test-path rule (`scan/test-paths.ere`) for the language's test file names, and the comment detection, which goes by line prefix (`//`, `#`, `/*`, `--`, `<!--`): a docstring counts as code and a C `#include` as a comment. Add a small before and after pair to the tests. Each of these is a ruleset change.
+Detection lives in three places: name patterns in `scan/residue.sh` (the classical-line count), CBOM rows in `scan/cbom-scan.sh`, and the structural scanner `pqlite/scan.py` (Java, Go). Start with `residue.sh` patterns and their behaviour rows, then check the test-path rule (`scan/test-paths.ere`) for the language's test file names, and the comment detection, which goes by language: `residue.sh` reads comments per file extension (Python docstrings and trailing `#`, `#` in shell, YAML, TOML, Terraform and `sshd_config`, C-family block comments), `cbom-scan.sh` reads a leading `#`, `--` or `;` as a comment only in the languages that use it (a C `#include` is code), and `pqlite/rules.py` checks Go, JavaScript, Python and Java rows with the tokenizer of `pqlite/verify.py`. Add a small before and after pair to the tests. Each of these is a ruleset change.
 
 ## Site rules
 
@@ -56,6 +56,12 @@ A service can add its own rules by copying `scan/residue.sh`, adding `SITE` rule
 ## Evidence format
 
 A field added, removed, renamed or changed in meaning raises `format_version` in `pqlite/version.py`. Before such a release, save evidence from the current version with `tests/golden/make_fixture.py`, so `tests/test_golden.py` keeps checking it, and regenerate the schemas with `python3 -I -B tests/make_schemas.py`.
+
+## Releases
+
+1. Set `__version__` in `src/pqproof/__init__.py` and turn `[Unreleased]` in `CHANGELOG.md` into a dated section with its verdict impact.
+2. Push `main` and wait for CI, then tag `vX.Y.Z` on that commit. The release workflow runs CI again and refuses a tag that is not on `main`.
+3. After the release, move the pins in `examples/`: the `g1mn/pqproof@<commit>` line in `examples/github-actions/pqproof-sarif.yml` (commit SHA and comment) and the `pqproof==` versions in the GitHub, GitLab and Jenkins examples.
 
 ## Pull requests
 

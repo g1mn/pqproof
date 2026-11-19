@@ -242,6 +242,24 @@ class CliTest(unittest.TestCase):
             rep = deps.check(env={}, bin_dir=None)
         self.assertTrue(rep.errors and "WSL" in rep.errors[0], rep.errors)
 
+    def test_folder_named_like_a_command_gets_a_warning(self):
+        # 원본 폴더 이름이 check 이면 'pqproof check fixed' 는 한 트리 점검으로 읽힌다: 바뀐 뜻을 알려 준다
+        here = os.getcwd()
+        with tempfile.TemporaryDirectory() as d:
+            os.mkdir(os.path.join(d, "check"))
+            err = io.StringIO()
+            try:
+                os.chdir(d)
+                with mock.patch.object(cli, "is_windows", return_value=False), mock.patch.object(cli, "preflight", return_value=True), \
+                        mock.patch.object(cli, "run", return_value=0) as run, contextlib.redirect_stderr(err):
+                    self.assertEqual(cli.main(["check", "fixed"]), 0)
+                    self.assertEqual(cli.main(["inventory", "fixed"]), 0)
+            finally:
+                os.chdir(here)
+        self.assertIn("pass ./check", err.getvalue())
+        self.assertNotIn("./inventory", err.getvalue())
+        self.assertEqual(run.call_args_list[0].args[0][-2:], ["--check", "fixed"])
+
     def test_entry_marker_only_for_judging(self):
         root = cli.tool_root()
         with mock.patch.dict(os.environ, {"PQPROOF_ENTRY": "pqproof"}):

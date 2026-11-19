@@ -7,7 +7,7 @@
 # 규칙 파일을 고치면 해시가 바뀐다. 그때는 scan/ruleset.json 에 새 버전 이름과 기록(sha256·since·verdict_impact·files)을 더하고
 # current 를 옮기며, CHANGELOG 의 '판정 영향' 칸에 적는다(tests/test_versioning.py 와 tests/version_policy.py 가 짝이 안 맞으면 실패한다).
 # ruleset.json 의 옛 꼴({이름: sha256})도 읽는다.
-#   python3 -I -B pqlite/version.py                 → "pqproof 0.1.0 (ruleset 1, evidence format 2)"
+#   python3 -I -B pqlite/version.py                 → "pqproof 0.2.0 (ruleset 2, evidence format 3)"
 #   python3 -I -B pqlite/version.py --ruleset       → 지금 규칙 파일로 계산한 ruleset_sha256
 #   python3 -I -B pqlite/version.py --ruleset-json  → 지금 규칙 파일의 sha256·files(ruleset.json 새 기록의 바탕, since·verdict_impact 는 사람이 적는다)
 """Tool version, ruleset version and hash, and evidence format version for PQ-Proof."""

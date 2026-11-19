@@ -42,7 +42,7 @@ On the eight practice tasks I wrote for rehearsal, the verdicts did not change, 
 
 ## Words in the output
 
-
+Code comments and tool output are in Korean, as they were in the finals. Two words changed: the output now says 검증 증적 (verification evidence) where the finals version said 영수증 (receipt), and 보안레벨 (security level) where it said 범주 (category). Both Korean words stand for the NIST security category, and the English CBOM column keeps that term. File and field names still use `receipt`.
 
 ## 한국어 요약
 

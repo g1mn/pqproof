@@ -19,11 +19,11 @@ A migration often keeps a few classical lines on purpose: a reader for data seal
 - `why`: required. Say why the line stays and when it goes.
 - `kind`: one of `fallback` (reads data from before the change), `boundary` (a partner or system outside the migration), `kept`, `exception` (an accepted risk), `false-positive` (the name matched but it is not classical cryptography) or `vendored`. Another word gets a warning and the entry still counts.
 - `what`: free text.
-- `expires_at` (optional, `YYYY-MM-DD`): after this date the entry still allows its lines, but `r-allow` needs review, or fails under `REQUIRE_REVIEW=1`, and the verdict line counts it. Thirty days before, the run warns.
+- `expires_at` (optional, `YYYY-MM-DD`): after this date the entry still allows its lines, but `r-allow` needs review, or fails under `REQUIRE_REVIEW=1`, and the verdict line counts it. Thirty days before, the run warns. A value that is not a `YYYY-MM-DD` date gets a warning and is ignored, so the entry never expires; check the warnings, even under `REQUIRE_REVIEW=1`.
 - `approval_ref` (optional): a ticket or approval number, copied to the evidence.
 - Any other field gets a warning, because the tool does not read it.
 
-Some lines never need an entry and some never get one. An X25519 or ECDH line in the same function as ML-KEM code counts as the classical half of a hybrid. A line in a `Legacy*.java` file, or one that contains `legacy`, is allowed when it does not write (no key generation, signing or encryption). ML-KEM-512 and ML-DSA-44 are never allowed.
+Some lines never need an entry and some never get one. An X25519 or ECDH line in the same function as ML-KEM code counts as the classical half of a hybrid. A line in a `Legacy*.java` file, or one with `legacy` in its code (not in a comment), is allowed when neither it nor the three lines below it writes (no key generation, signing, token or certificate signing, or encryption). ML-KEM-512 and ML-DSA-44 are never allowed.
 
 ## Review it
 
