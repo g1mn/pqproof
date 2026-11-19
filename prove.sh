@@ -5,6 +5,9 @@
 #   bash prove.sh --verify <출력 폴더>  검증 증적 다시 확인(스키마·receipt_id·산출물 해시·in/ 트리·HTML)
 #   bash prove.sh --check <폴더|zip>    한 트리의 지금 상태만 판정(원본 없음: 전환 뒤 회귀 방지·정기 점검). 두 트리 대조 검사는 해당 없음
 #   bash prove.sh --inventory <폴더|zip>  판정 없이 CBOM·계열별 고전 줄·PQC 이름 줄을 센다(첫 현황 조사). inventory.json
+#   bash prove.sh --impl prompt [--param 이름 ...] [-o 파일]   구현 검증(KpqC): 하네스가 답할 문제지(JSON)를 쓴다
+#   bash prove.sh --impl judge <답안.json|kat.rsp> [--param 이름]   답안을 참조판 KAT 와 대조해 증적 폴더를 쓴다(구현은 실행하지 않음,
+#                          받아 줄 판은 PROFILE=kpqc 의 impl_accept, 기본 최신판. 옛 판·알려진 변형 일치는 검토 필요. 공인 시험 아님)
 #   bash prove.sh --unit [이름]        단위 시험(tests/, 표준 라이브러리 unittest). 'n 통과 · m 건너뜀 · k 실패'로 센다
 #   bash prove.sh sarif <출력 폴더> [-o 파일] [--uri-prefix 경로/]   검증 증적을 SARIF 2.1.0 으로(GitHub code scanning)
 #   bash prove.sh --version            도구 버전, 규칙 묶음 이름, 증적 형식(버전은 src/pqproof/__init__.py 한 곳)
@@ -59,6 +62,7 @@ case "${1:-}" in
   --selftest) exec "$PY" -I -B "$HERE/prove.py" --selftest;;
   --check|--inventory) [ -n "${2:-}" ] && [ $# -eq 2 ] || { echo "사용: prove.sh $1 <폴더|zip>" >&2; exit 2; }
     exec "$PY" -I -B "$HERE/prove.py" "$1" "$2";;
+  --impl) shift; exec "$PY" -I -B "$HERE/prove.py" --impl "$@";;
   --version|-V) exec "$PY" -I -B "$HERE/pqlite/version.py";;
   sarif) shift
     for s in "$HERE/src/pqproof/sarif.py" "$HERE/../sarif.py"; do [ -f "$s" ] && exec "$PY" -I -B "$s" "$@"; done

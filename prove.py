@@ -11,6 +11,8 @@
 (c) 공개키 집계: residue.sh(RESIDUE로 준 것, 없으면 scan/residue.sh 일반판)를 두 판에 돌려 공개키 9계열 code 줄,
     ML-KEM-768·ML-DSA-65 사용, NIST 보안레벨 3 미만 PQC, 레거시 쓰기를 읽는다.
 (d) 검증 증적: receipt.json(RFC 8785 + SHA-256), receipt.html, tables/*.csv, tables/fragment.html, evidence-fragment.json.
+--impl(구현 검증, KpqC): 문제지를 내고(prompt), 사용자 하네스가 쓴 답안 JSON 이나 PQCgenKAT .rsp 를 참조판 KAT 와 대조한다(judge).
+    검사 대상 구현은 빌드하거나 실행하지 않는다(pqlite/impl.py). 증적은 같은 꼴의 receipt.json(형식 4, params.mode impl).
 받은 소스는 믿지 않는 입력이다. 그 안의 코드는 실행하지 않는다(cbom-scan·residue는 grep·awk, scan.py는 읽기만).
 종료 코드: 0 통과 · 1 실패 · 2 사용법·입력 오류 · 3 미판정 · 4 도구 오류(예상 못 한 예외) · 5 통과지만 검토 필요(FAIL_ON_REVIEW=1).
 """
@@ -35,6 +37,7 @@ if HERE not in sys.path:
     sys.path.insert(0, HERE)  # python3 -I는 스크립트 폴더를 넣지 않는다
 
 from pqlite import allowlist as al  # noqa: E402
+from pqlite import impl  # noqa: E402
 from pqlite import receipt as rc  # noqa: E402
 from pqlite import rules  # noqa: E402
 from pqlite import skipdirs  # noqa: E402
@@ -156,7 +159,7 @@ def default_openssl():
 class Params:
     def __init__(self, env=None, mode="pair"):
         env = os.environ if env is None else env
-        self.mode = mode  # pair: 원본과 고친 판, check: 한 트리의 지금 상태만(--check, 교차 리뷰 X13)
+        self.mode = mode  # pair: 원본과 고친 판, check: 한 트리의 지금 상태만(--check, 교차 리뷰 X13), impl: 구현 검증(--impl)
         self.out = env.get("OUT") or None
         self.tls_targets = env.get("TLS_TARGETS", "").split()
         self.tls_targets_orig = env.get("TLS_TARGETS_ORIG", "").split()
@@ -199,7 +202,7 @@ class Params:
         if not (self.tls_via == "host" or re.fullmatch(r"container:[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", self.tls_via)):
             raise UsageError(f"TLS_VIA는 host 또는 container:<컨테이너 이름>: {self.tls_via!r}")
         # PROFILE: 알고리즘 프로필(scan/profiles.json). c-expect 가 세는 이름, b-tls 가 홀로 제시하는 그룹, EXPECT=cert 의 인증서 키
-        self.profile = (env.get("PROFILE") or rules.DEFAULT_PROFILE).strip().lower()
+        self.profile = (env.get("PROFILE") or ("kpqc" if mode == "impl" else rules.DEFAULT_PROFILE)).strip().lower()
         if self.profile not in rules.PROFILES:
             raise UsageError(f"PROFILE은 {', '.join(rules.PROFILES)} 중 하나: {self.profile!r}")
         bad = [x for x in self.expect if x not in EXPECT_OK]
@@ -554,8 +557,14 @@ def tls_runs(params, tls_dir, art_log, targets, baseline, expect):
 
 # ---------------------------------------------------------------------------------------------
 def tool(name, path, version=""):
-    sha = sha256_file(path) if path and os.path.isfile(path) else None
+    """증적 tools[] 한 칸. 폴더(scan/kat 발췌)는 그 안 *.json 의 해시 묶음(pqlite/version.py path_sha256)."""
+    sha = ver.path_sha256(path) if path else None
     return {"name": name, "path": str(path or ""), "sha256": sha, "version": version or ""}
+
+
+def rule_tools():
+    """규칙 묶음에 드는 파일 전부의 tools[] 칸(규칙 묶음 해시를 tools[] 로 다시 계산하려면 다 있어야 한다)."""
+    return [tool(n, os.path.join(HERE, *p.split("/"))) for p, n in ver.RULESET_FILES]
 
 
 def probe_tool():
@@ -1052,9 +1061,9 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
 
     tools = [tool("cbom-scan.sh", params.cbom_scan), tool("residue", res_script, res_kind),
              tool("test-paths.ere", scanmod.TEST_PATHS_FILE), tool("skip-dirs", skipdirs.SKIP_FILE),
-             tool("profiles", rules.PROFILES_FILE)]
+             tool("profiles", rules.PROFILES_FILE), tool("kat-kpqc", impl.KAT_FILE), tool("kat-excerpts", os.path.join(HERE, "scan", "kat"))]
     pyfiles = ["prove.py", "prove.sh", "pqlite/scan.py", "pqlite/verify.py", "pqlite/tlsprobe.py", "pqlite/receipt.py",
-               "pqlite/allowlist.py", "pqlite/version.py", "pqlite/rules.py", "pqlite/skipdirs.py"]
+               "pqlite/allowlist.py", "pqlite/version.py", "pqlite/rules.py", "pqlite/skipdirs.py", "pqlite/impl.py"]
     tools += [tool(p, os.path.join(HERE, p)) for p in pyfiles]
     if probe:
         tools.append(probe)
@@ -1210,7 +1219,7 @@ def inventory(tree, params, out=None, quiet=False):
     art.add("artifacts/residue.txt", text)
     parsed = parse_residue(text)
     fams = parsed["families"] if parsed else None
-    rs_sha = ver.ruleset_from_tools([tool(n, os.path.join(HERE, p)) for p, n in ver.RULESET_FILES])
+    rs_sha = ver.ruleset_from_tools(rule_tools())
     summary = {
         "format": "pqproof inventory 1", "tool_version": ver.tool_version(), "ruleset_version": ver.ruleset_label(rs_sha),
         "ruleset_sha256": rs_sha, "started_at": rc.iso(started), "input": info, "profile": params.profile, "scope": params.scope,
@@ -1238,6 +1247,240 @@ def inventory(tree, params, out=None, quiet=False):
         print(f"TLS 서버 신호 {len(sig[0])} · 클라이언트 신호 {len(sig[1])} · 규칙 묶음 {summary['ruleset_version']}")
         print(f"출력: {out} (inventory.json, tables/cbom.csv)")
     return summary, 0
+
+
+# ---------------------------------------------------------------------------------------------
+# 구현 검증(--impl, KpqC KAT 대조). 문제지를 내고(prompt), 사용자 하네스가 쓴 답안(JSON 또는 PQCgenKAT .rsp)을 참조판 KAT 와
+# 대조한다(judge). 검사 대상 구현은 빌드하거나 실행하지 않는다. 대조 규칙은 pqlite/impl.py, 받아 줄 판은 scan/profiles.json 의
+# impl_accept(PROFILE, 구현 검증의 기본은 kpqc). 판정은 검사 한 줄 i-kpqc(pqlite/rules.py judge_impl)이고 증적은 형식 4다.
+IMPL_USAGE = ("사용: bash prove.sh --impl prompt [--param 이름 ...] [-o 파일]      문제지(JSON)를 쓴다(파일을 안 주면 표준 출력)\n"
+              "      bash prove.sh --impl judge <답안.json|kat.rsp> [--param 이름]   답안을 참조판 KAT 와 대조해 증적 폴더를 쓴다")
+IMPL_SAYS = ("참조판 KAT 와 일치하는지 본 것이다. 표준 준수 시험이나 공인 시험(KCMVP)이 아니고, PQ-Proof 는 구현을 빌드하거나 "
+             "실행하지 않았다(답안은 사용자 하네스가 만들었다).")
+
+
+class ToolDataError(Exception):
+    """도구 자신의 데이터(KAT 목록, 프로필)가 깨졌다(종료 4)."""
+
+
+def impl_cmd():
+    """사람에게 보일 구현 검증 명령 앞머리: 'pqproof impl' 또는 'bash prove.sh --impl'."""
+    return "pqproof impl" if entry_cmd() == "pqproof" else "bash prove.sh --impl"
+
+
+def impl_args(argv):
+    """--impl 뒤 인자 → (명령, 입력 파일, [--param 이름], 출력 파일). 틀리면 UsageError."""
+    if not argv or argv[0] not in ("prompt", "judge"):
+        raise UsageError(IMPL_USAGE)
+    cmd, rest, names, out, pos = argv[0], argv[1:], [], None, []
+    i = 0
+    while i < len(rest):
+        a = rest[i]
+        if a in ("--param", "-p", "-o", "--output"):
+            if i + 1 >= len(rest):
+                raise UsageError(f"{a} 뒤에 값이 없다\n{IMPL_USAGE}")
+            if a in ("-o", "--output"):
+                if cmd != "prompt":
+                    raise UsageError(f"{a} 는 prompt 에만 쓴다(judge 는 OUT 으로 증적 폴더를 정한다)\n{IMPL_USAGE}")
+                out = rest[i + 1]
+            else:
+                names.append(rest[i + 1])
+            i += 2
+        elif a.startswith("-"):
+            raise UsageError(f"모르는 옵션 {a}\n{IMPL_USAGE}")
+        else:
+            pos.append(a)
+            i += 1
+    if (cmd == "prompt" and pos) or (cmd == "judge" and len(pos) != 1):
+        raise UsageError(IMPL_USAGE)
+    return cmd, (pos[0] if pos else None), names, out
+
+
+def impl_manifest():
+    try:
+        return impl.load_manifest()
+    except impl.ManifestError as e:
+        raise ToolDataError(f"KpqC KAT 목록이 깨졌다: {e}") from None
+
+
+def impl_names(manifest, names):
+    """--param 이름(정식 이름·별칭, 대소문자 무관) → 정식 이름 목록(목록 순서, 겹침 없음)."""
+    got = []
+    for n in names:
+        pid = manifest["names"].get(n.strip().lower())
+        if pid is None:
+            raise UsageError(f"모르는 파라미터 {n!r}. 아는 이름: {', '.join(manifest['order'])}(별칭은 scan/kat-kpqc.json 의 aliases)")
+        if pid not in got:
+            got.append(pid)
+    return [p for p in manifest["order"] if p in got]
+
+
+def impl_prompt(names, out_path=None, quiet=False):
+    """문제지를 out_path(이미 있으면 멈춘다) 또는 표준 출력에 쓴다. 반환 (문제지, 종료 코드 0)."""
+    m = impl_manifest()
+    pids = impl_names(m, names) if names else list(m["order"])
+    prompt = impl.emit_prompt(impl.build_key(m, pids))
+    text = impl.dumps(prompt)
+    if out_path:
+        if os.path.lexists(out_path):
+            raise UsageError(f"문제지 파일이 이미 있다(덮어쓰지 않음): {out_path}")
+        with open(out_path, "x", encoding="utf-8") as f:
+            f.write(text)
+    else:
+        sys.stdout.write(text)
+    if not quiet:
+        print(f"pqproof: 문제지 {len(prompt['items'])}문항(파라미터 {len(pids)}개) prompt_sha256 {prompt['prompt_sha256']}"
+              + (f" -> {out_path}" if out_path else ""), file=sys.stderr)
+    return prompt, 0
+
+
+def impl_report_md(r):
+    """구현 검증의 tables/report.md."""
+    x = r["impl"]
+    out = [f"<!-- prove.sh --impl 이 만든 표. 답안 sha256 {x['input']['sha256']}. receipt_id는 같은 폴더 receipt.json. -->", "",
+           f"명령: `{impl_cmd()} judge {md_cell(os.path.basename(x['input']['path']), html=False)}` · 판정 **{rc.verdict_text(r)}**", "",
+           f"판정 근거: pqproof {r['tool_version']} · 규칙 묶음 {r['ruleset_version']} (sha256 `{r['ruleset_sha256'][:16]}`) · "
+           f"증적 형식 {r['format_version']} · PROFILE={r['params']['profile']} · 받아 줄 판 {', '.join(x['accept']) or '없음'}", ""]
+    out += ["검사 결과", "", md_table(["#", "검사", "기대", "실제"], [[f"V{i}", c["title"], c["expected"], f"{STATUS_KO[c['status']]}: {c['actual']}"]
+                                                                  for i, c in enumerate(r["checks"], 1)]), ""]
+    rows = [[f"`{a}`", b, c, d, e, f, STATUS_KO.get(g, ""), h] for a, b, c, d, e, f, g, h in rc.impl_rows(r)]
+    if rows:
+        out += ["파라미터별 참조판 대조", "", md_table(["파라미터", "판", "역할", "받아 줌", "대조", "첫 불일치", "결과", "요약"], rows), ""]
+    out += [IMPL_SAYS + f" 다시 확인: `{entry_cmd()} --verify <출력 폴더>`(답안 사본을 정답 묶음 사본으로 다시 판정한다).", ""]
+    return "\n".join(out)
+
+
+def impl_judge(path, names, params, out=None, quiet=False):
+    """답안 하나를 판정해 증적 폴더를 쓴다. 반환: (receipt dict, 종료 코드, 출력 줄 목록)."""
+    if not os.path.isfile(path):
+        raise UsageError(f"답안 파일이 없다: {path}")
+    m = impl_manifest()
+    hint = None
+    if names:
+        pids = impl_names(m, names)
+        if len(pids) != 1:
+            raise UsageError("--param 은 .rsp 하나에 하나만 준다(답안 JSON 은 params 칸을 읽는다)")
+        hint = pids[0]
+    spec = rules.PROFILES[params.profile].get("impl_accept")
+    if not spec:
+        raise UsageError(f"PROFILE={params.profile} 에는 받아 줄 판(impl_accept)이 없다. 구현 검증은 PROFILE=kpqc(기본)로 돈다")
+    out = os.path.abspath(out or params.out or default_out(path, "impl"))
+    if os.path.exists(out):
+        raise UsageError(f"출력 폴더가 이미 있다(덮어쓰지 않음): {out}")
+    started = now()
+    size, sha = os.path.getsize(path), sha256_file(path)
+    data = None
+    if size > impl.MAX_INPUT:
+        parsed = {"kind": None, "problem": impl.oversize_problem(size)}
+    else:
+        data = slurp(path, binary=True)
+        parsed = impl.parse_input(data)
+    if parsed["kind"] == "response" and hint:
+        raise UsageError("--param 은 .rsp 에만 쓴다(답안 JSON 은 params 칸을 읽는다)")
+    pids, problem = impl.input_params(parsed, m["names"], hint)
+    problem = parsed["problem"] or problem
+    key = impl.build_key(m, pids)
+    try:
+        accept = impl.resolve_accept(m["params"], spec, pids)
+    except ValueError as e:
+        raise ToolDataError(f"scan/profiles.json {params.profile}: {e}") from None
+    t1 = now()
+    control, results = (None, []) if problem else (impl.control_problem(key, accept, parsed["kind"]), impl.match_versions(key, parsed, accept))
+    checks, verdict = rules.judge_impl(results, control, problem, rc.derive_verdict)
+    os.makedirs(out)
+    art = rc.Artifacts(out)
+    timeline = [{"name": "준비", "started_at": rc.iso(started), "ended_at": rc.iso(t1)},
+                {"name": "대조", "started_at": rc.iso(t1), "ended_at": rc.iso(now())}]
+    t2 = now()
+    in_file = in_sha = None
+    if data is not None:
+        in_file, in_sha = art.add("artifacts/impl/answer." + ("rsp" if parsed["kind"] == "rsp" else "json"), data)
+    key_file, key_sha = art.add("artifacts/impl/key.json", impl.dumps(key))
+    prompt_rec = None
+    if parsed["kind"] == "response" and not problem:
+        prompt = impl.emit_prompt(key)
+        pf, ps = art.add("artifacts/impl/prompt.json", impl.dumps(prompt))
+        prompt_rec = {"file": pf, "file_sha256": ps, "prompt_sha256": prompt["prompt_sha256"], "items": len(prompt["items"])}
+    tools = rule_tools() + [tool(p, os.path.join(HERE, p)) for p in ("prove.py", "prove.sh", "pqlite/receipt.py", "pqlite/version.py")]
+    tools.append({"name": "python", "path": sys.executable, "sha256": None, "version": sys.version.split()[0]})
+    rs_sha = ver.ruleset_from_tools(tools)
+    out_name, out_parent = os.path.basename(out), os.path.dirname(out)
+    in_ev = os.path.basename(out_parent) == "evidence"
+    r = {"format": rc.FORMAT, "format_version": ver.FORMAT_VERSION, "tool_version": ver.tool_version(),
+         "ruleset_version": ver.ruleset_label(rs_sha), "ruleset_sha256": rs_sha, "note": rc.NOTE, "verdict": verdict,
+         "started_at": rc.iso(started), "finished_at": None, "tools": tools,
+         "params": {"mode": "impl", "profile": params.profile, "params": [P["id"] for P in key["params"]], "input": parsed["kind"],
+                    "fail_on_review": params.fail_on_review},
+         "impl": {"engine": impl.ENGINE, "kat_manifest_sha256": m["sha256"],
+                  "input": {"path": os.path.abspath(path), "kind": parsed["kind"], "bytes": size, "sha256": sha, "file": in_file,
+                            "file_sha256": in_sha, "implementation": parsed.get("implementation"), "header": parsed.get("header")},
+                  "prompt": prompt_rec, "key": {"file": key_file, "file_sha256": key_sha, "params": len(key["params"])},
+                  "accept": impl.accept_list(accept), "control": {"ok": control is None, "problem": control}, "problem": problem,
+                  "results": results},
+         "checks": checks, "timeline": timeline,
+         "deck_meta": {"receipt_file": f"evidence/{out_name}/receipt.json" if in_ev else os.path.join(out, "receipt.json"),
+                       "verify_cmd": f"{entry_cmd()} --verify {f'evidence/{out_name}' if in_ev else out}",
+                       "ev": params.ev or out_name + ".txt"}}
+    art.add("tables/summary.csv", csv_text(["검사", "제목", "판정", "기준", "실제"],
+                                           [[c["id"], c["title"], STATUS_KO[c["status"]], c["expected"], c["actual"]] for c in checks]))
+    art.add("tables/impl.csv", csv_text(["파라미터", "판", "역할", "받아 줌", "대조", "첫 불일치", "결과", "요약"],
+                                        [[a, b, c, d, e, f, STATUS_KO.get(g, ""), h] for a, b, c, d, e, f, g, h in rc.impl_rows(r)]))
+    art.add("tables/report.md", impl_report_md(r))
+    r["artifacts"] = art.manifest()
+    timeline.append({"name": "표·증적", "started_at": rc.iso(t2), "ended_at": rc.iso(now())})
+    r["finished_at"] = rc.iso(now())
+    r["receipt_id"] = rc.compute_id(r)
+    for name, text in (("receipt.json", rc.dumps(r)), ("receipt.html", rc.render_html(r)), ("deck.json", rc.render_deck(r)),
+                       ("README.txt", rc.render_readme(r))):
+        with open(os.path.join(out, name), "x", encoding="utf-8") as f:
+            f.write(text)
+    vres = rc.verify(out)
+    bad = [w for ok, w in vres if not ok]
+    inp = r["impl"]["input"]
+    lines = [f"== PQ-Proof {ver.tool_version()} 구현 검증(KpqC KAT 대조)  ({time.strftime('%Y-%m-%d %H:%M:%S %Z')})  [{platform.machine()}]",
+             f"답안: {inp['path']} ({ {'response': '답안 JSON', 'rsp': 'PQCgenKAT .rsp'}.get(inp['kind'], '읽지 않음') }, {size:,}바이트, "
+             f"sha256 {sha[:16]})" + (f" · 구현: {inp['implementation'][:80]}" if inp["implementation"] else "")
+             + (f" · 머리 줄 {inp['header']}" if inp["header"] else ""),
+             f"판정 기준: PROFILE={params.profile} · 받아 줄 판 {', '.join(r['impl']['accept']) or '없음'}"
+             + (f" · 문제지 {prompt_rec['items']}문항" if prompt_rec else "")]
+    for c in checks:
+        lines.append(f"[{c['id']}] {STATUS_KO[c['status']]}  {c['actual']}")
+    for res in results:
+        lines.append(f"  {res['param']}: " + " · ".join(
+            f"{v['version']}{'(받아 줌)' if v['accepted'] else ''} "
+            + (v["records"] if v["records"] is not None else (f"{v['ok']}/{v['checked']}" if v["checked"] else "발췌 없음"))
+            + (f" 첫 불일치 {v['first_mismatch']}" if v["first_mismatch"] and not (v["checked"] and v["ok"] == v["checked"]) else "")
+            for v in res["versions"]))
+    lines.append("자기 점검: " + ("통과(정답 답안 통과, 한 바이트 바꾼 답안 실패)" if control is None and not problem
+                                 else (f"실패: {control}" if control else "안 돌림(답안을 판정하지 못함)")))
+    code = {"pass": 0, "fail": 1, "undecided": 3}[verdict]
+    if code == 0 and params.fail_on_review and any(c["status"] == "review" for c in checks):
+        code = EXIT_REVIEW
+    note = rc.pending_note(r, en=True)
+    lines.append(f"VERDICT={verdict.upper()}{f' ({note})' if note else ''}  receipt_id={r['receipt_id']}")
+    lines.append(f"검사 1개: {STATUS_KO[checks[0]['status']]} (통과로 세는 것은 '통과'뿐) · 도구 {r['tool_version']} · 규칙 묶음 "
+                 f"{r['ruleset_version']} · 증적 형식 {r['format_version']}")
+    lines.append(IMPL_SAYS)
+    lines.append(f"검증 증적 다시 확인: {'ok' if not bad else 'FAIL'} ({len(vres)}개 검사)" + ("" if not bad else ": " + "; ".join(bad[:3])))
+    lines += [f"출력: {out}", "  사람이 볼 것: receipt.html · 기계가 읽을 것: receipt.json · 문서에 붙일 표: tables/report.md",
+              f"  다시 확인: {entry_cmd()} --verify {out} (폴더에 파일을 더하거나 고치면 실패한다)"]
+    if bad:
+        code = 3
+    if not quiet:
+        print("\n".join(lines))
+    return r, code, lines
+
+
+def impl_main(argv):
+    """--impl prompt|judge. 종료: 0 통과(prompt 는 씀) · 1 실패 · 2 사용법 · 3 미판정 · 4 도구 데이터 오류 · 5 FAIL_ON_REVIEW."""
+    cmd, path, names, out = impl_args(argv)
+    try:
+        if cmd == "prompt":
+            return impl_prompt(names, out)[1]
+        return impl_judge(path, names, Params(mode="impl"))[1]
+    except ToolDataError as e:
+        print(f"pqproof: {e} (도구 오류, 종료 {EXIT_TOOL_ERROR})", file=sys.stderr)
+        return EXIT_TOOL_ERROR
 
 
 def next_steps(r, fixed_items, out):
@@ -1277,6 +1520,7 @@ def next_steps(r, fixed_items, out):
 # 비우면 tests/fixtures/orders-edge 스냅숏), S6은 tls_probe 참조 서버, S7은 S1 검증 증적 변조,
 # S8은 허용 목록 가림(결함 D1, S8f 는 고친 판에서 지운 파일), S9는 시험 경로 기준 하나(결함 D2),
 # S10은 본 소스 패키지 이름의 example(src/main/java/com/example). S8~S10 은 examples/ 만 쓴다.
+# S11은 구현 검증(--impl): 참조판 KAT 발췌로 만든 최신판 답안 통과, 한 바이트 바꾼 답안 실패, 옛 판 답안 검토 필요, 증적 다시 확인.
 EXAMPLES = os.path.join(HERE, "examples")
 FIXTURES = os.path.join(HERE, "tests", "fixtures")
 ORDERS_EDGE = os.environ.get("ORDERS_EDGE") or os.path.join(FIXTURES, "orders-edge")
@@ -1558,6 +1802,22 @@ def selftest(base=None, keep=False):
     ok("S10b com/example 에 Java 만 있는 전환본 → 통과(a-input·c-expect 가 Java 를 본다)",
        (r["verdict"], code, st_of(r)["a-input"], st_of(r)["c-expect"]) == ("pass", 0, "pass", "pass"),
        json.dumps(st_of(r), ensure_ascii=False))
+    # S11 구현 검증(KpqC KAT 대조, 구현은 실행하지 않음). 답안은 발췌로 만든다(어느 판 구현이라면 낼 답, pqlite/impl.example_answers)
+    m = impl.load_manifest()
+    key = impl.build_key(m, ["smaug-t/mode1", "aimer/128f"])
+    for tag, pick, edit, want in (("a", {"smaug-t/mode1": "1.2.0", "aimer/128f": "3.0"}, None, ("pass", 0, "pass")),
+                                  ("b", {"smaug-t/mode1": "1.2.0", "aimer/128f": "3.0"}, "smaug-t/mode1@1.2.0#0:decaps", ("fail", 1, "fail")),
+                                  ("c", {"smaug-t/mode1": "1.1.1", "aimer/128f": "aim2-2026-01"}, None, ("pass", 0, "review"))):
+        resp = impl.example_answers(key, pick)
+        if edit:
+            resp["answers"][edit]["ss"] = impl._flip_hex(resp["answers"][edit]["ss"])
+        ans = os.path.join(tmp, f"s11{tag}.json")
+        spit(ans, impl.dumps(resp))
+        r, code, _ = impl_judge(ans, [], Params({}, mode="impl"), os.path.join(tmp, f"s11{tag}"), quiet=True)
+        vbad = [w for o, w in rc.verify(os.path.join(tmp, f"s11{tag}")) if not o]
+        ok(f"S11{tag} 구현 검증 {'최신판 답안' if tag == 'a' else '한 바이트 바꾼 답안' if tag == 'b' else '옛 판 답안'} → "
+           f"{STATUS_KO[want[2]]}, 증적 다시 확인 통과", (r["verdict"], code, r["checks"][0]["status"]) == want and not vbad
+           and r["impl"]["control"]["ok"], json.dumps([r["verdict"], code, r["checks"][0]["actual"][:200], vbad[:2]], ensure_ascii=False))
     bad = [n for n, s, _ in results if s == "fail"]
     skipped = [n for n, s, _ in results if s == "skip"]
     passed = sum(1 for _, s, _ in results if s == "pass")
@@ -1575,6 +1835,21 @@ def selftest(base=None, keep=False):
 def main(argv):
     if argv[:1] == ["--selftest"]:
         return selftest(base=os.environ.get("SELFTEST_DIR") or None, keep=os.environ.get("KEEP") == "1")
+    if argv[:1] == ["--impl"]:  # 구현 검증(KpqC KAT 대조): 표준 라이브러리만, bash·openssl 없이 돈다
+        for w in env_warnings(os.environ):
+            print(f"pqproof: 경고: {w}", file=sys.stderr)
+        try:
+            return impl_main(argv[1:])
+        except UsageError as e:
+            print(f"prove.sh: {e}", file=sys.stderr)
+            return 2
+        except KeyboardInterrupt:
+            return 130
+        except Exception as e:  # noqa: BLE001  도구 오류는 판정 실패(1)와 가른다
+            import traceback
+            traceback.print_exc()
+            print(f"pqproof: 도구 오류({type(e).__name__}: {str(e)[:200]}). 판정이 아니다(종료 {EXIT_TOOL_ERROR})", file=sys.stderr)
+            return EXIT_TOOL_ERROR
     if argv[:1] in (["--check"], ["--inventory"]):  # 한 트리(교차 리뷰 X13)
         if len(argv) != 2:
             print(f"사용: bash prove.sh {argv[0]} <폴더|zip>", file=sys.stderr)

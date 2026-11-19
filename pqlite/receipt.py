@@ -19,6 +19,10 @@
 #       같은지 본다. 정규화는 키를 UTF-16 코드 단위 순서로 정렬하고(RFC 8785 3.2.3) 절댓값 2^53 을 넘는 정수는 거부한다.
 #       verify 에서 폴더나 receipt.json 이 없으면 main 이 2(입력 오류)로 끝낸다. 열기는 O_NOFOLLOW·dir_fd 가 없는 플랫폼(Windows)에서
 #       경로 조각마다 lstat 으로 링크를 거른 뒤 연다.
+# 수정(0.3.0): 증적 형식 4. 구현 검증(pqproof impl, params.mode impl) 증적은 두 트리 칸(inputs·cbom·java·tls 등) 대신 최상위 impl 칸
+#       (답안 사본·정답 묶음 사본·문제지 사본, 받아 줄 판, 자기 점검, 파라미터별 결과)과 검사 i-kpqc 하나를 가진다(SCHEMA_IMPL).
+#       verify 는 정답 묶음 사본으로 답안 사본을 다시 판정해 결과·검사 행이 같은지 보고(impl_record), 지금 도구의 KAT 목록이 그 증적과
+#       같으면 정답 묶음·문제지를 다시 만들어 바이트까지 맞춘다. 두 트리·한 트리 증적은 형식 3과 같은 꼴이다. 형식 1~3을 계속 읽는다.
 # 수정: 축소판. RFC 8785 정규화(_number·_jcs·canonical)·compute_id·validate·obj·strict·iso·_Artifacts·_read_nofollow·
 #       _hash_refs·_listed_files·verify 뼈대·STYLE·SCRIPT(테마 토글)는 가져오고, microVM 증적용 build·_sandbox·_network·
 #       _proofs·_steps·POLICY·consistency·SCHEMA·render_html은 이 오프라인판용으로 새로 썼다. loop._open_nofollow도 옮겨 왔다.
@@ -177,7 +181,39 @@ SCHEMA = obj(_TOP_REQ,
     allowlist=ALLOWLIST, excluded=EXCLUDED, deck_meta=DECK_META, test_paths=strict(file=PATH, file_sha256=SHA),
     skip_dirs=strict(file=PATH, file_sha256=SHA),
 )
-# 형식마다 꼭 있어야 하는 칸과 있으면 안 되는 칸(스키마는 모든 형식을 한 번에 읽는다). skip_dirs 는 형식 3에서 보탰다
+# 구현 검증 증적(형식 4, params.mode impl). 두 트리 증적과 칸이 달라 따로 읽는다(verify 가 params.mode 로 고른다)
+IMPL_STATUS = ["pass", "fail", "undecided", "review"]
+IMPL_VERSION = strict(version=STR, role={"enum": ["reference", "known-variant"]}, latest=BOOL, accepted=BOOL, checked=INT, ok=INT,
+                      records=STR_OR_NULL, first_mismatch=STR_OR_NULL)
+IMPL_RESULT = strict(param=STR, name=STR, status={"enum": IMPL_STATUS}, summary=STR, matched=STRS,
+                     versions={"type": "array", "items": IMPL_VERSION})
+IMPL_PROMPT = dict(strict(file=PATH, file_sha256=SHA, prompt_sha256=SHA, items=INT), type=["object", "null"])
+IMPL = strict(engine={"const": "kpqc-kat"}, kat_manifest_sha256=SHA,
+              input=strict(path=STR, kind={"enum": ["response", "rsp", None]}, bytes=INT, sha256=SHA, file=PATH_OR_NULL,
+                           file_sha256=SHA_OR_NULL, implementation=STR_OR_NULL, header=STR_OR_NULL),
+              prompt=IMPL_PROMPT, key=strict(file=PATH, file_sha256=SHA, params=INT), accept=STRS,
+              control=strict(ok=BOOL, problem=STR_OR_NULL), problem=STR_OR_NULL, results={"type": "array", "items": IMPL_RESULT})
+_IMPL_REQ = ["format", "format_version", "tool_version", "ruleset_version", "ruleset_sha256", "receipt_id", "note", "verdict",
+             "started_at", "finished_at", "tools", "params", "impl", "checks", "timeline", "artifacts", "deck_meta"]
+SCHEMA_IMPL = obj(_IMPL_REQ,
+    format={"const": FORMAT}, format_version={"type": "integer", "minimum": 4}, tool_version=SCHEMA["properties"]["tool_version"],
+    ruleset_version=SCHEMA["properties"]["ruleset_version"], ruleset_sha256=SHA, receipt_id=SHA, note={"const": NOTE},
+    verdict={"enum": ["pass", "fail", "undecided"]}, started_at=TIME, finished_at=TIME,
+    tools={"type": "array", "minItems": 1, "items": TOOL},
+    params=strict(mode={"const": "impl"}, profile=STR, params=STRS, input={"enum": ["response", "rsp", None]}, fail_on_review=BOOL),
+    impl=IMPL, checks={"type": "array", "minItems": 1, "items": CHECK},
+    timeline={"type": "array", "items": strict(name=STR, started_at=TIME, ended_at=TIME)},
+    artifacts={"type": "array", "minItems": 1, "items": strict(path=PATH, bytes=INT, sha256=SHA)}, deck_meta=DECK_META,
+)
+IMPL_SINCE = 4  # params.mode impl 이 생긴 형식
+
+
+def is_impl(r):
+    """구현 검증 증적인가(params.mode 가 impl)."""
+    return isinstance(r, dict) and isinstance(r.get("params"), dict) and r["params"].get("mode") == "impl"
+
+
+# 형식마다 꼭 있어야 하는 칸과 있으면 안 되는 칸(스키마는 모든 형식을 한 번에 읽는다). skip_dirs 는 형식 3에서 보탰다(두 트리·한 트리 증적만)
 FORMAT_ONLY = {"skip_dirs": 3}
 # 형식 3에서 보탠 안쪽 칸(선택). 형식 2 스키마(schemas/receipt-v2.schema.json)에는 없다: tests/make_schemas.py 가 뺀다
 FORMAT_ONLY_NESTED = {("tls", "probe_build"): 3, ("params", "profile"): 3, ("params", "mode"): 3, ("params", "fail_on_review"): 3, ("params", "require_resolved"): 3,
@@ -520,6 +556,8 @@ def derive_verdict(checks):
 
 def consistency(r):
     """요약 칸이 그 아래 기록과 어긋나는 곳([] 이면 맞다). 판정은 검사 칸에서, 검사 칸은 숫자에서 나와야 한다."""
+    if is_impl(r):
+        return _impl_consistency(r)
     out = []
     want = derive_verdict(r["checks"])
     if r["verdict"] != want:
@@ -651,6 +689,134 @@ def _coverage_problems(a, unused):
     return out
 
 
+def _impl_consistency(r):
+    """구현 검증 증적: 판정이 검사에서, 검사 i-kpqc 가 impl 칸(결과·자기 점검·답안 문제)에서 나오는가. 결과마다 상태가 판 기록과 맞는가."""
+    out = []
+    im = _impl_module()
+    want = derive_verdict(r["checks"])
+    if r["verdict"] != want:
+        out.append(f"verdict is {r['verdict']!r}, but the checks give {want!r}")
+    if [c["id"] for c in r["checks"]] != [im.CHECK_ID]:
+        out.append(f"an impl receipt has exactly one check, {im.CHECK_ID}")
+    x = r["impl"]
+    if x["control"]["ok"] != (x["control"]["problem"] is None):
+        out.append("impl.control.ok does not match impl.control.problem")
+    row = im.check_row(x["results"], x["control"]["problem"], x["problem"])
+    if r["checks"] and r["checks"][0]["status"] != row["status"]:  # 글은 판마다 다를 수 있다. 상태만 본다(글은 impl_record 가 같은 규칙일 때 맞춘다)
+        out.append(f"{im.CHECK_ID} is {r['checks'][0]['status']}, but the impl results, self-check and problem give {row['status']}")
+    if x["results"] and [res["param"] for res in x["results"]] != r["params"]["params"]:
+        out.append("impl.results do not list the parameters in params.params")
+    if x["problem"] and x["results"]:
+        out.append("impl.problem is set, but there are results")
+    if r["params"]["input"] != x["input"]["kind"]:
+        out.append("params.input differs from impl.input.kind")
+    if (x["prompt"] is not None) != (x["input"]["kind"] == "response" and not x["problem"]):
+        out.append("impl.prompt must be recorded for a response that was judged, and only then")
+    if x["key"]["params"] != len(r["params"]["params"]):
+        out.append("impl.key.params differs from the number of parameters judged")
+    kat = [t.get("sha256") for t in r["tools"] if t.get("name") == "kat-kpqc"]
+    if kat != [x["kat_manifest_sha256"]]:
+        out.append("tools[] does not list the KAT list (kat-kpqc) with impl.kat_manifest_sha256")
+    for res in x["results"]:
+        acc = {v["version"] for v in res["versions"] if v["accepted"]}
+        known = {v["version"] for v in res["versions"]}
+        st, m = res["status"], set(res["matched"])
+        if not m <= known or (st == "pass" and (not m or not m <= acc)) or (st == "review" and not m) or (st in ("fail", "undecided") and m):
+            out.append(f"impl result {res['param']}: status {st} does not fit matched versions {sorted(m)} (accepted {sorted(acc)})")
+    return out
+
+
+def _impl_module():
+    """pqlite/impl.py(구현 검증의 대조 규칙). 스크립트로 돌 때는 sys.path 를 건드리지 않고 파일로 읽는다."""
+    if __package__:
+        from . import impl
+        return impl
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("pqlite_impl", os.path.join(os.path.dirname(os.path.abspath(__file__)), "impl.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def impl_record(root, r):
+    """구현 검증 증적을 다시 판정한다: [(ok, 무엇)]. 정답 묶음 사본(artifacts/impl/key.json)이 스스로 맞는지 늘 본다. 대조 규칙
+    (pqlite/impl.py)이 그 증적을 쓴 것과 같으면 문제지 사본이 그 묶음으로 다시 만든 것과 같은지, 답안 사본을 그 묶음으로 다시 판정한
+    결과·자기 점검·검사 행이 증적과 같은지 보고, KAT 목록까지 같으면 정답 묶음도 다시 만들어 바이트까지 맞춘다. 대조 규칙이 다르면
+    (다른 규칙 묶음의 증적) 다시 판정하지 않고 그렇게 적는다(두 트리 증적도 옛 규칙 묶음의 검사를 다시 돌리지 않는다)."""
+    im, v = _impl_module(), _version_module()
+    x, out = r["impl"], []
+    try:
+        raw_key = _read_nofollow(root, x["key"]["file"])
+        key = loads_strict(raw_key)
+    except (OSError, ValueError) as e:
+        return [(False, f"{x['key']['file']}: cannot be read ({e})")]
+    probs = im.check_key(key)
+    if probs:
+        return [(False, f"{x['key']['file']}: the answer key is not consistent: {probs[0]}")]
+    if [P["id"] for P in key["params"]] != r["params"]["params"]:
+        return [(False, f"{x['key']['file']} holds other parameters than params.params")]
+    tools = {t.get("name"): t.get("sha256") for t in r["tools"]}
+    if tools.get("pqlite/impl.py") != v.path_sha256(os.path.join(v.ROOT, "pqlite", "impl.py")):
+        return out + [(True, f"written with another pqlite/impl.py (ruleset {r['ruleset_version']}): the answer key is consistent, "
+                             "the answer is not judged again with this tool's rules; check it with the pqproof version that wrote it")]
+    try:
+        manifest = im.load_manifest()
+    except im.ManifestError:
+        manifest = None
+    same_kat = (manifest is not None and manifest["sha256"] == x["kat_manifest_sha256"] == tools.get("kat-kpqc")
+                and tools.get("kat-excerpts") == v.path_sha256(os.path.join(v.ROOT, "scan", "kat")))
+    if same_kat:
+        same = im.dumps(im.build_key(manifest, r["params"]["params"])).encode("utf-8") == raw_key
+        out.append((same, f"{x['key']['file']} is the answer key this tool's KAT list gives" if same else
+                    f"{x['key']['file']} differs from the answer key this tool's KAT list gives"))
+        prof = _profiles_accept(r)
+        if prof is not None:
+            try:
+                want = im.accept_list(im.resolve_accept(manifest["params"], prof, r["params"]["params"]))
+            except ValueError as e:
+                want = [f"error: {e}"]
+            out.append((want == x["accept"], "impl.accept follows the profile" if want == x["accept"] else
+                        f"impl.accept is {x['accept']}, but profile {r['params']['profile']} gives {want}"))
+    else:
+        out.append((True, f"{x['key']['file']}: this tool's KAT list differs from the one this receipt used; the answer is judged "
+                          "again with the copied answer key"))
+    if x["prompt"] is not None:
+        prompt = im.emit_prompt(key)
+        same = (im.dumps(prompt).encode("utf-8") == _read_nofollow(root, x["prompt"]["file"])
+                and prompt["prompt_sha256"] == x["prompt"]["prompt_sha256"] and len(prompt["items"]) == x["prompt"]["items"])
+        out.append((same, f"{x['prompt']['file']} is the question sheet of the answer key" if same else
+                    f"{x['prompt']['file']} differs from the question sheet the answer key gives"))
+    accept = im.accept_from_list(x["accept"])
+    if x["input"]["file"]:
+        parsed = im.parse_input(_read_nofollow(root, x["input"]["file"]))
+    else:
+        parsed = {"kind": None, "problem": im.oversize_problem(x["input"]["bytes"])}
+    hint = r["params"]["params"][0] if parsed["kind"] in ("rsp", None) and r["params"]["params"] else None  # 판정 때 --param 을 썼다
+    pids, problem = im.input_params(parsed, im.key_names(key), hint)
+    problem = parsed["problem"] or problem
+    control, results = (None, []) if problem else (im.control_problem(key, accept, parsed["kind"]), im.match_versions(key, parsed, accept))
+    row = im.check_row(results, control, problem)
+    same = (pids == r["params"]["params"] and problem == x["problem"] and results == x["results"]
+            and {"ok": control is None, "problem": control} == x["control"] and r["checks"] == [row])
+    out.append((same, f"the answer judged again gives the same {im.CHECK_ID} result ({STATUS_KO[row['status']]})" if same else
+                f"the answer judged again gives {im.CHECK_ID} {row['status']}: {row['actual'][:200]!r}, which differs from the receipt"))
+    return out
+
+
+def _profiles_accept(r):
+    """증적이 쓴 프로필의 impl_accept(지금 scan/profiles.json 이 그 증적의 것과 같을 때만, 아니면 None)."""
+    v = _version_module()
+    path = os.path.join(v.ROOT, "scan", "profiles.json")
+    rec = [t.get("sha256") for t in r["tools"] if t.get("name") == "profiles"]
+    if rec != [v.path_sha256(path)]:
+        return None
+    try:
+        with open(path, encoding="utf-8") as f:
+            return ((json.load(f).get("profiles") or {}).get(r["params"]["profile"]) or {}).get("impl_accept")
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
 def _allowlist_module():
     """pqlite/allowlist.py. `python3 -I pqlite/receipt.py verify` 처럼 스크립트로 돌 때는 sys.path 를 건드리지 않고 파일로 읽는다."""
     if __package__:
@@ -708,8 +874,9 @@ def version_problems(r):
     v = _version_module()
     fv = format_version(r)
     keys = ("tool_version", "ruleset_version", "ruleset_sha256")
+    impl = is_impl(r)
     if fv == 1:
-        extra = [k for k in keys + tuple(FORMAT_ONLY) if k in r]
+        extra = [k for k in keys + tuple(FORMAT_ONLY) if k in r] + (["params.mode impl"] if impl else [])
         return [f"{', '.join(extra)} without format_version: a format 1 receipt does not carry version fields"] if extra else []
     out = [f"format_version {fv} needs {k}" for k in keys if k not in r]
     if out:
@@ -717,7 +884,9 @@ def version_problems(r):
     want_note = NOTE_V2 if fv == 2 else NOTE
     if r["note"] != want_note:
         out.append(f"a format {fv} receipt must carry the note of format {fv}, not the note of another version")
-    for key, since in FORMAT_ONLY.items():
+    if impl and fv < IMPL_SINCE:
+        out.append(f"params.mode impl is a field of format {IMPL_SINCE}, but format_version is {fv}")
+    for key, since in ({} if impl else FORMAT_ONLY).items():
         if fv >= since and key not in r:
             out.append(f"format_version {fv} needs {key}")
         elif fv < since and key in r:
@@ -810,7 +979,8 @@ def verify(root):
     if fv not in reads:
         return out + [(False, f"receipt.json has format_version {fv!r}; this tool reads {', '.join(map(str, reads))}. "
                               "Check it with the pqproof version that wrote it, or a newer one")]
-    problems = validate(receipt, SCHEMA)
+    impl = is_impl(receipt)
+    problems = validate(receipt, SCHEMA_IMPL if impl else SCHEMA)
     out.append((not problems, "receipt.json fits the schema" if not problems else
                 "receipt.json does not fit the schema:\n  " + "\n  ".join(problems[:20])))
     if problems:
@@ -854,7 +1024,7 @@ def verify(root):
         out.append((False, f"{where}: {path} with sha256 {digest} is not an artifact with that hash"))
     if not bad:
         out.append((True, f"all {len(refs)} file references in the receipt name an artifact with the same SHA-256"))
-    for side in ("orig", "fixed"):
+    for side in () if impl else ("orig", "fixed"):
         inp = receipt["inputs"][side]
         if inp["kind"] == "zip":
             tree = os.path.join(root, *inp["root"].split("/"))
@@ -872,10 +1042,16 @@ def verify(root):
     problems = consistency(receipt)
     out.append((not problems, "the verdict and the checks agree with the numbers below them" if not problems
                 else "the verdict or the checks disagree with the record:\n  " + "\n  ".join(problems[:20])))
-    rv = review_record(root, receipt)
+    rv = None if impl else review_record(root, receipt)
     if rv:
         out.append(rv)
-    if _new_format(receipt):
+    if impl:
+        try:
+            out += impl_record(root, receipt)
+        except (OSError, ValueError, KeyError, TypeError) as e:
+            out.append((False, f"the implementation check cannot be judged again: {e}"))
+        out += _copies_agree(root, receipt, listed)
+    elif _new_format(receipt):
         out += _copies_agree(root, receipt, listed)
     try:
         page = _read_nofollow(root, "receipt.html").decode("utf-8")
@@ -907,6 +1083,8 @@ def render_readme(r):
     """결과 폴더 안내(README.txt, 형식 3). 먼저 볼 파일, 다시 확인하는 법, 폴더를 넘기기 전에 볼 것. receipt.json 에서만 만든다."""
     meta = r.get("deck_meta") or {}
     verify_cmd = meta.get("verify_cmd") or "pqproof --verify <this folder>"
+    if is_impl(r):
+        return _impl_readme(r, verify_cmd)
     lines = [
         f"PQ-Proof {r.get('tool_version', '')} result folder. Verdict: {verdict_text(r, en=True)}",
         f"판정: {verdict_text(r)} · 증적 해시(receipt_id): {r['receipt_id']}",
@@ -926,6 +1104,33 @@ def render_readme(r):
         "  artifacts/ holds the raw scanner output with source lines, and in/ holds unpacked zip inputs.",
         "  Paths on this machine are recorded in receipt.json. Read guide/outputs.md before handing the folder over.",
         "  artifacts/ 에는 소스 줄이 든 스캐너 원문이, in/ 에는 푼 zip 입력이 있다. 넘기기 전에 확인한다.",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def _impl_readme(r, verify_cmd):
+    """구현 검증 결과 폴더의 README.txt(형식 4)."""
+    lines = [
+        f"PQ-Proof {r.get('tool_version', '')} implementation check (KpqC KAT). Verdict: {verdict_text(r, en=True)}",
+        f"판정: {verdict_text(r)} · 증적 해시(receipt_id): {r['receipt_id']}",
+        "",
+        "Open first / 먼저 볼 것",
+        "  receipt.html             the evidence as one page (사람이 볼 것)",
+        "  receipt.json             the evidence for programs (기계가 읽을 것, schemas/receipt-v4.schema.json)",
+        "  tables/report.md         a summary to paste into a document (문서에 붙일 표)",
+        "  tables/impl.csv          every parameter set and reference version with its count",
+        "  artifacts/impl/          the answer file, the answer key and the question sheet that were compared",
+        "",
+        "What this is / 이것은",
+        "  A match with pinned reference KAT versions (scan/kat-kpqc.json). PQ-Proof did not build or run the implementation;",
+        "  your harness wrote the answers. It is not a conformance test or a certification (not KCMVP).",
+        "  참조판 KAT 와 일치하는지 본 것이다. 표준 준수 시험이나 공인 시험(KCMVP)이 아니다.",
+        "",
+        "Check again / 다시 확인",
+        f"  {verify_cmd}",
+        "  The check judges the copied answer again. Adding, removing or editing any file here makes it fail.",
+        "  폴더 안 파일을 더하거나 지우거나 고치면 다시 확인이 실패한다.",
         "",
     ]
     return "\n".join(lines)
@@ -1221,6 +1426,8 @@ def _words(r):
 
 def render_html(r):
     """receipt.html. 증적에서 온 값은 모두 이스케이프한다. 아무것도 불러오지 않고 자기 산출물에만 링크한다."""
+    if is_impl(r):
+        return render_impl_html(r)
     w = _words(r)
     basis = (f"<div><div class=\"muted\">판정 근거</div>pqproof {_e(r.get('tool_version'))} · 규칙 묶음 {_e(r.get('ruleset_version'))} · "
              f"증적 형식 {_num(r['format_version'])}<br>{_short(r.get('ruleset_sha256'))}</div>" if format_version(r) >= 2 else "")
@@ -1257,11 +1464,76 @@ def render_html(r):
     return "".join(parts)
 
 
+IMPL_NOTE = ("참조판 KAT 와 일치하는지 본 것이다(scan/kat-kpqc.json 의 판 이름과 .rsp SHA-256). PQ-Proof 는 구현을 빌드하거나 실행하지 "
+             "않았고 답안은 사용자 하네스가 만들었다. 표준 준수 시험이나 공인 시험(KCMVP)이 아니다.")
+ROLE_KO = {"reference": "참조판", "known-variant": "알려진 변형"}
+
+
+def impl_rows(r):
+    """파라미터 × 판 표의 칸(receipt.html·tables/impl.csv 가 같이 쓴다): (파라미터, 판, 역할, 받아 줌, 대조, 첫 불일치, 결과, 요약)."""
+    rows = []
+    for res in r["impl"]["results"]:
+        for i, v in enumerate(res["versions"]):
+            role = ROLE_KO.get(v["role"], v["role"]) + (" 최신" if v["latest"] else "")
+            count = v["records"] if v["records"] is not None else (f"문항 {v['ok']}/{v['checked']}" if v["checked"] else "발췌 없음")
+            rows.append((res["param"], v["version"], role, "예" if v["accepted"] else "", count, v["first_mismatch"] or "",
+                         res["status"] if i == 0 else "", res["summary"] if i == 0 else ""))
+    return rows
+
+
+def render_impl_html(r):
+    """구현 검증 증적의 receipt.html."""
+    x = r["impl"]
+    inp = x["input"]
+    verdict = f'<span class="badge {_e("undecided" if pending_note(r) else r["verdict"])}">{_e(verdict_text(r))}</span>'
+    basis = (f"<div><div class=\"muted\">판정 근거</div>pqproof {_e(r.get('tool_version'))} · 규칙 묶음 {_e(r.get('ruleset_version'))} · "
+             f"증적 형식 {_num(r['format_version'])}<br>{_short(r.get('ruleset_sha256'))}</div>")
+    answer = (f"<div><div class=\"muted\">답안</div><code>{_e(inp['path'])}</code><br><span class=\"muted\">"
+              f"{_e({'response': '답안 JSON', 'rsp': 'PQCgenKAT .rsp'}.get(inp['kind'], '읽지 않음'))} · {_num(inp['bytes'])}바이트</span> "
+              f"{_short(inp['sha256'])}" + (f"<br><span class=\"muted\">구현</span> {_e(inp['implementation'])}" if inp["implementation"] else "")
+              + (f"<br><span class=\"muted\">머리 줄</span> <code>{_e(inp['header'])}</code>" if inp["header"] else "") + "</div>")
+    params = (f"<div><div class=\"muted\">매개변수</div>PROFILE={_e(r['params']['profile'])} · 파라미터 "
+              f"{_e(', '.join(r['params']['params']) or '없음')}<br><span class=\"muted\">받아 줄 판</span> {_e(', '.join(x['accept']) or '없음')}</div>")
+    rows = [[f"<code>{_e(a)}</code>", _e(b), _e(c), _e(d), f'<span class="num">{_e(e)}</span>', _e(f), _status(g) if g else "", _e(h)]
+            for a, b, c, d, e, f, g, h in impl_rows(r)]
+    ctrl = ("자기 점검 통과: 받아 줄 판의 정답 답안은 통과, 한 바이트 바꾼 답안은 실패" if x["control"]["ok"]
+            else f"자기 점검 실패: {x['control']['problem']}")
+    files = " · ".join(f"{_link(f['file'], label)} {_short(f['file_sha256'])}" for f, label in
+                       ((inp, "답안 사본"), (x["key"], "정답 묶음"), (x["prompt"], "문제지")) if f and f.get("file"))
+    parts = [f"""<!doctype html><html lang="ko" data-theme="dark"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src {SCRIPT_CSP}; img-src 'none'; base-uri 'none'; form-action 'none'">
+<title>KpqC 구현 KAT 대조</title><style>{STYLE}</style></head><body><main>
+<header><h1>KpqC 구현 KAT 대조 증적 {verdict}</h1><button id="theme" type="button">라이트</button></header>
+<section><div class="grid">{answer}
+<div><div class="muted">시작, 끝(UTC)</div><span class="nowrap">{_e(r['started_at'])}</span><br><span class="nowrap">{_e(r['finished_at'])}</span></div>
+{params}
+{basis}</div><p><span class="muted">receipt_id</span><br>{_short(r['receipt_id'])}</p>
+<p class="muted">{_e(r['note'])}</p><pre>{WORDS['verify']}</pre>
+<p>{_e(IMPL_NOTE)}</p></section>"""]
+    parts.append("<h2>검사</h2><section>" + _table(["검사", "판정", "기준", "실제"], [
+        [f"<b>{_e(c['id'])}</b> {_e(c['title'])}", _status(c["status"]), _e(c["expected"]), _e(c["actual"])] for c in r["checks"]])
+        + "</section>")
+    parts.append("<h2>파라미터별 참조판 대조</h2><section>" + (f'<p class="s-undecided">{_e(x["problem"])}</p>' if x["problem"] else "")
+                 + _table(["파라미터", "판", "역할", "받아 줌", "대조", "첫 불일치", "결과", "요약"], rows)
+                 + f'<p class="{"muted" if x["control"]["ok"] else "s-undecided"}">{_e(ctrl)}</p>'
+                 + f"<p>{files}</p></section>")
+    parts.append("<h2>도구</h2><section>" + _table(["이름", "경로", "버전", "SHA-256"], [
+        [_e(t["name"]), f"<code>{_e(t['path'])}</code>", _e(t["version"]), _short(t["sha256"])] for t in r["tools"]]) + "</section>")
+    parts.append("<h2>시간</h2><section>" + _table(["단계", "시작(UTC)", "끝(UTC)"], [
+        [_e(t["name"]), f'<span class="nowrap">{_e(t["started_at"])}</span>', f'<span class="nowrap">{_e(t["ended_at"])}</span>']
+        for t in r["timeline"]]) + "</section>")
+    parts.append("<h2>산출물</h2><section>" + _table(["파일", "바이트", "SHA-256"], [
+        [_link(a["path"]), _num(a["bytes"]), _short(a["sha256"])] for a in r["artifacts"]]) + "</section>")
+    parts.append(f"</main><script>{SCRIPT}</script></body></html>\n")
+    return "".join(parts)
+
+
 # ---------------------------------------------------------------------------------------------
 # deck.json: 발표 자료·대시보드에 옮기기 쉬운 요약. receipt.json만으로 결정적으로 만든다(verify가 다시 만들어 비교).
 CHECK_LABEL = {"a-input": "입력 대조", "a-cbom": "막는 고전 위치 0", "b-weakening": "TLS 약화 없음", "b-tls": "TLS 하이브리드 협상",
                "c-classic": "사유 없는 고전 줄 0", "c-expect": "ML-KEM·ML-DSA 사용", "r-review": "검증 호출 유지",
-               "r-allow": "허용 항목 사람 확인"}
+               "r-allow": "허용 항목 사람 확인", "i-kpqc": "KpqC 참조판 KAT 일치"}
 HYBRID_WHY = "같은 함수 안 ML-KEM 결합(하이브리드 고전 성분)"
 LEGACY_WHY = "이름 규칙: Legacy*.java 파일이거나 같은 줄에 legacy, 그 줄에 쓰기 연산 없음(옛 자료 읽기·검증)"
 
@@ -1299,6 +1571,15 @@ def deck_view(r):
     사람 확인 칸이 있는 증적은 verdict_text·verdict_text_en('통과(허용 2건 사람 확인 전)'), allow_unreviewed(확인 전 허용 항목 수),
     허용 목록 항목의 reviewed_by·reviewed_at(없으면 null)을 더 적는다. hybrid·legacy-name 은 규칙이라 이 칸이 없다."""
     m = r["deck_meta"]
+    if is_impl(r):  # 구현 검증(형식 4): 파라미터마다 맞은 판과 상태
+        return {"verdict": r["verdict"], "verdict_text": verdict_text(r), "verdict_text_en": verdict_text(r, en=True),
+                "receipt": r["receipt_id"][:12], "receipt_file": m["receipt_file"], "mode": "impl",
+                "impl": [{"param": x["param"], "name": x["name"], "status": x["status"], "matched": x["matched"], "summary": x["summary"]}
+                         for x in r["impl"]["results"]],
+                "accept": r["impl"]["accept"], "control_ok": r["impl"]["control"]["ok"],
+                "checks": [{"id": c["id"], "status": c["status"], "label": CHECK_LABEL.get(c["id"], c["title"])} for c in r["checks"]],
+                "verify_cmd": m["verify_cmd"], "ev": [m["ev"]], "tool_version": r["tool_version"],
+                "ruleset_version": r["ruleset_version"], "format_version": r["format_version"]}
     co, cf = r["cbom"]["orig"], r["cbom"]["fixed"]
     jo, jf = r["java"]["orig"], r["java"]["fixed"]
     lst = (jf or {}).get("listed") or {}

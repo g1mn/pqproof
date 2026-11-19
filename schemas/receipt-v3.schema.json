@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/g1mn/pqproof/blob/main/schemas/receipt-v3.schema.json",
   "title": "PQ-Proof receipt.json, evidence format 3",
-  "description": "Shape of receipt.json written by pqproof 0.2.0 and later (format_version 3). Format 3 adds skip_dirs, the copy of scan/skip-dirs that the tree hash and the scanners used, and counts lines allowed by the name rule alone under r-allow. Generated from pqlite/receipt.py SCHEMA by tests/make_schemas.py. Fields named in guide/outputs.md as stable keep their meaning within a format_version. Text fields (checks[].title, expected, actual, note, warnings) are for people and can change in any release. pqproof --verify checks more than this schema: the receipt_id, every file hash and the consistency of the numbers.",
+  "description": "Shape of receipt.json written by pqproof 0.2.0 (format_version 3). Format 3 adds skip_dirs, the copy of scan/skip-dirs that the tree hash and the scanners used, and counts lines allowed by the name rule alone under r-allow. Generated from pqlite/receipt.py SCHEMA by tests/make_schemas.py. Fields named in guide/outputs.md as stable keep their meaning within a format_version. Text fields (checks[].title, expected, actual, note, warnings) are for people and can change in any release. pqproof --verify checks more than this schema: the receipt_id, every file hash and the consistency of the numbers.",
   "type": "object",
   "additionalProperties": false,
   "required": [

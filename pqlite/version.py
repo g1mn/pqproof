@@ -1,13 +1,14 @@
 # version.py: 버전 세 가지를 한곳에서 읽는다(표준 라이브러리만).
 #   도구 버전(tool_version)   : src/pqproof/__init__.py 의 __version__ 한 곳(pyproject 는 동적으로 읽고, prove.sh --version 도 여기서 읽는다)
 #   규칙 묶음(ruleset)        : 판정을 정하는 규칙 파일(RULESET_FILES)의 해시 묶음. 버전 이름과 해시·파일 목록의 짝은 scan/ruleset.json 에 적는다.
-#                              규칙 묶음마다 파일 목록이 다를 수 있다(1은 여섯, 2는 rules.py·tlsprobe.py·skipdirs.py·skip-dirs·profiles.json 을 더해 열하나).
+#                              규칙 묶음마다 파일 목록이 다를 수 있다(1은 여섯, 2는 rules.py·tlsprobe.py·skipdirs.py·skip-dirs·profiles.json 을 더해 열하나,
+#                              3은 구현 검증의 impl.py·kat-kpqc.json·scan/kat 발췌를 더해 열넷). scan/kat 은 폴더라 그 안 *.json 의 해시 묶음을 쓴다(path_sha256)
 #                              --verify 는 증적에 적힌 묶음 이름의 파일 목록으로 해시를 다시 계산한다
 #   증적 형식(format_version) : receipt.json 의 꼴. 이 칸이 없는 옛 증적은 형식 1로 읽는다(pqlite/receipt.py 가 계속 읽는다)
 # 규칙 파일을 고치면 해시가 바뀐다. 그때는 scan/ruleset.json 에 새 버전 이름과 기록(sha256·since·verdict_impact·files)을 더하고
 # current 를 옮기며, CHANGELOG 의 '판정 영향' 칸에 적는다(tests/test_versioning.py 와 tests/version_policy.py 가 짝이 안 맞으면 실패한다).
 # ruleset.json 의 옛 꼴({이름: sha256})도 읽는다.
-#   python3 -I -B pqlite/version.py                 → "pqproof 0.2.0 (ruleset 2, evidence format 3)"
+#   python3 -I -B pqlite/version.py                 → "pqproof 0.3.0 (ruleset 3, evidence format 4)"
 #   python3 -I -B pqlite/version.py --ruleset       → 지금 규칙 파일로 계산한 ruleset_sha256
 #   python3 -I -B pqlite/version.py --ruleset-json  → 지금 규칙 파일의 sha256·files(ruleset.json 새 기록의 바탕, since·verdict_impact 는 사람이 적는다)
 """Tool version, ruleset version and hash, and evidence format version for PQ-Proof."""
@@ -18,8 +19,8 @@ import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 저장소 루트, 또는 설치본의 pqproof/_tool
-FORMAT_VERSION = 3   # 이 도구가 쓰는 증적 형식(3: skip_dirs 사본, scan/skip-dirs 로 잰 트리 해시, 이름 규칙 허용이 r-allow 에 듦)
-FORMAT_READS = (1, 2, 3)  # 이 도구가 --verify 로 읽는 형식(1 = format_version 칸이 없는 0.1.0 이전 공개본 증적)
+FORMAT_VERSION = 4   # 이 도구가 쓰는 증적 형식(4: 구현 검증 params.mode impl 과 최상위 impl 칸, 검사 i-kpqc. 두 트리·한 트리 증적은 3과 같은 꼴)
+FORMAT_READS = (1, 2, 3, 4)  # 이 도구가 --verify 로 읽는 형식(1 = format_version 칸이 없는 0.1.0 이전 공개본 증적)
 # 규칙 파일 경로 → receipt.json tools[] 의 name. 옛 규칙 묶음에만 든 파일도 지우지 않는다(옛 증적의 묶음 해시를 다시 계산한다)
 TOOL_NAMES = {
     "scan/cbom-scan.sh": "cbom-scan.sh",
@@ -33,13 +34,17 @@ TOOL_NAMES = {
     "pqlite/skipdirs.py": "pqlite/skipdirs.py",
     "scan/skip-dirs": "skip-dirs",
     "scan/profiles.json": "profiles",
+    "pqlite/impl.py": "pqlite/impl.py",
+    "scan/kat-kpqc.json": "kat-kpqc",
+    "scan/kat": "kat-excerpts",
 }
 # 지금 규칙 묶음에 드는 파일: (저장소 경로, receipt.json tools[] 의 name). 탐지 패턴, 시험 경로, 허용 규칙, TLS 약화 규칙,
 # 판정 상수와 검사 판정식(pqlite/rules.py), TLS 대상 판정(pqlite/tlsprobe.py), 건너뛰는 폴더 목록과 걷기(scan/skip-dirs,
-# pqlite/skipdirs.py)가 이 안에 있다
+# pqlite/skipdirs.py), 구현 검증의 대조 규칙과 KpqC 참조판 KAT 목록·발췌(pqlite/impl.py, scan/kat-kpqc.json, scan/kat)가 이 안에 있다
 RULESET_FILES = tuple((p, TOOL_NAMES[p]) for p in (
     "scan/cbom-scan.sh", "scan/residue.sh", "scan/test-paths.ere", "pqlite/scan.py", "pqlite/verify.py", "pqlite/allowlist.py",
-    "pqlite/rules.py", "pqlite/tlsprobe.py", "pqlite/skipdirs.py", "scan/skip-dirs", "scan/profiles.json"))
+    "pqlite/rules.py", "pqlite/tlsprobe.py", "pqlite/skipdirs.py", "scan/skip-dirs", "scan/profiles.json", "pqlite/impl.py",
+    "scan/kat-kpqc.json", "scan/kat"))
 RULESET_JSON = os.path.join(ROOT, "scan", "ruleset.json")
 _VERSION_RE = re.compile(r'^__version__\s*=\s*"([^"]+)"', re.M)
 
@@ -49,6 +54,26 @@ def _sha256_file(path):
     with open(path, "rb") as f:
         for chunk in iter(lambda: f.read(1 << 20), b""):
             h.update(chunk)
+    return h.hexdigest()
+
+
+def path_sha256(path):
+    """규칙 파일의 해시. 파일이면 SHA-256, 폴더(scan/kat)면 그 아래 *.json 마다 '상대 경로\0sha256\n' 을 경로 순으로 이은 SHA-256
+    (NOTICE 같은 다른 파일은 판정에 쓰지 않아 넣지 않는다), 없으면 None."""
+    if os.path.isfile(path):
+        return _sha256_file(path)
+    if not os.path.isdir(path):
+        return None
+    found = []
+    for dirpath, dirnames, filenames in os.walk(path):
+        dirnames.sort()
+        for n in filenames:
+            if n.endswith(".json"):
+                full = os.path.join(dirpath, n)
+                found.append((os.path.relpath(full, path).replace(os.sep, "/"), full))
+    h = hashlib.sha256()
+    for rel, full in sorted(found):
+        h.update(f"{rel}\0{_sha256_file(full)}\n".encode("utf-8"))
     return h.hexdigest()
 
 
@@ -94,8 +119,7 @@ def ruleset_from_tools(tools, name=None, path=RULESET_JSON):
 
 def current_ruleset_files(root=ROOT):
     """지금 규칙 파일의 [{"path", "sha256"}](경로 순, 없는 파일은 sha256 None)."""
-    return [{"path": p, "sha256": (_sha256_file(os.path.join(root, *p.split("/"))) if os.path.isfile(os.path.join(root, *p.split("/")))
-                                   else None)} for p, _ in sorted(RULESET_FILES)]
+    return [{"path": p, "sha256": path_sha256(os.path.join(root, *p.split("/")))} for p, _ in sorted(RULESET_FILES)]
 
 
 def current_ruleset_sha256(root=ROOT):

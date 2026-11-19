@@ -70,8 +70,10 @@ RULES = {
                  "서명 검증·복호 호출이 줄었거나 늘 성공만 돌려준다"),
     "r-allow": ("AllowListReview", "Allow-list entry without human review, unused in the converted tree, or covering a write path",
                 "허용 항목이 사람 확인 전이거나, 고친 판에서 안 쓰였거나, 쓰기 경로를 덮는다"),
+    "i-kpqc": ("KpqcReferenceKat", "The KpqC implementation's answers do not match an accepted reference KAT version (a KAT match, "
+               "not a certification)", "KpqC 구현 답안이 받아 줄 참조판 KAT 와 맞지 않는다(KAT 대조이지 공인 시험이 아니다)"),
 }
-NO_LOCATION = ("a-input", "b-tls", "c-expect")
+NO_LOCATION = ("a-input", "b-tls", "c-expect", "i-kpqc")
 # c-classic 이 세는 residue 규칙: 공개키 9계열, 보안레벨 3 미만 PQC, 레거시 쓰기(LWRITE), 서비스별 SITE.
 # G-AES128 같은 다른 GEN 규칙은 표에만 나오고 판정에 안 들어가므로 결과로 내지 않는다
 COUNTED_GEN = {"G-RSA", "G-EC", "G-CURVE", "G-OAEP-PKCS1", "G-CLASSIC-SIG", "G-JWT-ALG", "G-EDDSA", "G-X25519", "G-DH-DSA", "G-WEAK-PQC"}
@@ -461,7 +463,7 @@ class Builder:
             name, en, ko = RULES.get(rid, (rid, rid, rid))
             rules.append({"id": rid, "name": name, "shortDescription": {"text": self.t(en, ko)},
                           "fullDescription": {"text": en if self.lang != "ko" else ko},
-                          "helpUri": HELP_URI, "defaultConfiguration": {"level": "error" if rid in ("a-cbom", "b-weakening", "c-classic") else "warning"},
+                          "helpUri": HELP_URI, "defaultConfiguration": {"level": "error" if rid in ("a-cbom", "b-weakening", "c-classic", "i-kpqc") else "warning"},
                           "properties": {"tags": ["security", "cryptography", "post-quantum"]}})
         counts = {}
         for st in self.status.values():

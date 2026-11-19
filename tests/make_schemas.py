@@ -1,5 +1,6 @@
 # make_schemas.py: schemas/*.schema.json 을 코드에서 다시 만든다(손으로 고치지 않는다). receipt 스키마는 pqlite/receipt.py SCHEMA
-# (--verify 가 쓰는 것)에 형식마다(2, 3) 필수 칸을 더한 것이고, 허용 목록 스키마는 pqlite/allowlist.py 가 읽는 꼴을 적은 것이다.
+# (--verify 가 쓰는 것)에 형식마다(2, 3, 4) 필수 칸을 더한 것이고, 허용 목록 스키마는 pqlite/allowlist.py 가 읽는 꼴을 적은 것이다.
+# 형식 4 스키마는 두 꼴 중 하나(oneOf)다: 두 트리·한 트리 증적(SCHEMA, 형식 3과 같은 칸)과 구현 검증 증적(SCHEMA_IMPL, params.mode impl).
 #   python3 -I -B tests/make_schemas.py           schemas/ 에 쓴다
 #   python3 -I -B tests/make_schemas.py --check   지금 파일이 코드와 같은지만 본다(다르면 1)
 """Write the JSON Schemas under schemas/ from the code that reads the same files."""
@@ -21,12 +22,18 @@ V2_REQUIRED = ("format_version", "tool_version", "ruleset_version", "ruleset_sha
                "test_paths")
 ABOUT = {
     2: ("pqproof 0.1.0 and 0.1.1 (format_version 2)", R.NOTE_V2),
-    3: ("pqproof 0.2.0 and later (format_version 3). Format 3 adds skip_dirs, the copy of scan/skip-dirs that the tree hash "
+    3: ("pqproof 0.2.0 (format_version 3). Format 3 adds skip_dirs, the copy of scan/skip-dirs that the tree hash "
         "and the scanners used, and counts lines allowed by the name rule alone under r-allow", R.NOTE),
+    4: ("pqproof 0.3.0 and later (format_version 4). A two-tree or one-tree receipt has the fields of format 3. An implementation "
+        "check receipt (params.mode impl, pqproof impl judge) has the impl field instead of the tree fields and one check, i-kpqc", R.NOTE),
 }
+DESCRIBE = ("Generated from pqlite/receipt.py SCHEMA by tests/make_schemas.py. Fields named in guide/outputs.md as stable keep their "
+            "meaning within a format_version. Text fields (checks[].title, expected, actual, note, warnings) are for people and can "
+            "change in any release. pqproof --verify checks more than this schema: the receipt_id, every file hash and the "
+            "consistency of the numbers.")
 
 
-def receipt_schema(fv):
+def receipt_body(fv):
     body = copy.deepcopy(R.SCHEMA)
     for key, since in R.FORMAT_ONLY.items():
         if fv < since:
@@ -40,13 +47,16 @@ def receipt_schema(fv):
     body["required"] = sorted(set(body["required"]) | set(V2_REQUIRED) | {k for k, s in R.FORMAT_ONLY.items() if fv >= s})
     body["properties"]["format_version"] = {"const": fv}
     body["properties"]["note"] = {"const": ABOUT[fv][1]}
-    return dict({"$schema": DRAFT, "$id": BASE + f"receipt-v{fv}.schema.json",
-                 "title": f"PQ-Proof receipt.json, evidence format {fv}",
-                 "description": (f"Shape of receipt.json written by {ABOUT[fv][0]}. Generated from "
-                                 "pqlite/receipt.py SCHEMA by tests/make_schemas.py. Fields named in guide/outputs.md as stable keep "
-                                 "their meaning within a format_version. Text fields (checks[].title, expected, actual, note, "
-                                 "warnings) are for people and can change in any release. pqproof --verify checks more than this "
-                                 "schema: the receipt_id, every file hash and the consistency of the numbers.")}, **body)
+    return body
+
+
+def head(fv):
+    return {"$schema": DRAFT, "$id": BASE + f"receipt-v{fv}.schema.json", "title": f"PQ-Proof receipt.json, evidence format {fv}",
+            "description": f"Shape of receipt.json written by {ABOUT[fv][0]}. {DESCRIBE}"}
+
+
+def receipt_schema(fv):
+    return dict(head(fv), **receipt_body(fv))
 
 
 def receipt_v2():
@@ -55,6 +65,12 @@ def receipt_v2():
 
 def receipt_v3():
     return receipt_schema(3)
+
+
+def receipt_v4():
+    impl = copy.deepcopy(R.SCHEMA_IMPL)
+    impl["properties"]["format_version"] = {"const": 4}
+    return dict(head(4), oneOf=[receipt_body(4), impl])
 
 
 ENTRY = {
@@ -90,7 +106,8 @@ def unconverted():
                                                "reviewed_digest": ENTRY["properties"]["reviewed_digest"]}}]}
 
 
-FILES = {"receipt-v2.schema.json": receipt_v2, "receipt-v3.schema.json": receipt_v3, "unconverted.schema.json": unconverted}
+FILES = {"receipt-v2.schema.json": receipt_v2, "receipt-v3.schema.json": receipt_v3, "receipt-v4.schema.json": receipt_v4,
+         "unconverted.schema.json": unconverted}
 
 
 def text(make):

@@ -5,6 +5,7 @@
 #   pqproof doctor          바깥 도구 점검표(bash, openssl, keytool, tls_probe, go)
 #   pqproof build-probe     tls_probe 를 사용자 캐시 폴더에 빌드(Go 1.27+, 인터넷 없음)
 #   pqproof mutations [--strict]   심어 둔 결함 시험 묶음
+#   pqproof impl prompt|judge ...  구현 검증(KpqC KAT 대조). 파이썬만 쓴다(bash 없이, Windows 에서도). 구현은 실행하지 않는다
 # 도구 본체는 패키지 데이터 pqproof/_tool(설치본) 또는 저장소 루트(소스에서 실행)에서 찾는다. PQPROOF_HOME 으로 바꿀 수 있다.
 # prove.sh 는 이 파이썬(sys.executable)으로 돌게 PYTHON 을 넘긴다. 판정 출력의 다시 확인 안내가 pqproof 로 나오게 PQPROOF_ENTRY 도 넘긴다.
 # 재검증(--verify)·--version·sarif·--env 는 bash 없이 이 파이썬으로만 돈다(Windows 에서도). 스캔·시험은 bash·grep·awk·OpenSSL 이
@@ -21,6 +22,10 @@ USAGE = """usage:
   pqproof <original dir|zip> <converted dir|zip>   judge both trees, write the evidence folder (env vars as in prove.sh)
   pqproof check <dir|zip>                          judge one tree as it is now (no original: after the migration, in CI)
   pqproof inventory <dir|zip>                      no verdict: CBOM rows, classical lines per family, PQC name lines
+  pqproof impl prompt [--param P ...] [-o file]    KpqC implementation check: write the question sheet your harness answers
+  pqproof impl judge <answers.json|kat.rsp> [--param P]
+                                                   compare the answers with pinned reference KAT versions, write the evidence
+                                                   folder (PQ-Proof does not run your code; a KAT match, not a certification)
   pqproof --verify <out dir>                       re-check an evidence folder (schema, receipt_id, file hashes, HTML)
   pqproof --unit [name]                            unit tests (standard library unittest)
   pqproof --selftest                               offline self-test on the bundled examples
@@ -31,7 +36,7 @@ USAGE = """usage:
   pqproof --version | --help | --env               (--env prints the environment variables prove.sh reads)
 exit codes: 0 pass, 1 fail, 2 usage or input error, 3 undecided, 4 tool error, 5 pass with checks that need review
 (only with FAIL_ON_REVIEW=1). A skipped check is never counted as passed.
---verify, sarif, --env and --version need only Python; judging needs bash, grep, awk and OpenSSL (on Windows, use WSL)."""
+--verify, sarif, impl, --env and --version need only Python; judging trees needs bash, grep, awk and OpenSSL (on Windows, use WSL)."""
 
 WINDOWS = ("pqproof: judging two trees runs bash, grep, awk and OpenSSL, so on Windows run it inside WSL: `wsl --install`, then "
            "`pip install pqproof` in the Ubuntu shell. Re-checking evidence works here without WSL: pqproof --verify <folder>, "
@@ -140,7 +145,27 @@ def doctor(root):
         print(f"  MISSING {line}")
     ok, line = deps.go_ok()
     print(f"  {'ok   ' if ok else 'info '} go: {line} {'(can build tls_probe)' if ok else '(only needed for pqproof build-probe)'}")
+    ok, line = kat_status(root)
+    print(f"  {'ok   ' if ok else 'warn '} impl: {line}")
     return 0 if rep.ok() else 2
+
+
+def kat_status(root):
+    """doctor 의 구현 검증 줄: KpqC KAT 목록(scan/kat-kpqc.json·scan/kat/)을 도구 파일의 pqlite/impl.py 로 읽어 본다."""
+    path = os.path.join(root, "pqlite", "impl.py")
+    if not os.path.isfile(path):
+        return False, "pqlite/impl.py is missing from this install"
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("pqproof_tool_impl", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    try:
+        m = mod.load_manifest()
+    except mod.ManifestError as e:
+        return False, f"the KpqC KAT list does not load: {e}"
+    versions = [v for p in m["params"].values() for v in p["versions"]]
+    return True, (f"KpqC KAT list with {len(m['params'])} parameter sets and {len(versions)} versions "
+                  f"({sum(1 for v in versions if v['excerpt'])} with excerpts), Python only (pqproof impl prompt|judge)")
 
 
 def build_probe(root):
@@ -181,6 +206,12 @@ def main(argv=None):
             print("usage: pqproof --verify <out dir>", file=sys.stderr)
             return 2
         return run([sys.executable, "-I", "-B", os.path.join(root, "pqlite", "receipt.py"), "verify", argv[1]], dict(os.environ))
+    if first == "impl":  # 구현 검증: 파이썬만 쓴다(bash·openssl 점검 없이, Windows 에서도)
+        if len(argv) < 2 or argv[1] not in ("prompt", "judge"):
+            print("usage: pqproof impl prompt [--param P ...] [-o file] | pqproof impl judge <answers.json|kat.rsp> [--param P]",
+                  file=sys.stderr)
+            return 2
+        return run([sys.executable, "-I", "-B", os.path.join(root, "prove.py"), "--impl"] + argv[1:], child_env(root, entry=True))
     if is_windows():
         print(WINDOWS, file=sys.stderr)
         return 2
@@ -203,7 +234,7 @@ def main(argv=None):
         if len(argv) != 2:
             print(f"usage: pqproof {first} <dir|zip>", file=sys.stderr)
             return 2
-        if os.path.isdir(first):  # 원본 폴더 이름이 check·inventory 이면 두 트리 판정이 아니라 이 명령으로 읽힌다
+        if os.path.isdir(first):  # 원본 폴더 이름이 check·inventory 이면 두 트리 판정이 아니라 이 명령으로 읽힌다(impl 도 같다)
             print(f"pqproof: '{first}' is a command here; to compare a folder named {first}, pass ./{first}", file=sys.stderr)
         if not preflight(root, inputs=argv[1:]):
             return 2
