@@ -73,6 +73,12 @@ class SiteMatchesVersion(unittest.TestCase):
         readme = (PROOF / "README.md").read_text(encoding="utf-8")
         self.assertIn("https://g1mn.github.io/pqproof/", readme)
 
+    def test_readme_is_english_only(self):
+        # Korean text belongs on the site, which switches between Korean and English. README and the PyPI page stay English.
+        readme = (PROOF / "README.md").read_text(encoding="utf-8")
+        hangul = [(n, line) for n, line in enumerate(readme.splitlines(), 1) if re.search("[\u1100-\u11ff\u3130-\u318f\uac00-\ud7a3]", line)]
+        self.assertEqual(hangul, [], "README.md must stay English; put Korean on the site")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -20,7 +20,7 @@
 ---
 
 ### [Everything is on the site: g1mn.github.io/pqproof](https://g1mn.github.io/pqproof/)
-> 사용법, 판정 기준, 공개 시험 결과, KpqC 구현 검증, KISA AI 보안 매뉴얼 대응표, 한계와 릴리스 기록을 사이트에서 한국어와 영어로 볼 수 있습니다. 참가자가 만든 도구이며 과학기술정보통신부·KISA가 검토하거나 보증하지 않았습니다.
+> Usage, what it judges, public test results, the KpqC implementation check, the KISA AI security manual mapping, limits and release notes, in English and Korean. Built by a contest participant; the Ministry of Science and ICT and KISA have not reviewed or endorsed it.
 
 ---
 
