@@ -60,5 +60,19 @@ class Links(unittest.TestCase):
         self.assertTrue((PROOF / "examples" / "allowlist" / "unconverted.json").is_file())
 
 
+@unittest.skipUnless((PROOF / "docs" / "index.html").is_file(), "사이트 없음(설치본)")
+class SiteMatchesVersion(unittest.TestCase):
+    """README 는 짧고 모든 정보는 사이트에 있다. 그래서 판을 올리면 같은 커밋에서 사이트도 다시 만든다: docs/index.html 의 data-build 블록
+    (사이트 생성기가 심는 판·규칙 묶음·증적 형식·KAT 숫자)이 지금 패키지와 같아야 한다. 검사는 tests/version_policy.py 의 check_site 한 곳."""
+
+    def test_site_was_built_for_this_version(self):
+        import version_policy as VP
+        self.assertEqual(VP.site_problems(), [])
+
+    def test_readme_sends_readers_to_the_site(self):
+        readme = (PROOF / "README.md").read_text(encoding="utf-8")
+        self.assertIn("https://g1mn.github.io/pqproof/", readme)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -8,6 +8,10 @@
 #                                                     버전이 그대로면 다음 릴리스가 MINOR 여야 하는지도 알린다
 #                                                     버전을 올렸어도 그 버전이 앞 판과 같은 규칙 묶음으로 나갔고 지금 묶음의
 #                                                     since 가 더 뒤면(다음 릴리스 몫) 버전이 그대로일 때처럼 본다
+#   python3 -I tests/version_policy.py --site-only    사이트(docs/index.html)만: 생성기가 심은 data-build 블록이 지금 판·규칙 묶음·
+#                                                     증적 형식·KAT 목록과 같은가(pages.yml 이 배포 전에 부른다)
+# 사이트 검사(check_site): docs/index.html 이 있으면 위 두 꼴에서도 늘 돈다. 그래서 CI version-policy 작업과 release.yml 이 판을 올렸는데
+#   사이트를 다시 만들지 않은 커밋·태그를 멈춘다(판 올림과 사이트 재빌드는 같은 커밋에, CONTRIBUTING.md 'Releases'). 설치본처럼 docs/ 가 없으면 건너뛴다.
 # 표준 라이브러리만 쓴다. 저장소는 읽기만 한다(--base 는 git show 로 그 판의 파일을 읽는다).
 # 종료: 0 맞음 · 1 어긋남 · 2 사용법 오류(git 없음, 그 판을 못 읽음)
 """Check the version policy: a release that can move a verdict is never a PATCH release."""
@@ -26,6 +30,10 @@ SEMVER = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 SECTION = re.compile(r"(?m)^## \[([^\]]+)\](?: - (.+))?$")
 IMPACT = re.compile(r"(?m)^\*\*Verdict impact \(판정 영향\): (yes|none)\b")
 SHA = re.compile(r"^[0-9a-f]{64}$")
+SITE = os.path.join(ROOT, "docs", "index.html")
+SITE_BLOCK = re.compile(r'<script type="application/json" id="data-build">(.*?)</script>', re.S)
+SITE_SCHEMA = "pqproof-site-build 1"
+REBUILD = "rebuild docs/index.html in the same commit as the version change (CONTRIBUTING.md, Releases)"
 
 
 def semver(s):
@@ -173,6 +181,67 @@ def check_release(version, base_version, ruleset_now, ruleset_base, gold_now, go
     return bad, notes
 
 
+def site_info(path=SITE):
+    """docs/index.html 에 사이트 생성기가 심은 data-build 블록(dict). 블록이 없거나 깨졌으면 None."""
+    with open(path, encoding="utf-8") as f:
+        m = SITE_BLOCK.search(f.read())
+    if not m:
+        return None
+    try:
+        info = json.loads(m.group(1))
+    except ValueError:
+        return None
+    return info if isinstance(info, dict) else None
+
+
+def kat_counts(doc):
+    """scan/kat-kpqc.json 의 숫자: 알고리즘·파라미터 세트·판(변형 포함)·발췌가 있는 판 수와 알고리즘별 최신판."""
+    algs = doc.get("algorithms") or {}
+    params = [p for a in algs.values() for p in (a.get("params") or {}).values()]
+    variants = [v for p in params for v in (p.get("variants") or [])]
+    latest = {}
+    for aid, a in algs.items():
+        vs = sorted({v.get("version") for p in (a.get("params") or {}).values() for v in (p.get("variants") or []) if v.get("latest")})
+        latest[aid] = vs[0] if len(vs) == 1 else vs
+    return {"algorithms": len(algs), "params": len(params), "versions": len(variants),
+            "excerpts": sum(1 for v in variants if v.get("excerpt")), "latest": latest}
+
+
+def check_site(version, ruleset_current, fmt, reads, info, kat):
+    """사이트가 지금 판으로 만들어졌는지. 어긋난 것의 목록([] 이면 맞다). info 는 site_info() 결과, kat 은 kat_counts() 결과."""
+    if info is None:
+        return [f"docs/index.html has no readable data-build block: {REBUILD}"]
+    if info.get("schema") != SITE_SCHEMA:
+        return [f"docs/index.html data-build schema is {info.get('schema')!r}, not {SITE_SCHEMA!r}: {REBUILD}"]
+    bad = []
+    for key, what in (("tool_version", "the tool version"), ("tests_version", "the public test numbers (section D)"),
+                      ("example_version", "the example output"), ("release_top", "the top release entry (section I)")):
+        if info.get(key) != version:
+            bad.append(f"docs/index.html shows {info.get(key)} for {what}, the package is {version}: {REBUILD}")
+    if str(info.get("ruleset")) != str(ruleset_current):
+        bad.append(f"docs/index.html was built for ruleset {info.get('ruleset')}, the current ruleset is {ruleset_current}: {REBUILD}")
+    if info.get("format_version") != fmt:
+        bad.append(f"docs/index.html was built for evidence format {info.get('format_version')}, the tool writes {fmt}: {REBUILD}")
+    if list(info.get("format_reads") or []) != list(reads):
+        bad.append(f"docs/index.html says --verify reads formats {info.get('format_reads')}, the tool reads {list(reads)}: {REBUILD}")
+    site_kat = info.get("kat") or {}
+    for key in ("algorithms", "params", "versions", "excerpts", "latest"):
+        if site_kat.get(key) != kat.get(key):
+            bad.append(f"docs/index.html KAT list {key} is {site_kat.get(key)}, scan/kat-kpqc.json gives {kat.get(key)}: {REBUILD}")
+    if info.get("stale") is not False:
+        bad.append(f"docs/index.html was built with --allow-stale (a local preview, not for publishing): {REBUILD}")
+    return bad
+
+
+def site_problems():
+    """지금 트리의 docs/index.html 검사(check_site 를 지금 값으로). docs/ 가 없으면(설치본) None."""
+    if not os.path.isfile(SITE):
+        return None
+    kat = kat_counts(json.loads(read("scan/kat-kpqc.json")))
+    current = json.loads(read("scan/ruleset.json")).get("current")
+    return check_site(V.tool_version(), current, V.FORMAT_VERSION, V.FORMAT_READS, site_info(), kat)
+
+
 def git_show(ref, path):
     r = subprocess.run(["git", "-C", ROOT, "show", f"{ref}:{path}"], capture_output=True, text=True, errors="replace")
     if r.returncode != 0:
@@ -195,8 +264,23 @@ def ruleset_doc(text):
 def main(argv=None):
     ap = argparse.ArgumentParser(description="PQ-Proof version policy")
     ap.add_argument("--base", default=None, help="an earlier release (tag or commit) to compare with")
+    ap.add_argument("--site-only", action="store_true", help="check only that docs/index.html was built for this version")
     a = ap.parse_args(argv)
     version = V.tool_version()
+    try:
+        site = site_problems()
+    except (OSError, ValueError) as e:
+        print(f"version policy: cannot read the site or the KAT list: {e}", file=sys.stderr)
+        return 2
+    if a.site_only:
+        if site is None:
+            print("version policy: no docs/index.html to check", file=sys.stderr)
+            return 2
+        print(f"version policy: site docs/index.html against pqproof {version}")
+        for b in site:
+            print(f"  FAIL {b}")
+        print("version policy: " + ("ok" if not site else f"{len(site)} problem(s)"))
+        return 1 if site else 0
     try:
         changelog = read("CHANGELOG.md")
         raw_rules = json.loads(read("scan/ruleset.json"))
@@ -217,6 +301,10 @@ def main(argv=None):
             return 2
         more, notes = check_release(version, base_version, ruleset_doc(json.dumps(raw_rules)), r_base, g_now, g_base, changelog)
         bad += more
+    if site is None:
+        notes.append("no docs/index.html here (an installed copy?): the site check is skipped")
+    else:
+        bad += site
     current = raw_rules.get("current")
     print(f"version policy: pqproof {version}, ruleset {current}" + (f", compared with {a.base}" if a.base else ""))
     for n in notes:

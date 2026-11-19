@@ -402,6 +402,72 @@ class VersionPolicy(unittest.TestCase):
         rel = (wf / "release.yml").read_text(encoding="utf-8")
         self.assertIn("python3 -I tests/version_policy.py", rel)
         self.assertIn("--base", rel)
+        # 사이트만 바뀐 push 는 ci.yml 이 돌지 않으므로(paths-ignore docs/**) Pages 배포 앞에서 사이트 판을 따로 본다
+        self.assertIn("python3 -I tests/version_policy.py --site-only", (wf / "pages.yml").read_text(encoding="utf-8"))
+
+
+def site_html(info):
+    return ('<html><body><p>site</p><script type="application/json" id="data-build">' + json.dumps(info)
+            + '</script><script type="application/json" id="data-kat">{}</script></body></html>')
+
+
+class SiteCheck(unittest.TestCase):
+    """tests/version_policy.py check_site: 판을 올렸는데 docs/index.html 을 다시 만들지 않으면 CI·릴리스·Pages 가 멈춘다."""
+
+    def setUp(self):
+        self.kat = VP.kat_counts(json.loads((PROOF / "scan" / "kat-kpqc.json").read_text(encoding="utf-8")))
+        self.ver, self.rs = V.tool_version(), RULESET["current"]
+        self.good = {"schema": "pqproof-site-build 1", "tool_version": self.ver, "release_date": "2026-11-20", "ruleset": str(self.rs),
+                     "format_version": V.FORMAT_VERSION, "format_reads": list(V.FORMAT_READS), "tests_version": self.ver,
+                     "example_version": self.ver, "release_top": self.ver,
+                     "kat": dict(self.kat, checked="2026-11-19"), "stale": False}
+
+    def check(self, info, version=None):
+        return VP.check_site(version or self.ver, self.rs, V.FORMAT_VERSION, V.FORMAT_READS, info, self.kat)
+
+    def test_kat_counts(self):
+        self.assertEqual((self.kat["algorithms"], self.kat["params"]), (4, 16))
+        self.assertEqual(self.kat["versions"], sum(len(p["variants"]) for a in json.loads((PROOF / "scan" / "kat-kpqc.json").read_text(encoding="utf-8"))["algorithms"].values() for p in a["params"].values()))
+        self.assertTrue(all(isinstance(v, str) for v in self.kat["latest"].values()), self.kat["latest"])
+
+    def test_a_site_built_for_this_version_passes(self):
+        self.assertEqual(self.check(self.good), [])
+
+    def test_a_version_bump_without_a_rebuild_fails(self):
+        # 버전업 흉내: 패키지만 다음 판이고 사이트는 지금 판 그대로
+        bad = self.check(self.good, version="9.9.9")
+        self.assertEqual(len(bad), 4, bad)
+        self.assertIn("the package is 9.9.9", bad[0])
+        self.assertIn("rebuild docs/index.html", bad[0])
+
+    def test_each_field_is_checked(self):
+        cases = [("tool_version", "0.0.1", "the tool version"), ("tests_version", "0.0.1", "public test numbers"),
+                 ("example_version", "0.0.1", "example output"), ("release_top", "0.0.1", "top release entry"),
+                 ("ruleset", "1", "ruleset 1"), ("format_version", 1, "evidence format 1"), ("format_reads", [1, 2], "reads formats"),
+                 ("stale", True, "--allow-stale"), ("stale", None, "--allow-stale"), ("schema", "other", "schema")]
+        for key, value, want in cases:
+            with self.subTest(key=key, value=value):
+                self.assertIn(want, "\n".join(self.check(dict(self.good, **{key: value}))))
+        for key in ("algorithms", "params", "versions", "excerpts"):
+            with self.subTest(kat=key):
+                kat = dict(self.good["kat"], **{key: self.good["kat"][key] + 1})
+                self.assertIn(f"KAT list {key}", "\n".join(self.check(dict(self.good, kat=kat))))
+        latest = dict(self.good["kat"]["latest"], **{"smaug-t": "1.1.1"})
+        self.assertIn("KAT list latest", "\n".join(self.check(dict(self.good, kat=dict(self.good["kat"], latest=latest)))))
+        self.assertIn("no readable data-build block", "\n".join(self.check(None)))
+
+    def test_site_info_reads_the_block(self):
+        tmp = tempfile.mkdtemp(prefix="pqproof-site-")
+        try:
+            path = os.path.join(tmp, "index.html")
+            pathlib.Path(path).write_text(site_html(self.good), encoding="utf-8")
+            self.assertEqual(VP.site_info(path), self.good)
+            pathlib.Path(path).write_text("<html><body>no block</body></html>", encoding="utf-8")
+            self.assertIsNone(VP.site_info(path))
+            pathlib.Path(path).write_text('<script type="application/json" id="data-build">{broken</script>', encoding="utf-8")
+            self.assertIsNone(VP.site_info(path))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)  # 이 시험이 만든 자기 폴더만
 
 
 if __name__ == "__main__":

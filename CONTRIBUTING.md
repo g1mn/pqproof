@@ -34,7 +34,7 @@ Code comments and tool output are in Korean; documentation is in English, with a
 
 ## Changing a rule
 
-The ruleset is the files in `RULESET_FILES` of `pqlite/version.py`: `scan/cbom-scan.sh`, `scan/residue.sh`, `scan/test-paths.ere`, `scan/skip-dirs`, `scan/profiles.json`, `pqlite/scan.py`, `pqlite/verify.py`, `pqlite/allowlist.py`, `pqlite/rules.py`, `pqlite/skipdirs.py` and `pqlite/tlsprobe.py` (eleven files). A folder to skip goes in `scan/skip-dirs`, nowhere else. A verdict constant or pattern belongs in `pqlite/rules.py`, not in `prove.py`; a test fails when `prove.py` gets a new pattern constant. Changing any byte of them, a comment included, changes the ruleset hash, and a run with a changed file is named `<current>+modified` until the change has its own ruleset name. So a lint fix in these files (CI runs shellcheck on `scan/cbom-scan.sh` and `scan/residue.sh`) goes in with a ruleset change.
+The ruleset is the files in `RULESET_FILES` of `pqlite/version.py`: `scan/cbom-scan.sh`, `scan/residue.sh`, `scan/test-paths.ere`, `scan/skip-dirs`, `scan/profiles.json`, `pqlite/scan.py`, `pqlite/verify.py`, `pqlite/allowlist.py`, `pqlite/rules.py`, `pqlite/skipdirs.py`, `pqlite/tlsprobe.py`, `pqlite/impl.py`, `scan/kat-kpqc.json` and the excerpts in `scan/kat/` (fourteen files from ruleset 3). A folder to skip goes in `scan/skip-dirs`, nowhere else. A verdict constant or pattern belongs in `pqlite/rules.py`, not in `prove.py`; a test fails when `prove.py` gets a new pattern constant. Changing any byte of them, a comment included, changes the ruleset hash, and a run with a changed file is named `<current>+modified` until the change has its own ruleset name. So a lint fix in these files (CI runs shellcheck on `scan/cbom-scan.sh` and `scan/residue.sh`) goes in with a ruleset change.
 
 A rule ID or a value can live in more than one file. For a new or changed rule:
 
@@ -60,8 +60,9 @@ A field added, removed, renamed or changed in meaning raises `format_version` in
 ## Releases
 
 1. Set `__version__` in `src/pqproof/__init__.py` and turn `[Unreleased]` in `CHANGELOG.md` into a dated section with its verdict impact.
-2. Push `main` and wait for CI, then tag `vX.Y.Z` on that commit. The release workflow runs CI again and refuses a tag that is not on `main`.
-3. After the release, move the pins in `examples/`: the `g1mn/pqproof@<commit>` line in `examples/github-actions/pqproof-sarif.yml` (commit SHA and comment) and the `pqproof==` versions in the GitHub, GitLab and Jenkins examples.
+2. Rebuild `docs/index.html` for the new version and commit it with the version change. The README is short and the site carries everything else, so review its numbers, example output, release entry, limits and FAQ for the new version too. The maintainer runs the site generator, which is not in this repository. While the site names another version, ruleset, evidence format or KAT list, `tests/version_policy.py` fails, so CI, the release workflow and the Pages deploy stop.
+3. Push `main` and wait for CI, then tag `vX.Y.Z` on that commit. The release workflow runs CI again and refuses a tag that is not on `main`.
+4. After the release, move the pins in `examples/`: the `g1mn/pqproof@<commit>` line in `examples/github-actions/pqproof-sarif.yml` (commit SHA and comment) and the `pqproof==` versions in the GitHub, GitLab and Jenkins examples.
 
 ## Pull requests
 

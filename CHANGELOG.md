@@ -14,6 +14,11 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 **Verdict impact (판정 영향): none.**
 
+### Changed
+
+- The README is short now; usage, verdict rules, public test results, the implementation check, limits and releases are on the site, [g1mn.github.io/pqproof](https://g1mn.github.io/pqproof/), which is rebuilt for 0.3.0 (test numbers, example output, KpqC versions and sources, FAQ).
+- `tests/version_policy.py` also checks that `docs/index.html` was built for the current version, ruleset, evidence format and KAT list (the `data-build` block the site generator writes). CI, the release workflow and the Pages deploy (`--site-only`) stop when it was not, so a version bump and the site rebuild go in the same commit (CONTRIBUTING.md, Releases).
+
 ## [0.3.0] - 2026-11-20
 
 Tool 0.3.0, ruleset 3 (new name and hash, fourteen rule files), evidence format 4. New command `pqproof impl` (`prove.sh --impl`): it checks a KpqC implementation (SMAUG-T, NTRU+, HAETAE, AIMer) against pinned reference KAT versions without building or running it, and with `--pq-verify` it also runs pq-verify, a separate tool you install, on a NIST PQC library and puts that audit in the same receipt. `--verify` still reads evidence formats 1, 2 and 3.
