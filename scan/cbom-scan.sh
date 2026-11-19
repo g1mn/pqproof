@@ -26,9 +26,10 @@ MAINRE=$(grep -v -e '^#' -e '^[[:space:]]*$' "$TESTRE_FILE" 2>/dev/null | sed -n
 SKIP_FILE=${SKIP_DIRS:-$HERE/skip-dirs}
 [ -r "$SKIP_FILE" ] || { echo "건너뛰는 폴더 목록 없음: $SKIP_FILE (SKIP_DIRS=<파일>로 준다)" >&2; exit 2; }
 # --- 건너뛰는 폴더(scan/skip-dirs). residue.sh 와 cbom-scan.sh 에 같은 글로 있고 pqlite/skipdirs.py 와 같은 규칙이다
-# (tests/test_rule_sync.py 가 세 곳을 대조한다). any 이름은 어느 깊이든, output 이름은 트리 맨 위이거나 같은 폴더에 buildfile 이
-# 있을 때만 건너뛴다. 경로에 main 표시가 있으면 output 규칙을 쓰지 않는다. 건너뛴 폴더 안은 보지 않는다.
-skip_load() { # SKIP_FILE → SK_ANYX·SK_OUTX(find 식), SK_ANYL(이름 목록), SK_BFS(빌드 파일), SK_MAIN
+# (tests/test_rule_sync.py 가 세 곳을 대조한다). any 이름은 어느 깊이든 건너뛰되 경로에 main 표시가 있으면 같은 폴더에 buildfile 이
+# 있을 때만 건너뛴다. output 이름은 트리 맨 위이거나 같은 폴더에 buildfile 이 있을 때만, 경로에 main 표시가 없을 때만 건너뛴다.
+# 건너뛴 폴더 안은 보지 않는다.
+skip_load() { # SKIP_FILE → SK_ANYX·SK_OUTX(find 식), SK_ANYL(이름 목록), SK_BFS(빌드 파일), SK_MAIN, SK_MAINP(find -path 꼴)
   local k v n
   SK_ANYX=""; SK_OUTX=""; SK_ANYL=" "; SK_BFS=""; SK_MAIN=""
   while read -r k v n; do
@@ -42,26 +43,37 @@ skip_load() { # SKIP_FILE → SK_ANYX·SK_OUTX(find 식), SK_ANYL(이름 목록)
     esac
   done < <(grep -v -e '^#' -e '^[[:space:]]*$' "$SKIP_FILE")
   SK_ANYX=${SK_ANYX:--name /}; SK_OUTX=${SK_OUTX:--name /}   # 빈 목록: '/' 는 이름에 없어 아무것도 안 맞는다
+  SK_MAINP=/; [ -n "$SK_MAIN" ] && SK_MAINP="*$SK_MAIN*"     # main 표시가 없으면 '/' 는 어느 하위 경로에도 안 맞는다
 }
 skip_dirs() { # $1=ROOT → 건너뛸 폴더의 전체 경로를 한 줄에 하나씩(LC_ALL=C 순)
-  local root=$1 d rel parent b p cut="" hit
+  local root=$1 d rel parent b p cut="" hit inmain bf
+  # main 표시 아래 any 이름 폴더는 잘라 내지 않고 들어가 본다(빌드 파일 옆이 아니면 운영 소스다). 판단은 아래에서 트리 안 경로로 한다
   # shellcheck disable=SC2086  # SK_ANYX·SK_OUTX 는 '-name 이름 -o ...' 식이라 나눠 넘긴다(이름에 공백·글롭 문자가 없다)
-  find "$root" -mindepth 1 -type d \( $SK_ANYX \) -prune -print -o -type d \( $SK_OUTX \) -print 2>/dev/null | LC_ALL=C sort |
-  while IFS= read -r d; do
+  find "$root" -mindepth 1 -type d \( $SK_ANYX \) \( -path "$SK_MAINP" -print -o -prune -print \) -o -type d \( $SK_OUTX \) -print 2>/dev/null |
+  LC_ALL=C sort | while IFS= read -r d; do
     hit=0
     while IFS= read -r p; do [ -n "$p" ] && case "$d/" in "$p"/*) hit=1;; esac; done <<< "$cut"
     [ $hit = 1 ] && continue
-    case "$SK_ANYL" in *" ${d##*/} "*) ;; *)
-      rel=${d#"$root"/}; parent=${d%/*}
-      [ -n "$SK_MAIN" ] && case "/$rel/" in *"$SK_MAIN"*) continue;; esac
-      if [ "$parent" != "$root" ]; then
-        hit=0
-        for b in $SK_BFS; do p="$parent/$b"; { [ -L "$p" ] || [ -e "$p" ]; } && [ ! -d "$p" ] && { hit=1; break; }; done
-        [ $hit = 1 ] || continue
-      fi;;
+    rel=${d#"$root"/}; parent=${d%/*}; inmain=0; bf=0
+    [ -n "$SK_MAIN" ] && case "/$rel/" in *"$SK_MAIN"*) inmain=1;; esac
+    if [ "$parent" != "$root" ]; then
+      for b in $SK_BFS; do p="$parent/$b"; { [ -L "$p" ] || [ -e "$p" ]; } && [ ! -d "$p" ] && { bf=1; break; }; done
+    fi
+    case "$SK_ANYL" in
+      *" ${d##*/} "*) [ $inmain = 1 ] && [ $bf = 0 ] && continue;;
+      *) [ $inmain = 1 ] && continue; [ "$parent" != "$root" ] && [ $bf = 0 ] && continue;;
     esac
     cut="$cut$d"$'\n'; printf '%s\n' "$d"
   done
+}
+skip_names() { # $1=ROOT → SK_PRUNEL·SK_PRUNEX: find·grep 이 이름만 보고 잘라 낼 any 이름. main 표시 아래에 같은 이름 폴더가 있는
+  # 이름은 빼고(그 폴더를 읽어야 할 수 있다), 그 이름의 다른 폴더는 skip_out 이 skip_dirs 목록으로 거른다
+  local keep x
+  # shellcheck disable=SC2086
+  keep=" $(find "$1" -mindepth 1 -type d \( $SK_ANYX \) \( -path "$SK_MAINP" -print -o -prune \) 2>/dev/null | sed 's#.*/##' | LC_ALL=C sort -u | tr '\n' ' ')"
+  SK_PRUNEL=""; SK_PRUNEX=""
+  for x in $SK_ANYL; do case "$keep" in *" $x "*) ;; *) SK_PRUNEL="$SK_PRUNEL $x"; SK_PRUNEX="${SK_PRUNEX:+$SK_PRUNEX -o }-name $x";; esac; done
+  SK_PRUNEX=${SK_PRUNEX:--name /}
 }
 skip_out() { # $1=skip_dirs 목록 파일. 표준 입력 줄 중 그 폴더 아래 경로로 시작하는 줄을 뺀다
   LC_ALL=C awk -v L="$1" 'BEGIN { while ((getline l < L) > 0) if (l != "") p[++n] = l "/"; close(L) }
@@ -80,9 +92,9 @@ TMP=$(mktemp -d "${TMPDIR:-/tmp}/cbom.XXXXXX") || exit 2
 trap 'set +f; rm -f "$TMP"/* 2>/dev/null; rmdir "$TMP" 2>/dev/null' EXIT
 ROWS=$TMP/rows; SEEN=$TMP/seen; : > "$ROWS"; : > "$SEEN"
 
-# find 가 잘라 낼 any 이름 폴더(scan/skip-dirs). output 이름 폴더(vendor·build·target·dist)는 조건이 있어 결과를 skip_out 으로 거른다
-PRUNE="-mindepth 1 ( -type d ( $SK_ANYX ) ) -prune -o"
-GX=""; for x in $SK_ANYL; do GX="$GX --exclude-dir=$x"; done   # grep -r 이 들어가지 않을 any 이름 폴더
+# find 가 잘라 낼 any 이름 폴더(PRUNE)와 grep -r 이 들어가지 않을 이름(GX)은 scan() 이 트리마다 skip_names 로 정한다. output 이름
+# 폴더(vendor·build·target·dist)와 main 표시 아래 같은 이름이 있는 any 폴더는 조건이 있어 결과를 skip_out 으로 거른다
+PRUNE=""; GX=""
 CODE='--include=*.java --include=*.kt --include=*.scala --include=*.groovy --include=*.py --include=*.js --include=*.mjs --include=*.cjs --include=*.ts --include=*.jsx --include=*.tsx --include=*.go --include=*.rb --include=*.php --include=*.cs --include=*.c --include=*.h --include=*.cc --include=*.cpp --include=*.rs --include=*.swift'
 CFG='--include=*.yml --include=*.yaml --include=*.properties --include=*.toml --include=*.ini --include=*.env --include=.env* --include=*.tf --include=*.tfvars --include=*.xml --include=*.json --include=*.conf --include=*.cfg --include=*.cnf --include=*.sh --include=*.bash --include=Dockerfile* --include=Makefile'
 NOLOCK='--exclude=package-lock.json --exclude=yarn.lock --exclude=pnpm-lock.yaml --exclude=*.min.js --exclude=*.lock'
@@ -527,7 +539,12 @@ pair_keys() {
     BEGIN { while ((getline l < cp) > 0) { split(l, a, "\t"); if (!(a[1] in c)) c[a[1]] = a[2]; else x[a[1]]++ }
             while ((getline l < kp) > 0) { split(l, a, "\t"); if (a[1] in c) m[a[2]] = c[a[1]] (x[a[1]] ? " 외 " x[a[1]] "곳" : "") } }
     ($2 in m) && index($3, "개인키(") == 1 && $5 == "쇼어로 깨짐" { $1 = ($1 >= 10 ? 12 : 2); $3 = "개인키(인증서 짝)"; $6 = "P2"; $7 = rp
-      n = "인증서 짝: " m[$2]; if (index($4, "RSA") == 1) n = n " · " rsa; $8 = ($8 == "" ? n : n " · " $8) }
+      n = "인증서 짝: " m[$2]; if (index($4, "RSA") == 1) n = n " · " rsa
+      # 주석·시험 표시(flag_of)는 비고 맨 앞에 남긴다: pqlite/rules.py cbom_flags 가 맨 앞만 읽는다(시험 폴더의 키·인증서 짝이 막는 위치가 됐다)
+      f = ""; r = $8; sep = " · "
+      while (1) { k = index(r, sep); p = (k ? substr(r, 1, k - 1) : r); if (p != "주석" && p != "테스트·예제") break
+        f = f p sep; r = (k ? substr(r, k + length(sep)) : "") }
+      $8 = f n (r == "" ? "" : sep r) }
     { print }' "$ROWS" > "$TMP/rows2" && mv "$TMP/rows2" "$ROWS"
 }
 key_row() { # 블록 형식(PEM|DER) 위치 pub|priv 비고
@@ -742,7 +759,9 @@ render() { # md csv 명령줄
 
 scan() { # DIR [host:port|파일 ...]
   ROOT=$(cd "$1" 2>/dev/null && pwd) || { echo "디렉터리 없음: $1" >&2; exit 2; }; shift
-  SKIPL=$TMP/skip; skip_dirs "$ROOT" > "$SKIPL" || exit 2   # 건너뛸 output 폴더(G 와 find 결과를 skip_out 으로 거른다)
+  SKIPL=$TMP/skip; skip_dirs "$ROOT" > "$SKIPL" || exit 2   # 건너뛸 폴더(G 와 find 결과를 skip_out 으로 거른다)
+  skip_names "$ROOT"; PRUNE="-mindepth 1 ( -type d ( $SK_PRUNEX ) ) -prune -o"
+  GX=""; for x in $SK_PRUNEL; do GX="$GX --exclude-dir=$x"; done
   scan_keys; scan_embedded; scan_ssh; scan_tls; scan_code; scan_generic
   local a l; for a in "$@"; do
     if [ -f "$a" ]; then while IFS= read -r l; do l=$(trim "${l%%#*}"); [ -n "$l" ] && probe "$l"; done < "$a"; else probe "$a"; fi; done
@@ -773,6 +792,8 @@ gen_fixtures() {
     "$O" pkcs12 -export -in "$g/rsa-server.crt" -inkey "$g/rsa2048.key" -name locked -out "$g/locked/locked.p12" -passout "pass:$pw" 2>/dev/null; }
   # 시험 폴더의 키스토어(주석·시험 표시가 붙어야 한다, 교차 리뷰 X24)
   [ -f "$g/test/ks.p12" ] || { mkdir -p "$g/test"; "$O" pkcs12 -export -in "$g/rsa-server.crt" -inkey "$g/rsa2048.key" -name t -out "$g/test/ks.p12" -passout pass:changeit 2>/dev/null; }
+  # 시험 폴더의 키·인증서 짝(인증서 짝 비고가 시험 표시 뒤에 붙어야 한다)
+  [ -f "$g/test/pair.crt" ] || "$O" req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -keyout "$g/test/pair.key" -out "$g/test/pair.crt" -subj /CN=test -days 3650 2>/dev/null
   # 비밀번호로 열리지만 인증서가 없는 키스토어(대칭키만)
   [ -n "$KT" ] && [ ! -f "$g/secret.jceks" ] && "$KT" -genseckey -alias aes -keyalg AES -keysize 256 -storetype JCEKS -keystore "$g/secret.jceks" \
     -storepass changeit -keypass changeit >/dev/null 2>&1
@@ -883,6 +904,7 @@ selftest() {
   ck r2/ssh/.ssh/config:2 ssh-rsa "쇼어로 깨짐" P2
   ck r2/ssh/known_hosts 25519 "쇼어로 깨짐" P2   # ssh-keygen 이 없어도 공개키 줄의 형식 이름으로 읽는다
   ck gen/test/ks.p12 RSA "쇼어로 깨짐" "" "테스트·예제"
+  ck gen/test/pair.crt:1 EC-256 "쇼어로 깨짐" "" "테스트·예제"; ck gen/test/pair.key:1 EC-256 "쇼어로 깨짐" P2 "테스트·예제 · 인증서 짝: gen/test/pair.crt"
   ck r2/scripts/ks.sh:1 RSA "" "" "-storepass ***"; nck r2/scripts/ks.sh:1 "s3cretPW"
   echo "selftest: PASS $PASS · FAIL $FAIL · SKIP $SKIP of $((PASS + FAIL + SKIP)) (OpenSSL: $("$O" version), ML-KEM $MLKEM, keytool ${KT:-없음}, ssh-keygen ${SK:-없음})"
 }

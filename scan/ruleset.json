@@ -1,5 +1,5 @@
 {
- "about": "Ruleset versions: a name for each hash of the rule files (pqlite/version.py RULESET_FILES). A run records ruleset_version and ruleset_sha256 in receipt.json. Each version lists sha256, since (the first tool version that shipped it), verdict_impact (yes when the same trees can get a different verdict, check status or count than under the previous ruleset; no when only comments, wording or code layout changed) and files (path and sha256 of each rule file). The file list can differ between versions: ruleset 1 hashed six files, ruleset 2 adds pqlite/rules.py and pqlite/tlsprobe.py. --verify recomputes a receipt's ruleset_sha256 from the files of the ruleset it names. Changing a rule file needs a new name here, a new current, and a CHANGELOG entry with its verdict impact. A ruleset with verdict_impact yes first ships in a MINOR release (MAJOR from 1.0), never a PATCH release (tests/version_policy.py). pqlite/version.py --ruleset-json prints sha256 and files for the rule files on disk.",
+ "about": "Ruleset versions: a name for each hash of the rule files (pqlite/version.py RULESET_FILES). A run records ruleset_version and ruleset_sha256 in receipt.json. Each version lists sha256, since (the first tool version that shipped it), verdict_impact (yes when the same trees can get a different verdict, check status or count than under the previous ruleset; no when only comments, wording or code layout changed) and files (path and sha256 of each rule file). The file list can differ between versions: ruleset 1 hashed six files, ruleset 2 hashes eleven: it adds scan/skip-dirs, scan/profiles.json, pqlite/rules.py, pqlite/skipdirs.py and pqlite/tlsprobe.py. --verify recomputes a receipt's ruleset_sha256 from the files of the ruleset it names. Changing a rule file needs a new name here, a new current, and a CHANGELOG entry with its verdict impact. A ruleset with verdict_impact yes first ships in a MINOR release (MAJOR from 1.0), never a PATCH release (tests/version_policy.py). pqlite/version.py --ruleset-json prints sha256 and files for the rule files on disk.",
  "current": "2",
  "versions": {
   "1": {
@@ -34,7 +34,7 @@
    ]
   },
   "2": {
-   "sha256": "238fbded98101c99522495bd079e683ab1694cc8e1a588902cf14c25c35ccc33",
+   "sha256": "4d3f69d3ff8b67dd7c68ab0fe6dd7e136cd0d6ab00e8cb18ca8ba0f4c1b7e6af",
    "since": "0.2.0",
    "verdict_impact": "yes",
    "files": [
@@ -44,7 +44,7 @@
     },
     {
      "path": "pqlite/rules.py",
-     "sha256": "d288ef63faf501ef5be0df663946a55f6ae8545f5dc912faf48224b8c7482326"
+     "sha256": "8cdee3956d7a0aba0300c587100b14c3cbee93e627d2de2cfce7f2e8d6bff7d8"
     },
     {
      "path": "pqlite/scan.py",
@@ -52,7 +52,7 @@
     },
     {
      "path": "pqlite/skipdirs.py",
-     "sha256": "34041f06c394f88c4a8d63519ec4cbc3c0b6f2fe21326c429984f8fda8e0111a"
+     "sha256": "9316b63f49613d6791c1de2327730e4268437fb39c1046f7d12ec1b6b0f134f2"
     },
     {
      "path": "pqlite/tlsprobe.py",
@@ -64,7 +64,7 @@
     },
     {
      "path": "scan/cbom-scan.sh",
-     "sha256": "c8a331aa19cb929b9c0d3f6ed21d7fb779025ce9be3ed3cb05f3714d50bd2bf9"
+     "sha256": "1d95037483ee21ea13785b022e908b61abdf8df245ea851bd5717ea1415b965b"
     },
     {
      "path": "scan/profiles.json",
@@ -72,11 +72,11 @@
     },
     {
      "path": "scan/residue.sh",
-     "sha256": "4b5387d5f18acf03c902c2e9024602de7dd1f6585a1650cfd4f7080de469ff61"
+     "sha256": "bb208ec4703b76979fe77beaea551fb6b72ca8f43d34b034e3177f8b862f1fe7"
     },
     {
      "path": "scan/skip-dirs",
-     "sha256": "21750b9e4d161d0bc01695a2c55602d3c28f6262df958fe7f4ce5e156a38aae9"
+     "sha256": "685fda3e7ac9ead22c216540301847dfc31b043918e920148ec74a08515ae1f7"
     },
     {
      "path": "scan/test-paths.ere",

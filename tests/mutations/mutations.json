@@ -1169,6 +1169,191 @@
      "c-classic": "error"
     }
    }
+  },
+  {
+   "id": "m27-x02-venv-package-in-main",
+   "title": "X02 follow-up: RSA code in a production package named venv under src/main is read",
+   "title_ko": "X02 후속: src/main 아래 venv 이름 운영 패키지의 RSA 코드도 읽는다",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "src/main/java/com/bank/venv/PgClient.java",
+     "text_file": "files/PgClient.java"
+    }
+   ],
+   "expect": {
+    "exit": 1,
+    "verdict": "fail",
+    "checks": {
+     "a-cbom": "fail",
+     "c-classic": "fail"
+    }
+   },
+   "sarif": {
+    "rules": {
+     "a-cbom": "error",
+     "c-classic": "error"
+    }
+   }
+  },
+  {
+   "id": "m27b-node-modules-beside-build-file",
+   "title": "X02 follow-up control: node_modules next to package.json under src/main is skipped, counted, and a-input asks for a review",
+   "title_ko": "X02 후속 대조군: src/main 아래 package.json 옆 node_modules 는 건너뛰고 세며 a-input 은 검토 필요",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "src/main/frontend/package.json",
+     "text": "{\"name\": \"frontend\", \"private\": true}\n"
+    },
+    {
+     "op": "add",
+     "file": "src/main/frontend/node_modules/acme/index.js",
+     "text_file": "files/npm_rsa.js"
+    }
+   ],
+   "expect": {
+    "exit": 0,
+    "verdict": "pass",
+    "checks": {
+     "a-input": "review",
+     "a-cbom": "pass",
+     "c-classic": "pass"
+    },
+    "contains": {
+     "inputs.fixed.skipped": "src/main/frontend/node_modules/ 파일 1 · 코드 1"
+    }
+   },
+   "sarif": {
+    "absent": [
+     "a-cbom",
+     "c-classic"
+    ]
+   }
+  },
+  {
+   "id": "m27c-misplaced-tox-folder",
+   "title": "X02 follow-up: a .tox folder away from any build file is counted, and its code makes a-input ask for a review",
+   "title_ko": "X02 후속: 빌드 파일 옆이 아닌 .tox 폴더는 세고, 안의 코드로 a-input 이 검토 필요",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "app/.tox/keys.py",
+     "text_file": "files/tox_keys.py"
+    }
+   ],
+   "expect": {
+    "exit": 0,
+    "verdict": "pass",
+    "checks": {
+     "a-input": "review",
+     "a-cbom": "pass",
+     "c-classic": "pass"
+    },
+    "contains": {
+     "inputs.fixed.skipped": "app/.tox/ 파일 1 · 코드 1"
+    }
+   },
+   "sarif": {
+    "absent": [
+     "a-cbom",
+     "c-classic"
+    ]
+   }
+  },
+  {
+   "id": "m28-test-keypair",
+   "title": "X06 follow-up: a TLS key and certificate pair under src/test is test material, not a blocking location",
+   "title_ko": "X06 후속: src/test 아래 TLS 키·인증서 짝은 시험 자료이고 막는 위치가 아니다",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "keypair",
+     "file": "src/test/resources/server.key",
+     "cert": "src/test/resources/server.crt"
+    }
+   ],
+   "expect": {
+    "exit": 0,
+    "verdict": "pass",
+    "checks": {
+     "a-cbom": "pass",
+     "c-classic": "pass"
+    },
+    "min": {
+     "cbom.fixed.tests": 2
+    }
+   },
+   "sarif": {
+    "absent": [
+     "a-cbom"
+    ]
+   }
+  },
+  {
+   "id": "m29-check-mode-outside-link",
+   "title": "Check mode: a folder link that points outside the tree leaves a-input undecided",
+   "title_ko": "한 트리 점검: 트리 밖을 가리키는 폴더 링크는 a-input 미판정",
+   "kind": "tree",
+   "mode": "check",
+   "orig": "pqc",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "symlink",
+     "file": "src/main/java/demo/ext",
+     "target": "/opt/pqproof-outside/ext"
+    }
+   ],
+   "expect": {
+    "exit": 3,
+    "verdict": "undecided",
+    "checks": {
+     "a-input": "undecided",
+     "b-weakening": "na",
+     "r-review": "na"
+    },
+    "contains": {
+     "checks[a-input].actual": "src/main/java/demo/ext"
+    }
+   }
+  },
+  {
+   "id": "m29b-check-mode-outside-link-strict",
+   "title": "Check mode under REQUIRE_REVIEW=1: the same link fails a-input",
+   "title_ko": "한 트리 점검, REQUIRE_REVIEW=1: 같은 링크는 a-input 실패",
+   "kind": "tree",
+   "mode": "check",
+   "orig": "pqc",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "symlink",
+     "file": "src/main/java/demo/ext",
+     "target": "/opt/pqproof-outside/ext"
+    }
+   ],
+   "env": {
+    "REQUIRE_REVIEW": "1"
+   },
+   "expect": {
+    "exit": 1,
+    "verdict": "fail",
+    "checks": {
+     "a-input": "fail"
+    }
+   }
   }
  ],
  "golden": "tests/golden/verdicts.json holds the verdict, check statuses and counts of every tree case. run_mutations.py --golden compares them; a rule change that moves any of them fails CI until the golden file and CHANGELOG.md are updated together."

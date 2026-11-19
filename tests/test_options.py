@@ -99,6 +99,41 @@ class Runs(unittest.TestCase):
         r, code, _ = self.run_("pair-same", PQC, orig=PQC)
         self.assertEqual((r["verdict"], st(r)["a-input"]), ("undecided", "undecided"))
 
+    def test_check_mode_code_link_outside_the_tree_is_undecided(self):
+        # 한 트리 점검에서 a-input 은 처음에 na 다. 트리 밖 코드 링크는 짝 판정과 같이 미판정, REQUIRE_REVIEW=1 이면 실패여야 한다
+        ext = os.path.join(self.tmp, "outside-ext")
+        os.makedirs(ext, exist_ok=True)
+        pathlib.Path(ext, "Rsa.java").write_text('class Rsa { Object k = java.security.KeyPairGenerator.getInstance("RSA"); }\n',
+                                                 encoding="utf-8")
+        fx = self.tree("check-link", {})
+        os.symlink(ext, os.path.join(fx, "src", "ext"))
+        base = {"ALLOW": "none", "RECON": "none"}
+        out = os.path.join(self.tmp, "out-check-link")
+        r, code, lines = prove.run(fx, fx, prove.Params(base, mode="check"), out, self.cache, quiet=True)
+        self.assertEqual((r["verdict"], code, st(r)["a-input"]), ("undecided", 3, "undecided"))
+        self.assertIn("src/ext", next(c for c in r["checks"] if c["id"] == "a-input")["actual"])
+        self.assertEqual([w for ok, w in rc.verify(out) if not ok], [])
+        out = os.path.join(self.tmp, "out-check-link-strict")
+        r, code, _ = prove.run(fx, fx, prove.Params(dict(base, REQUIRE_REVIEW="1"), mode="check"), out, self.cache, quiet=True)
+        self.assertEqual((r["verdict"], code, st(r)["a-input"]), ("fail", 1, "fail"))
+
+    def test_inventory_default_folder_name_keeps_the_working_folder(self):
+        # cwd 이름에 'proof-' 가 들어 있어도 결과 폴더 이름만 inventory-out-<시각> 이다(형제 폴더를 새로 만들지 않는다)
+        cwd = os.path.join(self.tmp, "pqproof-demo")
+        os.makedirs(cwd, exist_ok=True)
+        here = os.getcwd()
+        try:
+            os.chdir(cwd)
+            with mock.patch.object(prove.time, "strftime", return_value="20261119-000000"):
+                got = prove.default_out(CLASSIC, "inventory")
+                self.assertEqual(os.path.basename(prove.default_out(CLASSIC)), "proof-out-20261119-000000")
+                os.makedirs(got)
+                self.assertEqual(prove.default_out(CLASSIC, "inventory"), got + "-2")
+        finally:
+            os.chdir(here)
+        self.assertEqual(os.path.realpath(os.path.dirname(got)), os.path.realpath(cwd))
+        self.assertEqual(os.path.basename(got), "inventory-out-20261119-000000")
+
     def test_inventory_has_no_verdict(self):
         out = os.path.join(self.tmp, "out-inv")
         s, code = prove.inventory(CLASSIC, prove.Params({}), out, quiet=True)
@@ -217,6 +252,20 @@ class Runs(unittest.TestCase):
         r, _, _ = self.run_("age-on", fx, ALLOW=self.allow("age", [entry]), REQUIRE_REVIEW="1", REVIEW_MAX_AGE_DAYS="365")
         self.assertEqual((st(r)["r-allow"], r["params"]["review_max_age_days"]), ("fail", 365))
         self.assertTrue(any("REVIEW_MAX_AGE_DAYS=365" in w for w in r["allowlist"]["warnings"]))
+
+
+class SmallInputs(unittest.TestCase):
+    def test_report_cells_escape_html(self):
+        # 링크 대상처럼 입력이 정하는 글이 report.md 표에 날것의 태그로 남지 않는다(receipt.html 은 이미 이스케이프한다)
+        self.assertEqual(prove.md_cell("/x/<img src=x onerror=alert(1)>"), "/x/&lt;img src=x onerror=alert(1)&gt;")
+        self.assertEqual(prove.md_cell("a|b & c"), "a\\|b &amp; c")
+        self.assertEqual(prove.md_cell("a<b", html=False), "a<b")
+
+    def test_number_settings_take_ascii_digits_only(self):
+        for v in ("\u00b2", "\u0663", "1e3", "-1", "+5"):
+            with self.subTest(v=v), self.assertRaises(prove.UsageError):
+                prove.number({"N": v}, "N", 1, 0, 100)
+        self.assertEqual(prove.number({"N": " 30 "}, "N", 1, 0, 100), 30)
 
 
 class Digest(unittest.TestCase):

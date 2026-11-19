@@ -138,7 +138,8 @@ def receipt_id(doc):
 def golden_view(code, rec):
     if rec is None:
         return {"exit": code, "receipt": None}
-    side = lambda c: {k: c.get(k) for k in ("blocking", "allowed", "review", "comment_or_test", "tests")}  # noqa: E731
+    # check: '확인' 행 수(0.2.0 에서 PQC 로 끝까지 추적한 행이 '참고'로 내려가며 이 수가 움직였는데 golden 에 칸이 없어 못 잡았다)
+    side = lambda c: {k: c.get(k) for k in ("blocking", "allowed", "review", "comment_or_test", "tests", "check")}  # noqa: E731
 
     def java(j):
         if not j:
@@ -291,6 +292,27 @@ class Runner:
     def edit(self, root, e):
         path = os.path.join(root, *e["file"].split("/"))
         op = e["op"]
+        if op == "symlink":  # 링크만 만든다(대상은 열지 않는다: 트리 밖 절대 경로여도 된다)
+            if os.path.lexists(path):
+                raise Skip(f"{e['file']} already exists in the base tree")
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            os.symlink(e["target"], path)
+            return
+        if op == "keypair":  # openssl 로 키와 자체 서명 인증서 한 쌍(file=키, cert=인증서, curve 기본 P-256). 고정 키를 저장소에 두지 않는다
+            ossl = os.environ.get("OPENSSL") or shutil.which("openssl")
+            cert = os.path.join(root, *e["cert"].split("/"))
+            if not ossl:
+                raise Skip("openssl not found for a keypair edit")
+            if os.path.exists(path) or os.path.exists(cert):
+                raise Skip(f"{e['file']} or {e['cert']} already exists in the base tree")
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            os.makedirs(os.path.dirname(cert), exist_ok=True)
+            r = subprocess.run([ossl, "req", "-x509", "-newkey", "ec", "-pkeyopt", f"ec_paramgen_curve:{e.get('curve', 'P-256')}",
+                                "-nodes", "-keyout", path, "-out", cert, "-subj", "/CN=test", "-days", "3650"],
+                               capture_output=True, text=True, errors="replace", timeout=60, stdin=subprocess.DEVNULL)
+            if r.returncode != 0 or not os.path.isfile(cert):
+                raise Skip(f"openssl could not make the keypair: {r.stderr.strip()[-200:]}")
+            return
         if op == "add":
             if os.path.exists(path):
                 raise Skip(f"{e['file']} already exists in the base tree")
@@ -341,14 +363,16 @@ class Runner:
             json.dump(data, f, ensure_ascii=False, indent=1)
         return dst
 
-    def prove(self, orig, fixed, out, env_extra):
+    def prove(self, orig, fixed, out, env_extra, mode="pair"):
         env = {k: v for k, v in os.environ.items() if k not in ("ALLOW", "EXCLUDE", "REQUIRE_REVIEW", "TLS_TARGETS", "TLS_TARGETS_ORIG",
                                                                 "RECON", "EXPECT", "SCOPE", "CLASSIC", "OUT", "RESIDUE", "EV_NAME")}
         env.update({"OUT": out, "ALLOW": "none", "RECON": "none"})
         env.update(env_extra)
         t = time.time()
         try:
-            r = subprocess.run(self.cmd + [orig, fixed], env=env, capture_output=True, text=True, errors="replace",
+            # 한 트리 점검: prove.sh 는 --check, 깐 pqproof 명령은 check 하위 명령
+            args = [orig, fixed] if mode != "check" else (["--check"] if self.cmd[-1].endswith("prove.sh") else ["check"]) + [fixed]
+            r = subprocess.run(self.cmd + args, env=env, capture_output=True, text=True, errors="replace",
                                timeout=self.timeout, stdin=subprocess.DEVNULL)
         except FileNotFoundError as e:
             raise Skip(f"cannot start {self.cmd[0]}: {e}") from e
@@ -522,7 +546,7 @@ class Runner:
         if allow:
             env["ALLOW"] = allow
         out = os.path.join(mdir, "out")
-        code, log, secs = self.prove(orig, fixed, out, env)
+        code, log, secs = self.prove(orig, fixed, out, env, m.get("mode", "pair"))
         with open(os.path.join(mdir, "prove.log"), "w", encoding="utf-8") as f:
             f.write(log)
         rec = None

@@ -20,16 +20,20 @@ class Rules:
                                                               main)
 
     def kind(self, parent_rel, name, sibling_files):
-        """parent_rel('' = 트리 맨 위) 아래 폴더 name 을 건너뛰면 'any' 또는 'output', 아니면 None. sibling_files: 그 부모 폴더의
-        파일 이름들(링크 포함, 대상은 읽지 않는다)."""
-        if name in self.any:
-            return "any"
-        if name not in self.output:
-            return None
+        """parent_rel('' = 트리 맨 위) 아래 폴더 name 을 건너뛰면 'any'(말없이) 또는 'output'(파일·코드 파일 수를 센다), 아니면 None.
+        sibling_files: 그 부모 폴더의 파일 이름들(링크 포함, 대상은 읽지 않는다).
+        any 이름도 제자리(트리 맨 위나 빌드 파일 옆)가 아니면 세고, main 표시 아래에서는 빌드 파일 옆일 때만 건너뛴다. 그래서
+        src/main/java/com/bank/venv/ 는 운영 소스로 읽고, app/.tox/ 처럼 엉뚱한 곳의 의존성 폴더는 a-input 검토로 남는다(교차 리뷰 X02 후속)."""
         rel = f"{parent_rel}/{name}" if parent_rel else name
-        if self.main and self.main in f"/{rel}/":
+        in_main = bool(self.main) and self.main in f"/{rel}/"
+        beside_build = not self.build_files.isdisjoint(sibling_files)
+        if name in self.any:
+            if in_main:
+                return "output" if beside_build else None
+            return "any" if not parent_rel or beside_build else "output"
+        if name not in self.output or in_main:
             return None
-        if not parent_rel or not self.build_files.isdisjoint(sibling_files):
+        if not parent_rel or beside_build:
             return "output"
         return None
 
@@ -68,13 +72,13 @@ def walk(root, rules):
         for d in sorted(dirnames):
             full = os.path.join(dirpath, d)
             rel = f"{parent}/{d}" if parent else d
-            if d in rules.any:  # 이름이 any 면 링크여도 건너뛴다(형식 1·2 와 같다)
-                skipped.append((rel, "any"))
+            k = rules.kind(parent, d, siblings)
+            if k and d in rules.any:  # any 이름 폴더는 링크여도 건너뛴다(형식 1·2 와 같다). 링크는 따라가 세지 않는다
+                skipped.append((rel, "any" if os.path.islink(full) else k))
                 continue
             if os.path.islink(full):
                 entries.append((rel, full, "link"))
                 continue
-            k = rules.kind(parent, d, siblings)
             if k:
                 skipped.append((rel, k))
                 continue

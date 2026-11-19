@@ -14,6 +14,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 0,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -21,6 +22,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -106,6 +108,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -113,6 +116,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -198,6 +202,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 0,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -205,6 +210,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -290,6 +296,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 0,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -297,6 +304,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -382,6 +390,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 0,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -389,6 +398,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -474,6 +484,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 0,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -481,6 +492,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -569,6 +581,7 @@
     "fixed": {
      "allowed": 5,
      "blocking": 0,
+     "check": 0,
      "comment_or_test": 0,
      "review": 8,
      "tests": 0
@@ -576,6 +589,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -664,6 +678,7 @@
     "fixed": {
      "allowed": 5,
      "blocking": 0,
+     "check": 0,
      "comment_or_test": 0,
      "review": 8,
      "tests": 0
@@ -671,6 +686,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -759,6 +775,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 0,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -766,6 +783,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -851,6 +869,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 0,
+     "check": 0,
      "comment_or_test": 2,
      "review": 0,
      "tests": 2
@@ -858,6 +877,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -943,6 +963,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 3,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -950,6 +971,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -1037,6 +1059,7 @@
     "fixed": {
      "allowed": 1,
      "blocking": 0,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -1044,6 +1067,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -1131,6 +1155,7 @@
     "fixed": {
      "allowed": 1,
      "blocking": 0,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -1138,6 +1163,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -1223,6 +1249,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -1230,6 +1257,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -1315,6 +1343,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 3,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -1322,6 +1351,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -1407,6 +1437,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 0,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -1414,6 +1445,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -1499,6 +1531,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 0,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -1506,6 +1539,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -1591,6 +1625,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 2,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -1598,6 +1633,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -1683,6 +1719,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 0,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -1690,6 +1727,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -1775,6 +1813,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 1,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -1782,6 +1821,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -1867,6 +1907,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 2,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -1874,6 +1915,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -1959,6 +2001,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 0,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -1966,6 +2009,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -2051,6 +2095,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 1,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -2058,6 +2103,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -2143,6 +2189,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 0,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -2150,6 +2197,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -2235,6 +2283,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 0,
+     "check": 0,
      "comment_or_test": 3,
      "review": 0,
      "tests": 3
@@ -2242,6 +2291,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -2327,6 +2377,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 0,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -2334,6 +2385,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -2419,6 +2471,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 0,
+     "check": 0,
      "comment_or_test": 0,
      "review": 1,
      "tests": 0
@@ -2426,6 +2479,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -2511,6 +2565,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 1,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -2518,6 +2573,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -2603,6 +2659,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 1,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -2610,6 +2667,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -2695,6 +2753,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 0,
+     "check": 0,
      "comment_or_test": 2,
      "review": 0,
      "tests": 0
@@ -2702,6 +2761,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -2787,6 +2847,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 0,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -2794,6 +2855,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -2879,6 +2941,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 0,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -2886,6 +2949,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -2971,6 +3035,7 @@
     "fixed": {
      "allowed": 0,
      "blocking": 1,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -2978,6 +3043,7 @@
     "orig": {
      "allowed": 0,
      "blocking": 13,
+     "check": 0,
      "comment_or_test": 0,
      "review": 0,
      "tests": 0
@@ -3038,6 +3104,570 @@
       "E-MLDSA87": 0,
       "E-MLKEM1024": 0,
       "E-MLKEM768": 0
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    }
+   },
+   "ruleset_version": "2",
+   "verdict": "fail",
+   "weakening": {
+    "deny": 0,
+    "review": 0
+   }
+  },
+  "m27-x02-venv-package-in-main": {
+   "allow_status": [],
+   "allowlist": {
+    "unreviewed": 0,
+    "unused": 0,
+    "unused_orig_lines": 0,
+    "write_review": 0
+   },
+   "cbom": {
+    "fixed": {
+     "allowed": 0,
+     "blocking": 2,
+     "check": 0,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    },
+    "orig": {
+     "allowed": 0,
+     "blocking": 13,
+     "check": 0,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    }
+   },
+   "checks": {
+    "a-cbom": "fail",
+    "a-input": "pass",
+    "b-tls": "na",
+    "b-weakening": "pass",
+    "c-classic": "fail",
+    "c-expect": "pass",
+    "r-allow": "na",
+    "r-review": "pass"
+   },
+   "exit": 1,
+   "java": {
+    "fixed": {
+     "code": {
+      "G-CLASSIC-SIG": 1,
+      "G-CURVE": 0,
+      "G-DH-DSA": 0,
+      "G-EC": 0,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 0,
+      "G-RSA": 1,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-KPQC-KEM": 0,
+      "E-KPQC-SIG": 0,
+      "E-MLDSA65": 2,
+      "E-MLDSA87": 0,
+      "E-MLKEM1024": 0,
+      "E-MLKEM768": 2
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    },
+    "orig": {
+     "code": {
+      "G-CLASSIC-SIG": 2,
+      "G-CURVE": 2,
+      "G-DH-DSA": 0,
+      "G-EC": 5,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 3,
+      "G-RSA": 5,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-KPQC-KEM": 0,
+      "E-KPQC-SIG": 0,
+      "E-MLDSA65": 0,
+      "E-MLDSA87": 0,
+      "E-MLKEM1024": 0,
+      "E-MLKEM768": 0
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    }
+   },
+   "ruleset_version": "2",
+   "verdict": "fail",
+   "weakening": {
+    "deny": 0,
+    "review": 0
+   }
+  },
+  "m27b-node-modules-beside-build-file": {
+   "allow_status": [],
+   "allowlist": {
+    "unreviewed": 0,
+    "unused": 0,
+    "unused_orig_lines": 0,
+    "write_review": 0
+   },
+   "cbom": {
+    "fixed": {
+     "allowed": 0,
+     "blocking": 0,
+     "check": 0,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    },
+    "orig": {
+     "allowed": 0,
+     "blocking": 13,
+     "check": 0,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    }
+   },
+   "checks": {
+    "a-cbom": "pass",
+    "a-input": "review",
+    "b-tls": "na",
+    "b-weakening": "pass",
+    "c-classic": "pass",
+    "c-expect": "pass",
+    "r-allow": "na",
+    "r-review": "pass"
+   },
+   "exit": 0,
+   "java": {
+    "fixed": {
+     "code": {
+      "G-CLASSIC-SIG": 0,
+      "G-CURVE": 0,
+      "G-DH-DSA": 0,
+      "G-EC": 0,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 0,
+      "G-RSA": 0,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-KPQC-KEM": 0,
+      "E-KPQC-SIG": 0,
+      "E-MLDSA65": 2,
+      "E-MLDSA87": 0,
+      "E-MLKEM1024": 0,
+      "E-MLKEM768": 2
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    },
+    "orig": {
+     "code": {
+      "G-CLASSIC-SIG": 2,
+      "G-CURVE": 2,
+      "G-DH-DSA": 0,
+      "G-EC": 5,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 3,
+      "G-RSA": 5,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-KPQC-KEM": 0,
+      "E-KPQC-SIG": 0,
+      "E-MLDSA65": 0,
+      "E-MLDSA87": 0,
+      "E-MLKEM1024": 0,
+      "E-MLKEM768": 0
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    }
+   },
+   "ruleset_version": "2",
+   "verdict": "pass",
+   "weakening": {
+    "deny": 0,
+    "review": 0
+   }
+  },
+  "m27c-misplaced-tox-folder": {
+   "allow_status": [],
+   "allowlist": {
+    "unreviewed": 0,
+    "unused": 0,
+    "unused_orig_lines": 0,
+    "write_review": 0
+   },
+   "cbom": {
+    "fixed": {
+     "allowed": 0,
+     "blocking": 0,
+     "check": 0,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    },
+    "orig": {
+     "allowed": 0,
+     "blocking": 13,
+     "check": 0,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    }
+   },
+   "checks": {
+    "a-cbom": "pass",
+    "a-input": "review",
+    "b-tls": "na",
+    "b-weakening": "pass",
+    "c-classic": "pass",
+    "c-expect": "pass",
+    "r-allow": "na",
+    "r-review": "pass"
+   },
+   "exit": 0,
+   "java": {
+    "fixed": {
+     "code": {
+      "G-CLASSIC-SIG": 0,
+      "G-CURVE": 0,
+      "G-DH-DSA": 0,
+      "G-EC": 0,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 0,
+      "G-RSA": 0,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-KPQC-KEM": 0,
+      "E-KPQC-SIG": 0,
+      "E-MLDSA65": 2,
+      "E-MLDSA87": 0,
+      "E-MLKEM1024": 0,
+      "E-MLKEM768": 2
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    },
+    "orig": {
+     "code": {
+      "G-CLASSIC-SIG": 2,
+      "G-CURVE": 2,
+      "G-DH-DSA": 0,
+      "G-EC": 5,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 3,
+      "G-RSA": 5,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-KPQC-KEM": 0,
+      "E-KPQC-SIG": 0,
+      "E-MLDSA65": 0,
+      "E-MLDSA87": 0,
+      "E-MLKEM1024": 0,
+      "E-MLKEM768": 0
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    }
+   },
+   "ruleset_version": "2",
+   "verdict": "pass",
+   "weakening": {
+    "deny": 0,
+    "review": 0
+   }
+  },
+  "m28-test-keypair": {
+   "allow_status": [],
+   "allowlist": {
+    "unreviewed": 0,
+    "unused": 0,
+    "unused_orig_lines": 0,
+    "write_review": 0
+   },
+   "cbom": {
+    "fixed": {
+     "allowed": 0,
+     "blocking": 0,
+     "check": 0,
+     "comment_or_test": 2,
+     "review": 0,
+     "tests": 2
+    },
+    "orig": {
+     "allowed": 0,
+     "blocking": 13,
+     "check": 0,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    }
+   },
+   "checks": {
+    "a-cbom": "pass",
+    "a-input": "pass",
+    "b-tls": "na",
+    "b-weakening": "pass",
+    "c-classic": "pass",
+    "c-expect": "pass",
+    "r-allow": "na",
+    "r-review": "pass"
+   },
+   "exit": 0,
+   "java": {
+    "fixed": {
+     "code": {
+      "G-CLASSIC-SIG": 0,
+      "G-CURVE": 0,
+      "G-DH-DSA": 0,
+      "G-EC": 0,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 0,
+      "G-RSA": 0,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-KPQC-KEM": 0,
+      "E-KPQC-SIG": 0,
+      "E-MLDSA65": 2,
+      "E-MLDSA87": 0,
+      "E-MLKEM1024": 0,
+      "E-MLKEM768": 2
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    },
+    "orig": {
+     "code": {
+      "G-CLASSIC-SIG": 2,
+      "G-CURVE": 2,
+      "G-DH-DSA": 0,
+      "G-EC": 5,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 3,
+      "G-RSA": 5,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-KPQC-KEM": 0,
+      "E-KPQC-SIG": 0,
+      "E-MLDSA65": 0,
+      "E-MLDSA87": 0,
+      "E-MLKEM1024": 0,
+      "E-MLKEM768": 0
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    }
+   },
+   "ruleset_version": "2",
+   "verdict": "pass",
+   "weakening": {
+    "deny": 0,
+    "review": 0
+   }
+  },
+  "m29-check-mode-outside-link": {
+   "allow_status": [],
+   "allowlist": {
+    "unreviewed": 0,
+    "unused": 0,
+    "unused_orig_lines": 0,
+    "write_review": 0
+   },
+   "cbom": {
+    "fixed": {
+     "allowed": 0,
+     "blocking": 0,
+     "check": 0,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    },
+    "orig": {
+     "allowed": 0,
+     "blocking": 0,
+     "check": 0,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    }
+   },
+   "checks": {
+    "a-cbom": "pass",
+    "a-input": "undecided",
+    "b-tls": "na",
+    "b-weakening": "na",
+    "c-classic": "pass",
+    "c-expect": "pass",
+    "r-allow": "na",
+    "r-review": "na"
+   },
+   "exit": 3,
+   "java": {
+    "fixed": {
+     "code": {
+      "G-CLASSIC-SIG": 0,
+      "G-CURVE": 0,
+      "G-DH-DSA": 0,
+      "G-EC": 0,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 0,
+      "G-RSA": 0,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-KPQC-KEM": 0,
+      "E-KPQC-SIG": 0,
+      "E-MLDSA65": 2,
+      "E-MLDSA87": 0,
+      "E-MLKEM1024": 0,
+      "E-MLKEM768": 2
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    },
+    "orig": {
+     "code": {
+      "G-CLASSIC-SIG": 0,
+      "G-CURVE": 0,
+      "G-DH-DSA": 0,
+      "G-EC": 0,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 0,
+      "G-RSA": 0,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-KPQC-KEM": 0,
+      "E-KPQC-SIG": 0,
+      "E-MLDSA65": 2,
+      "E-MLDSA87": 0,
+      "E-MLKEM1024": 0,
+      "E-MLKEM768": 2
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    }
+   },
+   "ruleset_version": "2",
+   "verdict": "undecided",
+   "weakening": {
+    "deny": 0,
+    "review": 0
+   }
+  },
+  "m29b-check-mode-outside-link-strict": {
+   "allow_status": [],
+   "allowlist": {
+    "unreviewed": 0,
+    "unused": 0,
+    "unused_orig_lines": 0,
+    "write_review": 0
+   },
+   "cbom": {
+    "fixed": {
+     "allowed": 0,
+     "blocking": 0,
+     "check": 0,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    },
+    "orig": {
+     "allowed": 0,
+     "blocking": 0,
+     "check": 0,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    }
+   },
+   "checks": {
+    "a-cbom": "pass",
+    "a-input": "fail",
+    "b-tls": "na",
+    "b-weakening": "na",
+    "c-classic": "pass",
+    "c-expect": "pass",
+    "r-allow": "na",
+    "r-review": "na"
+   },
+   "exit": 1,
+   "java": {
+    "fixed": {
+     "code": {
+      "G-CLASSIC-SIG": 0,
+      "G-CURVE": 0,
+      "G-DH-DSA": 0,
+      "G-EC": 0,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 0,
+      "G-RSA": 0,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-KPQC-KEM": 0,
+      "E-KPQC-SIG": 0,
+      "E-MLDSA65": 2,
+      "E-MLDSA87": 0,
+      "E-MLKEM1024": 0,
+      "E-MLKEM768": 2
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    },
+    "orig": {
+     "code": {
+      "G-CLASSIC-SIG": 0,
+      "G-CURVE": 0,
+      "G-DH-DSA": 0,
+      "G-EC": 0,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 0,
+      "G-RSA": 0,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-KPQC-KEM": 0,
+      "E-KPQC-SIG": 0,
+      "E-MLDSA65": 2,
+      "E-MLDSA87": 0,
+      "E-MLKEM1024": 0,
+      "E-MLKEM768": 2
      },
      "legacy_write": 0,
      "tests": 0,

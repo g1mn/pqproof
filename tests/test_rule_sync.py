@@ -94,7 +94,8 @@ class ResidueAndProve(unittest.TestCase):
         self.assertTrue(ere and ere.startswith(rulesrc.residue_export("RES_WRITEOPS") + "|"))
         as_py = re.compile(ere.replace("[[:space:]]", r"\s"))
         import test_rules  # noqa: E402  같은 표(WRITES·NOT_WRITES)를 쓴다
-        rows = test_rules.AllowRules.WRITES + test_rules.AllowRules.NOT_WRITES + ["xSign(k)", "doEncryptOAEP(x)", "mygenerate_private_key"]
+        rows = test_rules.AllowRules.WRITES + test_rules.AllowRules.NOT_WRITES + [
+            "xSign(k)", "doEncryptOAEP(x)", "mygenerate_private_key", "myjwt.encode(x)", "x509CreateCertificate(a)"]
         for line in rows:
             with self.subTest(line=line):
                 self.assertEqual(bool(as_py.search(line)), bool(rules.ALLOW_WRITEOPS.search(line)))
@@ -219,11 +220,15 @@ class SkipDirs(unittest.TestCase):
     """건너뛰는 폴더(scan/skip-dirs): 트리 목록(pqlite/skipdirs.py)과 두 셸 스캐너가 같은 트리에서 같은 파일을 본다(교차 리뷰 X02·X03·X09)."""
 
     # 폴더마다 고전 키 한 줄짜리 K.java. 빌드 파일: 트리 맨 위 go.mod, svc-a/pom.xml, web/package.json, src/main/webapp/package.json
+    # main 표시 아래 any 이름(venv·node_modules·.idea)은 빌드 파일 옆이 아니면 운영 소스로 읽는다. 그 이름이 있으면 셸 스캐너는 이름으로
+    # 잘라 내지 않고 skip_dirs 목록으로 거른다(맨 위 node_modules/z·web/node_modules/y 는 그래도 빠져야 한다)
     DIRS = ["", "src/main/java/com/bank/vendor", "src/main/java/demo/build", "src/main/java/demo/target", "vendor/x", "build/gen",
             "dist", "svc-a/target/gen", "svc-a/src/main/java/a", "svc-b/target", "web/dist", "web/node_modules/y", "lib/vendor",
             "node_modules/z", ".venv/lib", "pkg/.terraform", "src/main/java/demo/vendor/build", "tools/out", ".svn/pristine",
-            "src/main/webapp/dist"]
-    WANT = ["K.java", "lib/vendor/K.java", "src/main/java/com/bank/vendor/K.java", "src/main/java/demo/build/K.java",
+            "src/main/webapp/dist", "src/main/java/com/bank/venv", "src/main/java/com/bank/node_modules", "src/main/java/com/bank/.idea",
+            "src/main/webapp/node_modules/q", "app/.tox/env", "svc-a/.venv/lib"]
+    WANT = ["K.java", "lib/vendor/K.java", "src/main/java/com/bank/.idea/K.java", "src/main/java/com/bank/node_modules/K.java",
+            "src/main/java/com/bank/vendor/K.java", "src/main/java/com/bank/venv/K.java", "src/main/java/demo/build/K.java",
             "src/main/java/demo/target/K.java", "src/main/java/demo/vendor/build/K.java", "src/main/webapp/dist/K.java",
             "svc-a/src/main/java/a/K.java",
             "svc-b/target/K.java", "tools/out/K.java"]
@@ -246,9 +251,23 @@ class SkipDirs(unittest.TestCase):
     def test_tree_list(self):
         got = sorted(r for r, _, _ in rc.tree_files(self.root) if r.endswith("K.java"))
         self.assertEqual(got, self.WANT)
-        skipped = [r for r, _ in skipdirs.walk(self.root, skipdirs.load())[1]]
-        self.assertEqual(skipped, [".svn", ".venv", "build", "dist", "node_modules", "pkg/.terraform", "svc-a/target", "vendor",
-                                   "web/dist", "web/node_modules"])
+        skipped = skipdirs.walk(self.root, skipdirs.load())[1]
+        self.assertEqual(skipped, [(".svn", "any"), (".venv", "any"), ("app/.tox", "output"), ("build", "output"), ("dist", "output"),
+                                   ("node_modules", "any"), ("pkg/.terraform", "output"), ("src/main/webapp/node_modules", "output"),
+                                   ("svc-a/.venv", "any"), ("svc-a/target", "output"), ("vendor", "output"), ("web/dist", "output"),
+                                   ("web/node_modules", "any")])
+
+    def test_misplaced_dependency_folders_are_counted(self):
+        # 제자리(트리 맨 위·빌드 파일 옆)가 아닌 any 폴더는 산출물 폴더처럼 세고, 코드가 있으면 a-input 검토 필요로 간다
+        out = tempfile.mkdtemp(prefix="prep-", dir=self.tmp)
+        info, _, _, extra = prove.prepare_input(self.root, out, "fixed")
+        got = {x["path"]: x["code"] for x in extra["skipped_output"]}
+        self.assertEqual(got["app/.tox"], 1)
+        self.assertEqual(got["src/main/webapp/node_modules"], 1)
+        self.assertEqual(got["pkg/.terraform"], 1)
+        self.assertNotIn("node_modules", got)
+        self.assertNotIn("svc-a/.venv", got)
+        self.assertIn("app/.tox/ 파일 1 · 코드 1", info["skipped"])
 
     def test_residue_sees_the_same_files(self):
         parsed = rules.parse_residue(prove.run_residue(prove.GENERIC_RESIDUE, self.root)[1])

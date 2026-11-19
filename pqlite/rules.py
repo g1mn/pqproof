@@ -135,10 +135,12 @@ LEGACY_FILE = re.compile(r"(?:^|/)Legacy[A-Za-z0-9_]*\.java$")
 ALLOWLINE = re.compile(r"legacy", re.I)
 WRITEOPS = re.compile(r"ENCRYPT_MODE|WRAP_MODE|initSign|KeyPairGenerator|generateKeyPair")
 # 허용 목록 줄의 쓰기 경로(허용 규칙): Java 규칙(WRITEOPS)에 Python·Go·Node의 새 서명·새 암호화·새 키 생성을 보탠다.
+# 토큰·인증서 서명 API(PyJWT jwt.encode, Go jwt SignedString, Java jjwt signWith, Go x509.CreateCertificate)도 쓰기다.
 # 그 줄과 아래 3줄(다음 함수 머리 전까지)을 본다. getInstance("RSA…") 줄 다음 줄에서 ENCRYPT_MODE로 여는 꼴을 놓치지 않으려고.
 ALLOW_WRITEOPS = re.compile(WRITEOPS.pattern + r"|\.sign\s*\(|\bSign(?:PKCS1v15|PSS|ASN1)?\s*\(|\.encrypt\s*\(|"
                             r"\bEncrypt(?:OAEP|PKCS1v15)\s*\(|generate_private_key|\bGenerateKey\s*\(|\.generate\s*\(|"
-                            r"createSign\s*\(|publicEncrypt\s*\(|generateKeyPair(?:Sync)?\s*\(")
+                            r"createSign\s*\(|publicEncrypt\s*\(|generateKeyPair(?:Sync)?\s*\(|"
+                            r"\bjwt\.encode\s*\(|\.SignedString\s*\(|\.signWith\s*\(|\bCreateCertificate\s*\(")
 HYBRID_LINE = re.compile(r"ML[-_]?KEM", re.I)  # MLKEM768·ML-KEM-768·ml_kem_768
 HYBRID_PART = re.compile(r"(?i)x25519|ecdh|x448|secp\d|p-?256|p-?384")
 # 하이브리드 결합(허용 규칙): 같은 함수 안 몇 줄 위아래에 주석이 아닌 ML-KEM 코드가 있으면 키 교환 고전 성분은 '하이브리드 허용'.
@@ -786,8 +788,8 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
         in_act += (f" · 검사 밖을 가리키는 링크 {len(out_links)}개(이 도구는 따라가지 않고 빌드 도구는 따라간다): "
                    + ", ".join(f"{x['path']} -> {x['target'][:60]}({x['why']})" for x in out_links[:4]) + (" 외" if len(out_links) > 4 else ""))
     if skip_code:
-        in_act += (f" · 건너뛴 폴더 {len(skip_code)}곳에 코드 파일 {sum(x['code'] for x in skip_code)}개(빌드 산출물·받아 둔 의존성으로 보고 "
-                   "검사하지 않음, scan/skip-dirs): " + ", ".join(f"{x['path']}/ {x['code']}개" for x in skip_code[:4])
+        in_act += (f" · 건너뛴 폴더 {len(skip_code)}곳에 코드 파일 {sum(x['code'] for x in skip_code)}개(빌드 산출물·받아 둔 의존성·가상 환경으로 "
+                   "보고 검사하지 않음, scan/skip-dirs): " + ", ".join(f"{x['path']}/ {x['code']}개" for x in skip_code[:4])
                    + (" 외" if len(skip_code) > 4 else ""))
     if oversize:
         in_act += (f" · 크기 한도({MAX_TEXT:,}바이트)를 넘어 scan.py·약화·허용 검사가 건너뛴 코드·설정 파일 {len(oversize)}개"
@@ -796,7 +798,7 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
         in_act += " · 코드·폴더 링크는 내용을 보지 못해 판정할 수 없다(대상을 트리에 넣거나 링크를 지운다)"
         if params.require_review:
             in_st = "fail"
-        elif in_st in ("pass", "review"):
+        elif in_st in ("pass", "review", "na"):  # 한 트리 점검(na)도 같다: 링크 너머 코드를 못 봤다
             in_st = "undecided"
     elif (out_links or skip_code or oversize) and in_st in ("pass", "na"):
         in_st = "review"

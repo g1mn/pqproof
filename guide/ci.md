@@ -8,7 +8,7 @@ PQ-Proof fits a pipeline as one step: judge the change against its base commit, 
 | After the migration: stop classical code from coming back, catch expired allowlist entries | `pqproof check .`, or the Action with `mode: check` | `examples/github-actions/pqproof-check.yml` |
 | A first survey or an audit, no verdict | `pqproof inventory <tree>` writes `inventory.json` and `tables/cbom.csv` | |
 
-`check` judges one tree with the same rules. The checks that compare two trees (`a-input`'s common files, `b-weakening`, `r-review`) are "not applicable" and never count as passed; `receipt.json` records `params.mode: check`. Before 0.2.0 the only way was to pass the same tree twice, which ended undecided because the original showed nothing to migrate.
+`check` judges one tree with the same rules. The checks that compare two trees (`a-input`'s common files, `b-weakening`, `r-review`) are "not applicable" and never count as passed; `receipt.json` records `params.mode: check`. So check mode does not catch TLS weakening (a trust-all `TrustManager`, `InsecureSkipVerify`, a lower minimum version) or a removed verification call: run the two-tree judgment on every pull request and use `check` on `main` as an extra guard for classical algorithms, allowlist expiry and review age. `a-input` still reports counted folders, oversize files and links; a code link outside the tree leaves it undecided, and fails it under `REQUIRE_REVIEW=1`. Before 0.2.0 the only way was to pass the same tree twice, which ended undecided because the original showed nothing to migrate.
 
 ## GitHub Action
 

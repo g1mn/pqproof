@@ -220,7 +220,7 @@ def number(env, name, default, lo, hi):
     v = (env.get(name) or "").strip()
     if not v:
         return default
-    if not v.isdigit() or not lo <= int(v) <= hi:
+    if not re.fullmatch(r"[0-9]{1,9}", v) or not lo <= int(v) <= hi:  # isdigit 은 '²'·'٣' 같은 유니코드 숫자도 받는다
         raise UsageError(f"{name}는 {lo}~{hi} 정수: {v!r}")
     return int(v)
 
@@ -330,7 +330,8 @@ MAX_SKIPPED = 100  # inputs.*.skipped 에 하나씩 적는 건너뛴 폴더·링
 
 def prepare_input(path, out, side, skip_rules=None, max_bytes=rules.MAX_TEXT):
     """(receipt 입력 칸, 트리 루트 경로, 파일 목록, 입력 정보 {links, skipped_output}). 건너뛰는 폴더는 scan/skip-dirs(skip_rules).
-    links: 트리의 심볼릭 링크와 zip 안 링크(풀지 않음)마다 rules.link_info. skipped_output: 건너뛴 산출물 폴더마다 파일·코드 파일 수."""
+    links: 트리의 심볼릭 링크와 zip 안 링크(풀지 않음)마다 rules.link_info. skipped_output: 세는 폴더(산출물 폴더와 제자리가 아닌
+    any 이름 폴더, pqlite/skipdirs.Rules.kind)마다 파일·코드 파일 수. 코드 파일이 없는 any 이름 폴더는 이름만 skipped 에 적는다."""
     path = os.path.abspath(path)
     skip_rules = skip_rules or skipdirs.load()
     zlinks = []
@@ -354,22 +355,29 @@ def prepare_input(path, out, side, skip_rules=None, max_bytes=rules.MAX_TEXT):
     if odd is not None:  # 줄바꿈·탭 같은 제어 문자가 든 이름은 줄 단위로 읽는 스캐너가 놓치거나 잘못 가른다(교차 리뷰 X21)
         raise UsageError(f"파일 이름에 제어 문자(줄바꿈·탭 등)가 있다: {odd!r}. 이름을 바꾼 뒤 다시 돌린다(스캐너가 줄 단위로 읽어 그 파일을 놓친다)")
     skipped_rel = [r for r, _ in skips]
-    skip_out = []
+    skip_out, quiet_any = [], set()
     for r, k in skips:
         if k == "output":
             n, c = count_files(os.path.join(root, *r.split("/")))
+            name = r.rsplit("/", 1)[-1]
+            if name in skip_rules.any and not c:  # 제자리가 아닌 any 폴더도 코드 파일이 없으면 이름만 적는다(__pycache__·.idea 등)
+                quiet_any.add(name)
+                continue
             skip_out.append({"path": r, "files": n, "code": c})
     links = [rules.link_info(r, d[len("symlink:"):], skipped_rel) for r, d, _ in files if d.startswith("symlink:")]
     for n, tgt in zlinks:
         parts = n.split("/")
-        if any(x in skip_rules.any for x in parts[:-1]) or any(n.startswith(s + "/") for s in skipped_rel):
-            continue  # 건너뛴 폴더 안 링크는 폴더 입력과 같이 보지 않는다
+        # 건너뛴 폴더 안 링크는 폴더 입력과 같이 보지 않는다. 링크만 든 폴더는 풀리지 않아 skipped_rel 에 없을 수 있어 any 이름으로도
+        # 거른다(main 표시 아래 any 이름은 운영 소스일 수 있어 빼지 않는다)
+        if any(x in skip_rules.any and not (skip_rules.main and skip_rules.main in "/" + "/".join(parts[:i + 1]) + "/")
+               for i, x in enumerate(parts[:-1])) or any(n.startswith(s + "/") for s in skipped_rel):
+            continue
         links.append(dict(rules.link_info(n, tgt, skipped_rel), zip=True))
     shown = [f"{x['path']}/ 파일 {x['files']} · 코드 {x['code']}" for x in skip_out] + [rules.link_text(x) for x in links]
     # 크기 한도를 넘어 scan.py·약화·허용 검사가 통째로 건너뛰는 코드·설정 파일(교차 리뷰 X56). 형식 3 inputs.*.oversize
     big = [f"{r} ({n:,}바이트)" for r, d, n in files if not d.startswith("symlink:") and n > max_bytes and al.KEEP_FILE.search(r)]
     info = {"path": path, "kind": kind, "zip_sha256": zsha, "root": rel, "files": len(files), "tree_sha256": rc.tree_sha256(files),
-            "skipped": sorted({r.rsplit("/", 1)[-1] for r, k in skips if k == "any"}) + shown[:MAX_SKIPPED]
+            "skipped": sorted({r.rsplit("/", 1)[-1] for r, k in skips if k == "any"} | quiet_any) + shown[:MAX_SKIPPED]
             + ([f"외 {len(shown) - MAX_SKIPPED}곳"] if len(shown) > MAX_SKIPPED else []),
             "oversize": big[:MAX_SKIPPED] + ([f"외 {len(big) - MAX_SKIPPED}개"] if len(big) > MAX_SKIPPED else [])}
     return info, root, files, {"links": links, "skipped_output": skip_out, "oversize": big}
@@ -578,15 +586,16 @@ def openssl_35(openssl):
     return bool(m) and (int(m[1]), int(m[2])) >= (3, 5)
 
 
-def default_out(orig):
+def default_out(orig, prefix="proof"):
     """원본이 <작업 폴더>/orig 이고 <작업 폴더>/evidence 가 있으면 그 아래 proof-YYYYMMDD-HHMMSS, 아니면 ./proof-out-YYYYMMDD-HHMMSS.
-    같은 이름이 이미 있으면(같은 초에 두 번 돌린 경우) 뒤에 -2, -3 을 붙인다. OUT 으로 준 이름은 그대로 쓰고 있으면 멈춘다."""
+    prefix 는 이름 앞머리만 바꾼다(--inventory 는 inventory). 같은 이름이 이미 있으면(같은 초에 두 번 돌린 경우) 뒤에 -2, -3 을
+    붙인다. OUT 으로 준 이름은 그대로 쓰고 있으면 멈춘다."""
     stamp = time.strftime("%Y%m%d-%H%M%S")
     o = os.path.abspath(orig)
     if os.path.basename(o) == "orig" and os.path.isdir(os.path.join(os.path.dirname(o), "evidence")):
-        base = os.path.join(os.path.dirname(o), "evidence", f"proof-{stamp}")
+        base = os.path.join(os.path.dirname(o), "evidence", f"{prefix}-{stamp}")
     else:
-        base = os.path.abspath(f"proof-out-{stamp}")
+        base = os.path.abspath(f"{prefix}-out-{stamp}")
     path, n = base, 1
     while os.path.lexists(path):
         n += 1
@@ -614,8 +623,11 @@ STEP = {"a-input": "입력 트리 해시·대조", "a-cbom": "(a) cbom-scan.sh +
         "c-expect": "(c) residue.sh EXPECT", "r-review": "(b) verify.review", "r-allow": "허용 목록 reviewed_by·reviewed_at·reviewed_digest"}
 
 
-def md_cell(x):
-    return str("" if x is None else x).replace("\r", " ").replace("\n", " ").replace("|", "\\|").strip()
+def md_cell(x, html=True):
+    """마크다운 표 칸. 링크 대상·경로처럼 입력이 정하는 글이 들어오므로 &·<·> 를 엔티티로 바꾼다(원시 HTML 을 받는 위키에 붙여도
+    태그가 되지 않게). 코드 스팬(백틱) 안에서는 엔티티가 풀리지 않으니 html=False 로 둔다."""
+    s = str("" if x is None else x).replace("\r", " ").replace("\n", " ").replace("|", "\\|").strip()
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;") if html else s
 
 
 def md_table(head, rows):
@@ -635,7 +647,7 @@ def report_md(r, fixed_items, ev):
     fx = r["inputs"]["fixed"]
     out = [f"<!-- prove.sh가 만든 표. 고친 판 트리 sha256 {fx['tree_sha256']}"
            + (f", zip sha256 {fx['zip_sha256']}" if fx["zip_sha256"] else "") + ". receipt_id는 같은 폴더 receipt.json. -->", "",
-           f"명령: `{md_cell(cmd)}` · 판정 **{rc.verdict_text(r)}** · 실행 기록 {ev}", ""]
+           f"명령: `{md_cell(cmd, html=False)}` · 판정 **{rc.verdict_text(r)}** · 실행 기록 {ev}", ""]
     if r.get("format_version"):
         out += [f"판정 근거: pqproof {r['tool_version']} · 규칙 묶음 {r['ruleset_version']} "
                 f"(sha256 `{r['ruleset_sha256'][:16]}`) · 증적 형식 {r['format_version']}", ""]
@@ -1173,7 +1185,7 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
 # 한 트리 인벤토리(--inventory, 교차 리뷰 X13): 판정 없이 CBOM 과 계열별 고전 줄, PQC 이름 줄을 센다. 정기 감사·첫 현황 조사용
 def inventory(tree, params, out=None, quiet=False):
     """한 트리를 두 스캐너와 residue.sh 로 훑어 out 에 inventory.json·tables/cbom.csv·artifacts/ 를 쓴다. 반환 (요약 dict, 종료 코드 0)."""
-    out = os.path.abspath(out or params.out or default_out(tree).replace("proof-", "inventory-", 1))
+    out = os.path.abspath(out or params.out or default_out(tree, "inventory"))
     if os.path.exists(out):
         raise UsageError(f"출력 폴더가 이미 있다(덮어쓰지 않음): {out}")
     started = now()

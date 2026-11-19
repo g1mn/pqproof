@@ -456,9 +456,12 @@ class AllowRules(unittest.TestCase):
               "ecdsa.SignASN1(r, k, d)", "ed25519.Sign(k, m)", "pub.encrypt(m, padding.OAEP(...))", "rsa.EncryptOAEP(h, r, p, m, nil)",
               "rsa.EncryptPKCS1v15(r, p, m)", "rsa.generate_private_key(public_exponent=65537, key_size=2048)",
               "rsa.GenerateKey(rand.Reader, 2048)", "SigningKey.generate()", "crypto.createSign('SHA256')",
-              "crypto.publicEncrypt(pub, buf)", "crypto.generateKeyPair('rsa', o, cb)", "crypto.generateKeyPairSync('ec', o)"]
+              "crypto.publicEncrypt(pub, buf)", "crypto.generateKeyPair('rsa', o, cb)", "crypto.generateKeyPairSync('ec', o)",
+              "jwt.encode(claims, key, algorithm='RS256')", "tok.SignedString(key)", "Jwts.builder().signWith(key).compact()",
+              "x509.CreateCertificate(rand.Reader, t, t, pub, priv)"]
     NOT_WRITES = ["pub.verify(sig, data)", "priv.decrypt(c)", "crypto.privateDecrypt(k, b)", "s.initVerify(k);", "x.generated()",
-                  "c.init(Cipher.DECRYPT_MODE, k);", "byte[] signature = s;"]
+                  "c.init(Cipher.DECRYPT_MODE, k);", "byte[] signature = s;", "jwt.decode(tok, key, algorithms=['RS256'])",
+                  "Jwts.parser().verifyWith(key)", "x509.ParseCertificate(der)"]
 
     def test_write_operations(self):
         for t in self.WRITES:

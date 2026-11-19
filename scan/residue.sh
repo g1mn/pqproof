@@ -37,9 +37,10 @@ RES_MAINRE=$(grep -v -e '^#' -e '^[[:space:]]*$' "$TESTRE_FILE" 2>/dev/null | se
 TMPD=$(mktemp -d "${TMPDIR:-/tmp}/residue.XXXXXX") || exit 2
 trap 'rm -f "$TMPD"/* 2>/dev/null; rmdir "$TMPD" 2>/dev/null' EXIT
 # --- 건너뛰는 폴더(scan/skip-dirs). residue.sh 와 cbom-scan.sh 에 같은 글로 있고 pqlite/skipdirs.py 와 같은 규칙이다
-# (tests/test_rule_sync.py 가 세 곳을 대조한다). any 이름은 어느 깊이든, output 이름은 트리 맨 위이거나 같은 폴더에 buildfile 이
-# 있을 때만 건너뛴다. 경로에 main 표시가 있으면 output 규칙을 쓰지 않는다. 건너뛴 폴더 안은 보지 않는다.
-skip_load() { # SKIP_FILE → SK_ANYX·SK_OUTX(find 식), SK_ANYL(이름 목록), SK_BFS(빌드 파일), SK_MAIN
+# (tests/test_rule_sync.py 가 세 곳을 대조한다). any 이름은 어느 깊이든 건너뛰되 경로에 main 표시가 있으면 같은 폴더에 buildfile 이
+# 있을 때만 건너뛴다. output 이름은 트리 맨 위이거나 같은 폴더에 buildfile 이 있을 때만, 경로에 main 표시가 없을 때만 건너뛴다.
+# 건너뛴 폴더 안은 보지 않는다.
+skip_load() { # SKIP_FILE → SK_ANYX·SK_OUTX(find 식), SK_ANYL(이름 목록), SK_BFS(빌드 파일), SK_MAIN, SK_MAINP(find -path 꼴)
   local k v n
   SK_ANYX=""; SK_OUTX=""; SK_ANYL=" "; SK_BFS=""; SK_MAIN=""
   while read -r k v n; do
@@ -53,26 +54,37 @@ skip_load() { # SKIP_FILE → SK_ANYX·SK_OUTX(find 식), SK_ANYL(이름 목록)
     esac
   done < <(grep -v -e '^#' -e '^[[:space:]]*$' "$SKIP_FILE")
   SK_ANYX=${SK_ANYX:--name /}; SK_OUTX=${SK_OUTX:--name /}   # 빈 목록: '/' 는 이름에 없어 아무것도 안 맞는다
+  SK_MAINP=/; [ -n "$SK_MAIN" ] && SK_MAINP="*$SK_MAIN*"     # main 표시가 없으면 '/' 는 어느 하위 경로에도 안 맞는다
 }
 skip_dirs() { # $1=ROOT → 건너뛸 폴더의 전체 경로를 한 줄에 하나씩(LC_ALL=C 순)
-  local root=$1 d rel parent b p cut="" hit
+  local root=$1 d rel parent b p cut="" hit inmain bf
+  # main 표시 아래 any 이름 폴더는 잘라 내지 않고 들어가 본다(빌드 파일 옆이 아니면 운영 소스다). 판단은 아래에서 트리 안 경로로 한다
   # shellcheck disable=SC2086  # SK_ANYX·SK_OUTX 는 '-name 이름 -o ...' 식이라 나눠 넘긴다(이름에 공백·글롭 문자가 없다)
-  find "$root" -mindepth 1 -type d \( $SK_ANYX \) -prune -print -o -type d \( $SK_OUTX \) -print 2>/dev/null | LC_ALL=C sort |
-  while IFS= read -r d; do
+  find "$root" -mindepth 1 -type d \( $SK_ANYX \) \( -path "$SK_MAINP" -print -o -prune -print \) -o -type d \( $SK_OUTX \) -print 2>/dev/null |
+  LC_ALL=C sort | while IFS= read -r d; do
     hit=0
     while IFS= read -r p; do [ -n "$p" ] && case "$d/" in "$p"/*) hit=1;; esac; done <<< "$cut"
     [ $hit = 1 ] && continue
-    case "$SK_ANYL" in *" ${d##*/} "*) ;; *)
-      rel=${d#"$root"/}; parent=${d%/*}
-      [ -n "$SK_MAIN" ] && case "/$rel/" in *"$SK_MAIN"*) continue;; esac
-      if [ "$parent" != "$root" ]; then
-        hit=0
-        for b in $SK_BFS; do p="$parent/$b"; { [ -L "$p" ] || [ -e "$p" ]; } && [ ! -d "$p" ] && { hit=1; break; }; done
-        [ $hit = 1 ] || continue
-      fi;;
+    rel=${d#"$root"/}; parent=${d%/*}; inmain=0; bf=0
+    [ -n "$SK_MAIN" ] && case "/$rel/" in *"$SK_MAIN"*) inmain=1;; esac
+    if [ "$parent" != "$root" ]; then
+      for b in $SK_BFS; do p="$parent/$b"; { [ -L "$p" ] || [ -e "$p" ]; } && [ ! -d "$p" ] && { bf=1; break; }; done
+    fi
+    case "$SK_ANYL" in
+      *" ${d##*/} "*) [ $inmain = 1 ] && [ $bf = 0 ] && continue;;
+      *) [ $inmain = 1 ] && continue; [ "$parent" != "$root" ] && [ $bf = 0 ] && continue;;
     esac
     cut="$cut$d"$'\n'; printf '%s\n' "$d"
   done
+}
+skip_names() { # $1=ROOT → SK_PRUNEL·SK_PRUNEX: find·grep 이 이름만 보고 잘라 낼 any 이름. main 표시 아래에 같은 이름 폴더가 있는
+  # 이름은 빼고(그 폴더를 읽어야 할 수 있다), 그 이름의 다른 폴더는 skip_out 이 skip_dirs 목록으로 거른다
+  local keep x
+  # shellcheck disable=SC2086
+  keep=" $(find "$1" -mindepth 1 -type d \( $SK_ANYX \) \( -path "$SK_MAINP" -print -o -prune \) 2>/dev/null | sed 's#.*/##' | LC_ALL=C sort -u | tr '\n' ' ')"
+  SK_PRUNEL=""; SK_PRUNEX=""
+  for x in $SK_ANYL; do case "$keep" in *" $x "*) ;; *) SK_PRUNEL="$SK_PRUNEL $x"; SK_PRUNEX="${SK_PRUNEX:+$SK_PRUNEX -o }-name $x";; esac; done
+  SK_PRUNEX=${SK_PRUNEX:--name /}
 }
 skip_out() { # $1=skip_dirs 목록 파일. 표준 입력 줄 중 그 폴더 아래 경로로 시작하는 줄을 뺀다
   LC_ALL=C awk -v L="$1" 'BEGIN { while ((getline l < L) > 0) if (l != "") p[++n] = l "/"; close(L) }
@@ -108,14 +120,16 @@ export RES_ALLOWLINE='[Ll][Ee][Gg][Aa][Cc][Yy]'
 # 보안레벨 3 미만이라 허용하지 않고(LEFT), G-WEAK-PQC 도 그대로 센다
 export RES_COMPOSITE='[Mm][Ll][-_]?[Dd][Ss][Aa][-_]?(65|87)[-_](RSA|rsa|ECDSA|ecdsa|Ed25519|ed25519|Ed448|ed448)'
 export RES_WRITEOPS='ENCRYPT_MODE|WRAP_MODE|initSign|KeyPairGenerator|generateKeyPair'
-# 이름 규칙의 쓰기 연산: RES_WRITEOPS 에 Python·Go·Node 의 새 서명·새 암호화·새 키 생성을 보탠다(pqlite/rules.py ALLOW_WRITEOPS 와 같은 뜻의 ERE)
-export RES_ALLOW_WRITEOPS='ENCRYPT_MODE|WRAP_MODE|initSign|KeyPairGenerator|generateKeyPair|\.sign[[:space:]]*\(|(^|[^A-Za-z0-9_])Sign(PKCS1v15|PSS|ASN1)?[[:space:]]*\(|\.encrypt[[:space:]]*\(|(^|[^A-Za-z0-9_])Encrypt(OAEP|PKCS1v15)[[:space:]]*\(|generate_private_key|(^|[^A-Za-z0-9_])GenerateKey[[:space:]]*\(|\.generate[[:space:]]*\(|createSign[[:space:]]*\(|publicEncrypt[[:space:]]*\(|generateKeyPair(Sync)?[[:space:]]*\('
+# 이름 규칙의 쓰기 연산: RES_WRITEOPS 에 Python·Go·Node 의 새 서명·새 암호화·새 키 생성과 토큰·인증서 서명 API 를 보탠다
+# (pqlite/rules.py ALLOW_WRITEOPS 와 같은 뜻의 ERE)
+export RES_ALLOW_WRITEOPS='ENCRYPT_MODE|WRAP_MODE|initSign|KeyPairGenerator|generateKeyPair|\.sign[[:space:]]*\(|(^|[^A-Za-z0-9_])Sign(PKCS1v15|PSS|ASN1)?[[:space:]]*\(|\.encrypt[[:space:]]*\(|(^|[^A-Za-z0-9_])Encrypt(OAEP|PKCS1v15)[[:space:]]*\(|generate_private_key|(^|[^A-Za-z0-9_])GenerateKey[[:space:]]*\(|\.generate[[:space:]]*\(|createSign[[:space:]]*\(|publicEncrypt[[:space:]]*\(|generateKeyPair(Sync)?[[:space:]]*\(|(^|[^A-Za-z0-9_])jwt\.encode[[:space:]]*\(|\.SignedString[[:space:]]*\(|\.signWith[[:space:]]*\(|(^|[^A-Za-z0-9_])CreateCertificate[[:space:]]*\('
 
 skip_load || exit 2
 skip_dirs "$ROOT" > "$TMPD/skip" || exit 2
+skip_names "$ROOT"
 find_files() { # 건너뛰는 폴더를 뺀 일반 파일(이름 순)
-  # shellcheck disable=SC2086  # SK_ANYX 는 '-name 이름 -o ...' 식이라 나눠 넘긴다(이름에 공백·글롭 문자가 없다)
-  find "$ROOT" -mindepth 1 \( -type d \( $SK_ANYX \) \) -prune -o -type f -print | skip_out "$TMPD/skip" | LC_ALL=C sort
+  # shellcheck disable=SC2086  # SK_PRUNEX 는 '-name 이름 -o ...' 식이라 나눠 넘긴다(이름에 공백·글롭 문자가 없다)
+  find "$ROOT" -mindepth 1 \( -type d \( $SK_PRUNEX \) \) -prune -o -type f -print | skip_out "$TMPD/skip" | LC_ALL=C sort
 }
 FILES=(); SKIP=0; SKIPN=""
 while IFS= read -r f; do
