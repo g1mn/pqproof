@@ -13,7 +13,7 @@ URL=https://github.com/pq-code-package/mlkem-native/archive/$COMMIT.tar.gz
 mkdir "$OUT"
 TAR=${2:-$OUT/mlkem-native-$COMMIT.tar.gz}
 [ -n "${2:-}" ] || curl -sSfL -o "$TAR" "$URL"
-echo "$SHA  $TAR" | shasum -a 256 -c - >/dev/null || { echo "pqverify_targets.sh: $TAR is not mlkem-native $COMMIT" >&2; exit 1; }
+echo "$SHA  $TAR" | shasum -a 256 -c - >/dev/null || { echo "pqverify_targets.sh: $TAR does not match the pinned SHA-256 of mlkem-native $COMMIT. GitHub generates archive downloads and has changed their bytes before: if the commit is right, compare the unpacked files with a clone of that commit before you pin a new SHA-256" >&2; exit 1; }
 mkdir "$OUT/src"
 tar -xzf "$TAR" -C "$OUT/src" --strip-components=1
 ext=so

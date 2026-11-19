@@ -54,7 +54,7 @@ for n in $NAMES; do
     mkdir -p "$OUT/dl/$n"
     curl -sSfL --retry 3 -o "$OUT/dl/$n/archive" "$(url "$n")"
   fi
-  echo "$(sha "$n")  $OUT/dl/$n/archive" | shasum -a 256 -c - >/dev/null || { echo "kpqc_targets.sh: $n archive does not match its pinned SHA-256" >&2; exit 1; }
+  echo "$(sha "$n")  $OUT/dl/$n/archive" | shasum -a 256 -c - >/dev/null || { echo "kpqc_targets.sh: $n archive does not match its pinned SHA-256 (for a GitHub archive/<commit>.tar.gz, GitHub can regenerate the bytes: compare the unpacked files with a clone of that commit before you pin a new SHA-256)" >&2; exit 1; }
   mkdir "$OUT/src/$n"
   if [ "$n" = pqclean ]; then
     tar -xzf "$OUT/dl/$n/archive" -C "$OUT/src/$n" --strip-components=1

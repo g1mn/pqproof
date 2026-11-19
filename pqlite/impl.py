@@ -19,6 +19,7 @@
 from __future__ import annotations  # 맥 기본 python3 3.9
 
 import hashlib
+import io
 import json
 import os
 import re
@@ -27,17 +28,46 @@ import re
 DEC_FIELDS = frozenset({"count", "mlen", "smlen", "siglen"})
 DEC_DIGITS = 18  # 10진 칸의 자릿수 상한(앞의 0 을 뗀 뒤). 맥 기본 python 3.9 의 int() 는 긴 숫자에 자릿수 제곱 시간이 걸린다
 JSON_NUMBER_CHARS = 40  # JSON 숫자 글의 길이 상한(같은 까닭. 3.11 부터는 int 가 4300자리에서 스스로 멈춘다)
+KEY_CHARS = 32  # .rsp 칸 이름의 길이 상한(참조판은 count·seed·pk·sk·ct·ss·mlen·msg·siglen·sig·smlen·sm 뿐이다)
+MAX_RSP_RECORDS = 1000  # .rsp 레코드 수 상한(참조 KAT 는 100건). 'count = 0' 줄만 이어 붙인 파일이 메모리를 입력의 백 배 넘게 쓰지 않게
 _KEY_RE = re.compile(r"[a-z][a-z0-9_]*")
 _HEX_RE = re.compile(r"[0-9A-Fa-f]*")
 _DEC_RE = re.compile(r"[0-9]+")
 _DIGEST_RE = re.compile(r"[0-9a-f]{64}")
 
 
+# 판정 글에 그대로 넣지 않는 글자: C0·DEL·C1 제어 문자, 줄·문단 나눔(U+2028·2029), 양방향 제어(U+061C, U+200E·200F, U+202A~202E,
+# U+2066~2069), 폭 없는 글자(U+200B~200D, U+2060~2064, U+FEFF), 서로게이트. str.isprintable() 은 파이썬에 든 유니코드 판을 따라
+# (3.9 는 13.0, 3.15 는 17.0) 새 글자를 판마다 다르게 보므로 쓰지 않는다: 같은 입력이면 어느 파이썬에서도 같은 판정 글이 나와야 한다
+_UNSAFE_RANGES = ((0x00, 0x1F), (0x7F, 0x9F), (0x061C, 0x061C), (0x200B, 0x200F), (0x2028, 0x202E), (0x2060, 0x2064),
+                  (0x2066, 0x2069), (0xD800, 0xDFFF), (0xFEFF, 0xFEFF))
+_ESCAPES = {"\n": "\\n", "\r": "\\r", "\t": "\\t"}
+
+
+def unsafe_char(c):
+    """판정 글에 그대로 넣지 않는 글자인가(_UNSAFE_RANGES, 파이썬 판과 무관한 고정 규칙)."""
+    o = ord(c)
+    return any(a <= o <= b for a, b in _UNSAFE_RANGES)
+
+
+def _escape(c):
+    o = ord(c)
+    return _ESCAPES.get(c) or (f"\\x{o:02x}" if o < 0x100 else f"\\u{o:04x}")
+
+
+def _q(v):
+    """판정 글에 값을 따옴표로 넣는 꼴. ASCII 글과 글이 아닌 값은 repr 그대로(파이썬 판마다 같다), 그 밖의 글은 repr 대신 작은따옴표로
+    싼다(repr 은 isprintable 을 따라 파이썬 판마다 다르게 적는다). 넣기 전에 shown 으로 제어 문자를 적어 바꾼다."""
+    if not isinstance(v, str) or v.isascii():
+        return repr(v)
+    return "'" + v.replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+
 def shown(text, n=80):
-    """남이 준 글(답안의 문항 id·칸 이름·파라미터 이름, .rsp 머리 줄, pq-verify 출력)을 판정 글에 넣는 꼴: 인쇄할 수 없는 글자(제어 문자,
-    줄바꿈, ESC 등)는 \\x1b 처럼 적고 n 자에서 자른다. 콘솔·receipt·report.md·csv 로 터미널 제어 문자가 새지 않게 한다."""
+    """남이 준 글(답안의 문항 id·칸 이름·파라미터 이름, .rsp 머리 줄, pq-verify 출력)을 판정 글에 넣는 꼴: 제어 문자·줄바꿈·ESC·양방향
+    제어 같은 글자(unsafe_char)는 \\x1b 처럼 적고 n 자에서 자른다. 콘솔·receipt·report.md·csv 로 터미널 제어 문자가 새지 않게 한다."""
     s = str(text)
-    body = "".join(c if c.isprintable() else repr(c)[1:-1] for c in s[:n])
+    body = "".join(_escape(c) if unsafe_char(c) else c for c in s[:n])
     return body + ("..." if len(s) > n else "")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 저장소 루트, 또는 설치본의 pqproof/_tool
@@ -56,8 +86,10 @@ def _norm_field(key, value, where=""):
     if not isinstance(key, str) or not isinstance(value, str):
         raise ValueError(f"{where}키와 값은 문자열이어야 한다({key!r})")
     key, value = key.strip().lower(), value.strip()
+    if len(key) > KEY_CHARS:
+        raise ValueError(f"{where}키 이름이 {len(key):,}자로 상한 {KEY_CHARS}자를 넘는다: {_q(shown(key, 40))}")
     if not _KEY_RE.fullmatch(key):
-        raise ValueError(f"{where}키 이름이 아니다: {key!r}")
+        raise ValueError(f"{where}키 이름이 아니다: {_q(shown(key, 40))}")
     if key in DEC_FIELDS:
         if not _DEC_RE.fullmatch(value):
             raise ValueError(f"{where}{key} 는 10진 정수여야 한다: {value[:40]!r}")
@@ -84,7 +116,7 @@ def parse_rsp(text):
     - 10진 칸(count, mlen, smlen, siglen)은 10진 정수여야 하고 앞의 0 을 뗀 문자열로 둔다('033' 은 '33'). 18자리를 넘으면 ValueError.
     - 그 밖의 칸은 16진수여야 하고(빈 값 허용) 대문자로 바꾼다. 16진수가 아닌 글자나 홀수 자릿수는 ValueError.
     - count 줄이 새 레코드를 연다(PQCgenKAT 는 count 를 맨 앞에 쓴다). 첫 count 앞에 다른 칸이 있거나, 한 레코드에 같은 키가
-      두 번 나오면 ValueError.
+      두 번 나오면 ValueError. 레코드가 MAX_RSP_RECORDS 건을 넘거나 키 이름이 KEY_CHARS 자를 넘어도 ValueError.
     - 레코드 수, count 가 0 부터 이어지는지, 칸 이름과 길이가 맞는지는 여기서 보지 않는다(부르는 쪽이 본다).
     """
     if isinstance(text, (bytes, bytearray)):
@@ -102,7 +134,7 @@ def parse_rsp(text):
     if not text.isascii():
         raise ValueError(".rsp 에 ASCII 밖의 글자가 있다")
     records, cur = [], None
-    for n, raw in enumerate(text.replace("\r\n", "\n").replace("\r", "\n").split("\n"), 1):
+    for n, raw in enumerate(io.StringIO(text.replace("\r\n", "\n").replace("\r", "\n"), newline="\n"), 1):  # 줄 목록을 한꺼번에 만들지 않는다
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
@@ -111,6 +143,8 @@ def parse_rsp(text):
             raise ValueError(f"{n}행: '키 = 값' 꼴이 아니다: {line[:40]!r}")
         key, value = _norm_field(key, value, f"{n}행: ")
         if key == "count":
+            if len(records) >= MAX_RSP_RECORDS:
+                raise ValueError(f"{n}행: 레코드가 상한 {MAX_RSP_RECORDS:,}건을 넘는다(참조 KAT 는 100건)")
             cur = {}
             records.append(cur)
         elif cur is None:
@@ -177,7 +211,7 @@ def _loads_strict(data, where):
         out = {}
         for k, v in items:
             if k in out:
-                raise ValueError(f"{where}: 키 {shown(k)!r} 가 두 번 있다")
+                raise ValueError(f"{where}: 키 {_q(shown(k))} 가 두 번 있다")
             out[k] = v
         return out
 
@@ -199,8 +233,8 @@ def _loads_strict(data, where):
             raise ValueError(f"{where}: UTF-8 이 아니다(위치 {e.start})") from None
     try:
         return json.loads(data, object_pairs_hook=pairs, parse_constant=constant, parse_int=number(int), parse_float=number(float))
-    except json.JSONDecodeError as e:
-        raise ValueError(f"{where}: JSON 이 아니다({e})") from None
+    except json.JSONDecodeError:  # 파이썬 json 의 오류 글과 위치는 판마다 다르다(끝 쉼표: 3.13 부터 'Illegal trailing comma'). 판정 글에 넣지 않는다
+        raise ValueError(f"{where}: JSON 이 아니다(문법 오류. 위치는 python3 -m json.tool 로 본다)") from None
     except RecursionError:
         raise ValueError(f"{where}: 값이 너무 깊게 겹쳐 있다(파이썬 재귀 한도)") from None
     except MemoryError:
@@ -441,10 +475,19 @@ def _names(params):
     return out
 
 
+def _source_note(S):
+    """출처 기록 → 한 줄 설명: 제목, 그리고 공식 페이지가 낸 SHA-256 이 맞은 출처(official.match true)면 그 페이지와 페이지의 말."""
+    if not isinstance(S, dict) or not isinstance(S.get("title"), str):
+        return None
+    o = S.get("official") if isinstance(S.get("official"), dict) else {}
+    said = o.get("match") is True and isinstance(o.get("page"), str) and isinstance(o.get("says"), str)
+    return S["title"] + (f" ({o['page']}: \"{o['says']}\")" if said else "")
+
+
 def load_manifest(path=KAT_FILE):
     """scan/kat-kpqc.json 과 그것이 가리키는 scan/kat/ 발췌를 읽어 검사한다(rules.load_profiles 처럼, 틀리면 ManifestError).
     반환: {"sha256": 목록 파일의 SHA-256, "params": {파라미터: 정답 묶음 꼴}, "order": [파라미터](목록 순서), "names": {소문자 이름:
-    파라미터}}. 정답 묶음 꼴은 {id, alg, name, kind, fields, aliases, versions: [{version, latest, role, source, rsp_sha256, digest,
+    파라미터}, "sources": {출처 id: 제목(공식 페이지 해시가 맞으면 그 페이지의 말)}(콘솔 안내용, 판정에 쓰지 않는다)}. 정답 묶음 꼴은 {id, alg, name, kind, fields, aliases, versions: [{version, latest, role, source, rsp_sha256, digest,
     records, record_digests, sizes, excerpt(레코드 목록 또는 None)}]}."""
     root = os.path.dirname(os.path.dirname(os.path.abspath(path)))
     rel = "scan/kat-kpqc.json"
@@ -493,7 +536,9 @@ def load_manifest(path=KAT_FILE):
             order.append(pid)
     if not params:
         raise ManifestError(f"{rel}: 파라미터가 없다")
-    return {"sha256": hashlib.sha256(raw).hexdigest(), "params": params, "order": order, "names": _names(params.values())}
+    sources = {sid: _source_note(S) for sid, S in doc["sources"].items()}
+    return {"sha256": hashlib.sha256(raw).hexdigest(), "params": params, "order": order, "names": _names(params.values()),
+            "sources": sources}
 
 
 def build_key(manifest, pids):
@@ -591,8 +636,9 @@ ANSWER_GUIDE = {
               "Required. Some items carry a changed signature on purpose; do not read meaning into item ids.",
     "sizes": "byte lengths for buffers per parameter set: pk, sk, ct, ss of the latest reference version, and the longest sig.",
     "derand": "optional: call randombytes_init(seed, NULL, 256) of the NIST KAT DRBG that your build links, then keypair and encaps "
-              "(KEM: pk, sk, ct, ss) or keypair and sign msg with ctx (signature: pk, sk, sig, or sm). Give any of these fields, or leave "
-              "the item out. These answers tell reference versions apart when decaps and verify answers cannot.",
+              "(KEM: pk, sk, ct, ss) or keypair and sign msg with ctx (signature: pk, sk, sig, or sm). sm is msg || sig for AIMer and "
+              "sig || msg for HAETAE, as their reference crypto_sign writes it (msg || sig is also taken for HAETAE). Give any of these "
+              "fields, or leave the item out. These answers tell reference versions apart when decaps and verify answers cannot.",
 }
 DERAND_FIELDS = {"kem": ["pk", "sk", "ct", "ss"], "sig": ["pk", "sk", "sig", "sm"]}
 
@@ -728,8 +774,8 @@ def _parse_response(data):
         return bad("params 가 겹치지 않는 파라미터 이름 목록이 아니다")
     if impl is not None and (not isinstance(impl, str) or len(impl) > 500):
         return bad("implementation 은 500자 이하 글이거나 null 이어야 한다")
-    if impl is not None and not impl.isprintable():
-        return bad("implementation 에 인쇄할 수 없는 글자(줄바꿈·제어 문자)가 있다")
+    if impl is not None and any(unsafe_char(c) for c in impl):
+        return bad("implementation 에 인쇄할 수 없는 글자(줄바꿈·제어 문자·양방향 제어)가 있다")
     if not isinstance(answers, dict):
         return bad("answers 가 객체가 아니다")
     norm = {}
@@ -748,7 +794,7 @@ def _parse_response(data):
                     return bad(f"답 {w}: {k} 가 짝수 자리 16진수가 아니다")
                 got[k] = v.strip().upper()
             else:
-                return bad(f"답 {w}: 모르는 칸 {shown(k, 40)!r}")
+                return bad(f"답 {w}: 모르는 칸 {_q(shown(k, 40))}")
         norm[iid] = got
     return dict(out, params=params, prompt_sha256=ps, implementation=impl, answers=norm)
 
@@ -761,11 +807,9 @@ def _parse_rsp_input(data):
         text = data[skip:].decode("ascii")
     except UnicodeDecodeError as e:
         return dict(out, problem=f".rsp 에 ASCII 밖의 바이트가 있다(위치 {e.start + skip})")
-    for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
-        s = line.strip()
-        if s:
-            out["header"] = (shown(s[1:].strip(), 200) or None) if s.startswith("#") else None
-            break
+    s = re.match(r"[^\r\n]*", text.lstrip())[0].strip()  # 첫 비지 않은 줄(줄 목록을 만들지 않는다)
+    if s.startswith("#"):
+        out["header"] = shown(s[1:].strip(), 200) or None
     try:
         out["records"] = parse_rsp(text)
     except ValueError as e:
@@ -775,10 +819,12 @@ def _parse_rsp_input(data):
 
 def input_params(parsed, names, hint=None):
     """판정할 파라미터와 입력 문제: ([파라미터], 까닭 또는 None). names: {소문자 이름: 파라미터}(목록 전체 또는 정답 묶음).
-    답안 JSON 은 params 칸을 정식 이름으로 읽고, .rsp 는 hint(--param, 정식 이름) 또는 머리 줄 이름을 쓴다. hint 를 주면 머리 줄이
+    답안 JSON 은 params 칸을 정식 이름으로 읽어 names 의 순서(목록 순서)로 돌려주고(답안이 params 를 다른 순서로 써도 증적의 params·
+    impl.accept 는 목록 순서다), .rsp 는 hint(--param, 정식 이름) 또는 머리 줄 이름을 쓴다. hint 를 주면 머리 줄이
     다른 파라미터의 알려진 이름일 때만 막고, 모르는 이름(자체 빌드 이름 등)이면 hint 를 따른다(머리 줄은 증적 impl.input.header 에 남는다)."""
     if parsed["kind"] == "response":
-        known = [p for p in parsed["params"] if names.get(p.lower()) == p]
+        order = list(dict.fromkeys(names.values()))  # 목록(정답 묶음) 순서. 답안 params 순서와 상관없이 증적은 이 순서로 적는다
+        known = sorted((p for p in parsed["params"] if names.get(p.lower()) == p), key=order.index)
         unknown = [p for p in parsed["params"] if p not in known]
         if unknown:
             return known, (f"모르는 파라미터 {', '.join(shown(p, 60) for p in unknown[:4])}"
@@ -843,8 +889,16 @@ def _decide(P, cands, acc, rows, unit):
     if good:
         return _result(P, "review", f"{', '.join(V['version'] for V in good)} 와 {', '.join(_label(V) for V in other)} 모두 일치: 이 답안으로는 "
                        "판을 가를 수 없다(derand 문항 결과를 함께 내거나 .rsp 를 낸다)", rows, names)
+    hint = next((f"{P['id']}@{V['version']}" for V in other if V["role"] == "reference"), None)
     return _result(P, "review", ", ".join(f"{_label(V)} 일치({count(by[V['version']])})" for V in other)
-                   + f": 받아 줄 판({', '.join(acc) or '없음'})이 아니다", rows, names)
+                   + f": 받아 줄 판({', '.join(acc) or '없음'})이 아니다"
+                   + (f"(받아 줄 판은 프로필의 impl_accept 가 정한다. 이 판도 받으려면 {hint} 항목을 더한다)" if hint else ""), rows, names)
+
+
+def _sm_other_form(P, it, f, got, val):
+    """HAETAE 꼴(siglen·sig) 파라미터의 derand sm 은 참조 crypto_sign 의 sig || msg 와 함께 msg || sig 도 맞는 답으로 본다(.rsp 길의
+    canonical_record 와 같은 규칙. AIMer 는 sm = msg || sig 하나다)."""
+    return f == "sm" and "sig" in P["fields"] and "msg" in it and got == it["msg"] + val["sig"]
 
 
 def _judge_items(P, items, answers, acc):
@@ -871,7 +925,7 @@ def _judge_items(P, items, answers, acc):
         ver, val = exp[it["id"]]
         s = stats[ver]
         s["checked"] += 1
-        bad = next((f for f in it["answer"] + it["optional"] if f in a and a[f] != val[f]), None)
+        bad = next((f for f in it["answer"] + it["optional"] if f in a and a[f] != val[f] and not _sm_other_form(P, it, f, a[f], val)), None)
         if bad is None:
             s["ok"] += 1
         elif s["first"] is None:
@@ -1171,6 +1225,16 @@ def clip_text(text, limit=PQV_MAX_TEXT):
     return text[:head] + f"\n[pqproof: {len(text) - head - tail:,} characters cut]\n" + text[-tail:]
 
 
+def clip_stream(head, tail, total, limit=PQV_MAX_TEXT):
+    """하위 프로세스 출력을 읽으며 앞(head)·뒤(tail) 바이트만 남긴 것 → 실행 기록에 남길 글. 가운데를 버리지 않았으면(total 이 둘의 합)
+    clip_text 와 같다. 버렸으면 앞 256 KiB 와 끝을 남기고 전체 바이트 수를 적는다(prove.py run_logged 가 출력 전체를 메모리에 두지 않는다)."""
+    if total == len(head) + len(tail):
+        return clip_text((head + tail).decode("utf-8", "replace"), limit)
+    keep = 256 << 10
+    return (head.decode("utf-8", "replace")[:keep] + f"\n[pqproof: {total:,} bytes in all, the middle was not kept]\n"
+            + tail.decode("utf-8", "replace")[-(limit - keep):])
+
+
 def pqverify_version(stdout):
     """'pq-verify 2.19.0' → '2.19.0'(못 읽으면 '')."""
     m = re.search(r"\bpq-verify\s+([0-9][0-9A-Za-z.+-]*)", stdout or "")
@@ -1282,9 +1346,9 @@ def pqverify_status(s):
     if want is None:
         return "undecided", f"{head}, 받는 감사 옵션({', '.join(PQV_AUDITS)})으로 돈 결과가 아니다"
     if s.get("schema") != want:
-        return "undecided", f"{head}, 보고서 꼴 {s.get('schema')!r} 이 {s['audit']} 의 {want} 가 아니다"
+        return "undecided", f"{head}, 보고서 꼴 {_q(s.get('schema'))} 이 {s['audit']} 의 {want} 가 아니다"
     if (s.get("schema_version") or "").split(".")[0] != PQV_SCHEMA_MAJOR:
-        return "undecided", f"{head}, 보고서 schema_version {s.get('schema_version')!r} 의 주 버전이 {PQV_SCHEMA_MAJOR} 이 아니다(이 판의 PQ-Proof 가 읽는 꼴이 아니다)"
+        return "undecided", f"{head}, 보고서 schema_version {_q(s.get('schema_version'))} 의 주 버전이 {PQV_SCHEMA_MAJOR} 이 아니다(이 판의 PQ-Proof 가 읽는 꼴이 아니다)"
     if s.get("degraded"):
         return "undecided", f"{head}, DEGRADED RUN(빠진 엔진·의존 때문에 돌지 않은 검사가 있다), {counts}"
     if s.get("exit_code") not in (0, 1):
@@ -1314,7 +1378,7 @@ def pqverify_status(s):
         return "undecided", f"{head}, VERIFIED 지만 검사 범위가 완전하지 않다({s.get('scope') or '범위 칸 없음'}), {counts}"
     if s.get("status") == "CANNOT VERIFY":
         return "undecided", f"{head}, CANNOT VERIFY(pq-verify 가 검증하지 못했다), {counts}"
-    return "undecided", (f"{head}, 종료 {s['exit_code']} 와 보고서 status {s.get('status')!r}·verified {s.get('verified')} 가 통과나 실패 꼴이 "
+    return "undecided", (f"{head}, 종료 {s['exit_code']} 와 보고서 status {_q(s.get('status'))}·verified {s.get('verified')} 가 통과나 실패 꼴이 "
                          f"아니다, {counts}" + (f", 통과 못 한 단계: {', '.join(s['failed'][:8])}" if s["failed"] else ""))
 
 

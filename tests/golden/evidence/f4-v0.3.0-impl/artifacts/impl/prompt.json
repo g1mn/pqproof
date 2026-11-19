@@ -3,7 +3,7 @@
  "format": "pqproof impl prompt 1",
  "guide": {
   "decaps": "decapsulate ct with sk and give ss (answer: ss). Required.",
-  "derand": "optional: call randombytes_init(seed, NULL, 256) of the NIST KAT DRBG that your build links, then keypair and encaps (KEM: pk, sk, ct, ss) or keypair and sign msg with ctx (signature: pk, sk, sig, or sm). Give any of these fields, or leave the item out. These answers tell reference versions apart when decaps and verify answers cannot.",
+  "derand": "optional: call randombytes_init(seed, NULL, 256) of the NIST KAT DRBG that your build links, then keypair and encaps (KEM: pk, sk, ct, ss) or keypair and sign msg with ctx (signature: pk, sk, sig, or sm). sm is msg || sig for AIMer and sig || msg for HAETAE, as their reference crypto_sign writes it (msg || sig is also taken for HAETAE). Give any of these fields, or leave the item out. These answers tell reference versions apart when decaps and verify answers cannot.",
   "sizes": "byte lengths for buffers per parameter set: pk, sk, ct, ss of the latest reference version, and the longest sig.",
   "verify": "verify sig on msg under pk with the context string ctx (hex, empty for none) and give ok: true or false (answer: ok). Required. Some items carry a changed signature on purpose; do not read meaning into item ids."
  },

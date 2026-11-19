@@ -1,5 +1,7 @@
 # pq-verify (MIT) for the live i-nist test in CI only (tests/test_pqverify.py Live). PQ-Proof does not depend on it at run time.
 # Library audits (--audit-kem, --audit-dsa) use none of its extras, so CI installs the wheel alone with --no-deps.
-# Regenerate pq-verify.txt (one platform-independent wheel):
-#   uv pip compile --generate-hashes --no-deps --python-version 3.13 --exclude-newer <two weeks ago> --no-header -o .github/requirements/pq-verify.txt .github/requirements/pq-verify.in
+# pq-verify.txt pins the version the tests were written against (pqlite/impl.py PQV_TESTED) by the hash of its one
+# platform-independent wheel, taken from the PyPI JSON API (2.19.0 was uploaded 2026-11-15, so no two-week cutoff was used).
+# For a new version, change the line below and PQV_TESTED together, run the tests, and write the new wheel's
+# digests.sha256 from https://pypi.org/pypi/pq-verify/<version>/json into pq-verify.txt (the wheel only, not the sdist).
 pq-verify==2.19.0

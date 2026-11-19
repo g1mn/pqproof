@@ -443,9 +443,11 @@ class Runner:
                         a["sha256"], a["bytes"] = sha, size
                         hit += 1
 
-                def walk(o, rel=rel, sha=sha):
+                def walk(o, rel=rel, sha=sha, size=size):
                     nonlocal hit
                     if isinstance(o, dict):
+                        if o.get("file") == rel and {"sha256", "bytes"} <= set(o):  # 사본이 기록한 원본 파일 칸(impl.input)도 다시 쓴다
+                            o["sha256"], o["bytes"] = sha, size
                         for k in list(o):
                             if isinstance(o[k], str) and o[k] == rel and f"{k}_sha256" in o:
                                 o[f"{k}_sha256"] = sha

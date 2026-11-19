@@ -639,9 +639,13 @@ STEP = {"a-input": "입력 트리 해시·대조", "a-cbom": "(a) cbom-scan.sh +
 
 
 def md_cell(x, html=True):
-    """마크다운 표 칸. 링크 대상·경로처럼 입력이 정하는 글이 들어오므로 &·<·> 를 엔티티로 바꾼다(원시 HTML 을 받는 위키에 붙여도
-    태그가 되지 않게). 코드 스팬(백틱) 안에서는 엔티티가 풀리지 않으니 html=False 로 둔다."""
-    s = str("" if x is None else x).replace("\r", " ").replace("\n", " ").replace("|", "\\|").strip()
+    """마크다운 표 칸. 링크 대상·경로·답안의 파라미터 이름처럼 입력이 정하는 글이 들어오므로 &·<·> 를 엔티티로 바꾸고(원시 HTML 을
+    받는 위키에 붙여도 태그가 되지 않게) '](' 를 ']\\(' 로 적는다([글](주소)·![글](주소) 꼴이 눌리는 링크나 그림이 되지 않게. 경로의
+    [id] 같은 대괄호는 그대로 둔다). 코드 스팬(백틱) 안에서는 엔티티와 이스케이프가 풀리지 않으니 html=False 로 둔다."""
+    s = str("" if x is None else x).replace("\r", " ").replace("\n", " ")
+    if html:
+        s = s.replace("](", "]\\(")
+    s = s.replace("|", "\\|").strip()
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;") if html else s
 
 
@@ -1381,9 +1385,34 @@ def _kill_group(p):
             pass
 
 
+def _drain(stream, buf, keep=impl.PQV_MAX_TEXT):
+    """파이프를 끝까지 읽어 비우되 앞 keep 바이트와 뒤 keep 바이트만 메모리에 둔다(감사 대상 라이브러리가 같은 stdout 에 많이 써도
+    PQ-Proof 의 메모리가 커지지 않게). buf({"head", "tail", "total"})를 읽는 대로 고치므로 중간에 멈춰도 읽은 데까지 남는다."""
+    try:
+        while True:
+            chunk = stream.read1(1 << 16)
+            if not chunk:
+                break
+            buf["total"] += len(chunk)
+            head = buf["head"]
+            if len(head) < keep:
+                n = keep - len(head)
+                head += chunk[:n]
+                chunk = chunk[n:]
+            if chunk:
+                tail = buf["tail"]
+                tail += chunk
+                if len(tail) > keep:
+                    del tail[:len(tail) - keep]
+    except (OSError, ValueError):
+        pass
+
+
 def run_logged(argv, log, role, timeout, env, cwd):
     """하위 프로세스 하나를 셸 없이 새 세션에서 돌린다(시간 초과면 묶음째 멈춤). tlsprobe.HostRunner.run 처럼 argv·종료 코드·stdout·
-    stderr 를 log 에 남긴다(글은 impl.clip_text 상한). 반환: 그 기록."""
+    stderr 를 log 에 남긴다(글은 impl.clip_stream 상한, 읽는 동안에도 앞·뒤만 메모리에 둔다). communicate 처럼 출력 파이프가 닫힐 때까지
+    기다리고, 프로세스가 끝났어도 그 자식이 파이프를 쥐고 시간 한도를 넘기면 시간 초과로 적고 묶음째 멈춘다. 반환: 그 기록."""
+    import threading
     t = time.time()
     rec = {"role": role, "argv": list(argv), "exit_code": None, "stdout": "", "stderr": "", "t": t, "seconds": 0.0, "timeout": timeout,
            "timed_out": False, "error": None}
@@ -1394,18 +1423,32 @@ def run_logged(argv, log, role, timeout, env, cwd):
         rec["error"] = str(e)
         log.append(rec)
         return rec
+    bufs = [{"head": bytearray(), "tail": bytearray(), "total": 0} for _ in range(2)]
+    readers = [threading.Thread(target=_drain, args=(s, b), daemon=True) for s, b in zip((p.stdout, p.stderr), bufs)]
+    for th in readers:
+        th.start()
     try:
-        out, err = p.communicate(timeout=timeout)
+        p.wait(timeout=timeout)
+        for th in readers:
+            th.join(max(0.0, t + timeout - time.time()))
+        if any(th.is_alive() for th in readers):
+            raise subprocess.TimeoutExpired(argv, timeout)
         rec["exit_code"] = p.returncode
     except subprocess.TimeoutExpired:
         rec["timed_out"] = True
         _kill_group(p)
         try:
-            out, err = p.communicate(timeout=10)
+            p.wait(timeout=10)
         except subprocess.TimeoutExpired:
-            out, err = b"", b""
-    rec["stdout"] = impl.clip_text((out or b"").decode("utf-8", "replace"))
-    rec["stderr"] = impl.clip_text((err or b"").decode("utf-8", "replace"))
+            pass
+        for th in readers:
+            th.join(timeout=10)
+    for f in (p.stdout, p.stderr):
+        try:
+            f.close()
+        except OSError:
+            pass
+    rec["stdout"], rec["stderr"] = (impl.clip_stream(bytes(b["head"]), bytes(b["tail"]), b["total"]) for b in bufs)
     rec["seconds"] = round(time.time() - t, 3)
     log.append(rec)
     return rec
@@ -1467,9 +1510,32 @@ def impl_report_md(r):
     if rows:
         out += ["파라미터별 참조판 대조", "", md_table(["파라미터", "판", "역할", "받아 줌", "대조", "첫 불일치", "결과", "요약"], rows), ""]
     if nist:
-        out += ["NIST 구현 감사(pq-verify)", "", md_table(["항목", "값"], [[a, md_cell(b)] for a, b in rc.nist_rows(r)]), "", PQV_SAYS, ""]
+        out += ["NIST 구현 감사(pq-verify)", "", md_table(["항목", "값"], [[a, b] for a, b in rc.nist_rows(r)]), "", PQV_SAYS, ""]
     out += [IMPL_SAYS + f" 다시 확인: `{entry_cmd()} --verify <출력 폴더>`(답안·보고서 사본으로 다시 판정한다).", ""]
     return "\n".join(out)
+
+
+def impl_review_sources(m, key, results, accept, profile):
+    """검토 필요인 파라미터마다 일치한 판과 받아 줄 판이 어느 출처인지(scan/kat-kpqc.json sources 의 제목) 적는 콘솔 줄. 옛 참조판과
+    일치했으면 프로필로 그 판도 받게 하는 법을 덧붙인다. 증적에는 넣지 않는다(판정 글은 정답 묶음 사본만으로 다시 만들 수 있어야 한다)."""
+    out = []
+    for res in results:
+        if res["status"] != "review":
+            continue
+        P = next(P for P in key["params"] if P["id"] == res["param"])
+        by = {V["version"]: V for V in P["versions"]}
+        acc = accept.get(P["id"], [])
+
+        def title(v, by=by):
+            sid = by[v]["source"] if v in by else None
+            return f"{v} = {m['sources'].get(sid) or sid or '출처 없음'}"
+        out.append(f"  {res['param']} 판 출처(scan/kat-kpqc.json): 일치 " + " · ".join(title(v) for v in res["matched"])
+                   + " / 받아 줄 판 " + (" · ".join(title(v) for v in acc) or "없음"))
+        old = next((v for v in res["matched"] if v not in acc and by.get(v, {}).get("role") == "reference"), None)
+        if old:
+            out.append(f"    이 판도 받으려면 scan/profiles.json 의 {profile} 프로필 impl_accept 에 \"{res['param']}@{old}\" 을 더한다"
+                       "(규칙 묶음이 '+modified' 로 적히고, --verify 도 같은 프로필로 한다. guide/impl.md)")
+    return out
 
 
 def impl_judge(path, names, params, out=None, quiet=False, pq_verify=None):
@@ -1606,6 +1672,7 @@ def impl_judge(path, names, params, out=None, quiet=False, pq_verify=None):
             + (v["records"] if v["records"] is not None else (f"{v['ok']}/{v['checked']}" if v["checked"] else "발췌 없음"))
             + (f" 첫 불일치 {v['first_mismatch']}" if v["first_mismatch"] and not (v["checked"] and v["ok"] == v["checked"]) else "")
             for v in res["versions"]))
+    lines += impl_review_sources(m, key, results, accept, params.profile)
     if inp:
         lines.append("자기 점검: " + ("통과(정답 답안 통과, 한 바이트 바꾼 답안 실패)" if control is None and not problem
                                      else (f"실패: {control}" if control else "안 돌림(답안을 판정하지 못함)")))

@@ -48,10 +48,10 @@ The run writes `proof-out-YYYYMMDD-HHMMSS/`. Open `receipt.html` (for people) or
 | 4 | tool error: an unexpected exception inside PQ-Proof (no verdict) |
 | 5 | pass with a check that needs review, only with `FAIL_ON_REVIEW=1` (use it in CI for `pqproof impl`, where an old KpqC version is "needs review") |
 
-| System | Judge two trees | `--verify`, `sarif` |
-|---|---|---|
-| Linux, macOS | yes (bash, OpenSSL; 3.5 or later for the TLS cross-check) | yes |
-| Windows | in WSL | yes, Python alone |
+| System | Judge two trees | `pqproof impl` | `--verify`, `sarif` |
+|---|---|---|---|
+| Linux, macOS | yes (bash, OpenSSL; 3.5 or later for the TLS cross-check) | yes | yes |
+| Windows | in WSL | yes, Python alone (pq-verify itself runs on macOS and Linux) | yes, Python alone |
 
 ## In CI
 
@@ -63,7 +63,7 @@ Three ways to run it in a pipeline: a migration pull request judged against its 
 |---|---|
 | PQ-Proof, `pqproof` | the tool; the Python package and its command |
 | original, converted (fixed) | the tree before and after the migration |
-| check, verdict | eight checks (`a-cbom`, `c-classic`, `b-weakening` ...) and the one verdict they give |
+| check, verdict | eight checks for two trees (`a-cbom`, `c-classic`, `b-weakening` ...), two more in `pqproof impl` (`i-kpqc`, `i-nist`), and the one verdict they give |
 | blocking location | a quantum-breakable public-key use in the converted tree with no recorded reason |
 | allowlist | the classical lines a migration keeps on purpose, each with a reason and a reviewer |
 | evidence (검증 증적), evidence hash | the output folder, and `receipt_id`, the SHA-256 of `receipt.json` in RFC 8785 form |

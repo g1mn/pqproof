@@ -13,37 +13,37 @@
     {
       "bytes": 2742,
       "path": "artifacts/impl/pq-verify/log.json",
-      "sha256": "7b79da10a1ab6432d78777020bb779ee26d71e81c5665f237d555f17d02d83f2"
+      "sha256": "95bfb61d75b0d73b2636388b174814d562acdcf823e43589ad9be4052870608f"
     },
     {
       "bytes": 2923,
       "path": "artifacts/impl/pq-verify/report.json",
-      "sha256": "7f135fddcbfbce062c207ffbebc92317b3042b8d6f784f346d8be95f8ad44fbb"
+      "sha256": "ad906832adff607948e71907fd26d4cea4be5edc679daf9460630d22cdd9e79c"
     },
     {
-      "bytes": 35115,
+      "bytes": 35249,
       "path": "artifacts/impl/prompt.json",
-      "sha256": "a5a29c9f0e1975c1d083c19ffe896915dae32dc29f507862f3cb37a48cd93b95"
+      "sha256": "39a4690214a3a1555d87422e714779beca0ca6559f92183a1d7f878a59d7a753"
     },
     {
-      "bytes": 290,
+      "bytes": 413,
       "path": "tables/impl.csv",
-      "sha256": "4aa746151abfd807dea6b36a972f5cee5e39cf69c65e4dce1115dcfa6c6f052f"
+      "sha256": "ea4656a5159c66fd95f27f4d43b8b6836026e81f4540cf15b7b77f09ff8f657e"
     },
     {
-      "bytes": 3246,
+      "bytes": 3492,
       "path": "tables/report.md",
-      "sha256": "2486fc1225ce99700b2fcfd3f4be5afc32b9da6212a1caa39c069323dea89bdb"
+      "sha256": "3bf57b1a6c9255c4b585f50608ffb1c2591c309058f9adf12503c840e54ad3de"
     },
     {
-      "bytes": 1024,
+      "bytes": 1147,
       "path": "tables/summary.csv",
-      "sha256": "58adafff09e45db007e53df6da94e59d1ccdd464cf7c44ae22ad512d2af79f1a"
+      "sha256": "2683472f634effa3c8408eb550c5a90b4a149ba4be9b2b9ce02a0eb19129902f"
     }
   ],
   "checks": [
     {
-      "actual": "smaug-t/modet 검토 필요: 옛 판 1.1.1 일치(문항 10/10): 받아 줄 판(1.2.0)이 아니다",
+      "actual": "smaug-t/modet 검토 필요: 옛 판 1.1.1 일치(문항 10/10): 받아 줄 판(1.2.0)이 아니다(받아 줄 판은 프로필의 impl_accept 가 정한다. 이 판도 받으려면 smaug-t/modet@1.1.1 항목을 더한다)",
       "expected": "파라미터마다 받아 줄 판(프로필의 impl_accept, 기본 최신판)의 KAT 와 일치, 변조 서명 거부, 자기 점검 통과",
       "id": "i-kpqc",
       "status": "review",
@@ -62,7 +62,7 @@
     "receipt_file": "/tmp/work/impl-out/receipt.json",
     "verify_cmd": "bash prove.sh --verify /tmp/work/impl-out"
   },
-  "finished_at": "2026-11-19T13:29:13.627Z",
+  "finished_at": "2026-11-19T15:47:50.823Z",
   "format": "pqc-proof receipt 1",
   "format_version": 4,
   "impl": {
@@ -115,10 +115,10 @@
         "sha256": "21e5cdbd3da1531fe473cb7f0a4da039c551683c8fc8c6e1c400c923eaa9ac28"
       },
       "log": "artifacts/impl/pq-verify/log.json",
-      "log_sha256": "7b79da10a1ab6432d78777020bb779ee26d71e81c5665f237d555f17d02d83f2",
+      "log_sha256": "95bfb61d75b0d73b2636388b174814d562acdcf823e43589ad9be4052870608f",
       "not_run": null,
       "report": "artifacts/impl/pq-verify/report.json",
-      "report_sha256": "7f135fddcbfbce062c207ffbebc92317b3042b8d6f784f346d8be95f8ad44fbb",
+      "report_sha256": "ad906832adff607948e71907fd26d4cea4be5edc679daf9460630d22cdd9e79c",
       "status": "pass",
       "summary": {
         "artifact_sha256": "21e5cdbd3da1531fe473cb7f0a4da039c551683c8fc8c6e1c400c923eaa9ac28",
@@ -149,7 +149,7 @@
     "problem": null,
     "prompt": {
       "file": "artifacts/impl/prompt.json",
-      "file_sha256": "a5a29c9f0e1975c1d083c19ffe896915dae32dc29f507862f3cb37a48cd93b95",
+      "file_sha256": "39a4690214a3a1555d87422e714779beca0ca6559f92183a1d7f878a59d7a753",
       "items": 20,
       "prompt_sha256": "c824724a42a383b7f9eb0d64ca55c4b8f0b2aedc64ed31bd8925a62c0ad17bf1"
     },
@@ -161,7 +161,7 @@
         "name": "SMAUG-T",
         "param": "smaug-t/modet",
         "status": "review",
-        "summary": "옛 판 1.1.1 일치(문항 10/10): 받아 줄 판(1.2.0)이 아니다",
+        "summary": "옛 판 1.1.1 일치(문항 10/10): 받아 줄 판(1.2.0)이 아니다(받아 줄 판은 프로필의 impl_accept 가 정한다. 이 판도 받으려면 smaug-t/modet@1.1.1 항목을 더한다)",
         "versions": [
           {
             "accepted": true,
@@ -197,30 +197,30 @@
     ],
     "profile": "kpqc"
   },
-  "receipt_id": "d80241c88b2490470924d8955608e31e3b1dad17c09a1331db1959dfbbe67df9",
-  "ruleset_sha256": "0f1ffa02779585702fc7503c3a0c715036426d6358c49838bf8c153282941caf",
+  "receipt_id": "ee46fcc6906921027cd5dcccd64d0f36a4241c317df3eb91076a531dc11037dc",
+  "ruleset_sha256": "bc42d7882af52ebfe9d7cf0dce278921baf3480059d30500cffad7cf7d19181b",
   "ruleset_version": "3",
-  "started_at": "2026-11-19T13:29:10.853Z",
+  "started_at": "2026-11-19T15:47:48.280Z",
   "timeline": [
     {
-      "ended_at": "2026-11-19T13:29:10.853Z",
+      "ended_at": "2026-11-19T15:47:48.280Z",
       "name": "준비",
-      "started_at": "2026-11-19T13:29:10.853Z"
+      "started_at": "2026-11-19T15:47:48.280Z"
     },
     {
-      "ended_at": "2026-11-19T13:29:10.854Z",
+      "ended_at": "2026-11-19T15:47:48.281Z",
       "name": "대조",
-      "started_at": "2026-11-19T13:29:10.853Z"
+      "started_at": "2026-11-19T15:47:48.280Z"
     },
     {
-      "ended_at": "2026-11-19T13:29:13.621Z",
+      "ended_at": "2026-11-19T15:47:50.818Z",
       "name": "pq-verify",
-      "started_at": "2026-11-19T13:29:10.854Z"
+      "started_at": "2026-11-19T15:47:48.281Z"
     },
     {
-      "ended_at": "2026-11-19T13:29:13.627Z",
+      "ended_at": "2026-11-19T15:47:50.823Z",
       "name": "표·증적",
-      "started_at": "2026-11-19T13:29:13.627Z"
+      "started_at": "2026-11-19T15:47:50.822Z"
     }
   ],
   "tool_version": "0.3.0",
@@ -294,7 +294,7 @@
     {
       "name": "pqlite/impl.py",
       "path": "/opt/pqproof/pqlite/impl.py",
-      "sha256": "33314f64cb0da8fbb8d01d778cbf0f61ce38ba1236843f03a8ddf5f1c16aeb60",
+      "sha256": "947a04626dc43ea14369b8d3836f0b478eff88433734bf6c3a53f44cb8e1ae34",
       "version": ""
     },
     {
@@ -312,7 +312,7 @@
     {
       "name": "prove.py",
       "path": "/opt/pqproof/prove.py",
-      "sha256": "b0aac356be76c2d2a244f4f13687058cb5786bf5ac9f601877f0bf3d59612959",
+      "sha256": "bd5a24945046b4b0ce04906b4892604bdaec6a638c3685977e4610cdfd431159",
       "version": ""
     },
     {
@@ -324,7 +324,7 @@
     {
       "name": "pqlite/receipt.py",
       "path": "/opt/pqproof/pqlite/receipt.py",
-      "sha256": "e448953d6dfc75ab5db8de6fc1c4b5f7d6b6044a88cc0b168614cc5b6cbd887f",
+      "sha256": "75cda84da61b4e0574d5ae1c07a9bc0b0290fb4f9f5a7e2df347a39aba2da1ae",
       "version": ""
     },
     {

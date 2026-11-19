@@ -2,7 +2,7 @@
  "verdict": "pass",
  "verdict_text": "통과(검토 필요 검사 i-kpqc)",
  "verdict_text_en": "pass (needs review: i-kpqc)",
- "receipt": "b92a7d41d527",
+ "receipt": "6e47dbff0c13",
  "receipt_file": "/tmp/work/impl-out/receipt.json",
  "mode": "impl",
  "impl": [
@@ -13,7 +13,7 @@
    "matched": [
     "1.1.1"
    ],
-   "summary": "옛 판 1.1.1 일치(문항 10/10): 받아 줄 판(1.2.0)이 아니다"
+   "summary": "옛 판 1.1.1 일치(문항 10/10): 받아 줄 판(1.2.0)이 아니다(받아 줄 판은 프로필의 impl_accept 가 정한다. 이 판도 받으려면 smaug-t/modet@1.1.1 항목을 더한다)"
   }
  ],
  "accept": [

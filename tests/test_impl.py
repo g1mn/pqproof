@@ -9,6 +9,7 @@ import pathlib
 import shutil
 import sys
 import tempfile
+import time
 import unittest
 from unittest import mock
 
@@ -517,6 +518,17 @@ class Evidence(unittest.TestCase):
         rehash(d, "artifacts/impl/answer.json", impl.dumps(doc))
         got = self.fails(d)
         self.assertIn("judged again gives i-kpqc fail", got)
+        d = self.copy("answer-only")  # 사본만 바꾸고 impl.input 의 해시는 그대로 두면 사본과 맞추는 검사에서 걸린다
+        rehash(d, "artifacts/impl/answer.json", impl.dumps(doc), input_too=False)
+        self.assertIn("impl.input bytes and sha256 differ from the copied answer", self.fails(d))
+
+    def test_changed_input_fields_are_caught(self):
+        # 리뷰 A5: receipt.json 의 impl.input(구현 이름·머리 줄·종류)은 답안 사본에서 나와야 한다
+        for field, value in (("implementation", "certified module v9 (official)"), ("header", "smaugt_modet"), ("kind", "rsp")):
+            with self.subTest(field=field):
+                d = self.copy("input-" + field)
+                rewrite(d, lambda r, field=field, value=value: r["impl"]["input"].update({field: value}))
+                self.assertIn(f"impl.input {field} differ from the copied answer", self.fails(d))
 
     def test_changed_result_is_caught(self):
         d = self.copy("result")
@@ -693,6 +705,126 @@ class Commands(unittest.TestCase):
             prove.impl_judge(a, [], prove.Params({"PROFILE": "nist-cat3"}, mode="impl"), os.path.join(self.tmp, "o"), quiet=True)
 
 
+class ReviewFixes(unittest.TestCase):
+    """두 번째 리뷰에서 고친 것: 답안 params 순서(A3), .rsp 머리 줄과 --param(A2), 파이썬 판과 무관한 글 규칙(A4), HAETAE sm 두 꼴(A9),
+    .rsp 레코드 수·칸 이름 상한과 하위 프로세스 출력(A10), report.md 링크(A12), 옛 판 안내(B3)."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="pqproof-implfix-")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)  # setUp 이 만든 자기 폴더만
+
+    def run_judge(self, name, doc=None, text=None, names=()):
+        p = os.path.join(self.tmp, name + (".json" if doc is not None else ".rsp"))
+        if doc is not None:
+            pathlib.Path(p).write_text(impl.dumps(doc), encoding="utf-8")
+        else:
+            pathlib.Path(p).write_text(text, encoding="ascii")
+        out = os.path.join(self.tmp, name)
+        r, code, lines = prove.impl_judge(p, list(names), prove.Params({}, mode="impl"), out, quiet=True)
+        return r, code, lines, [w for ok, w in rc.verify(out) if not ok]
+
+    def test_params_in_another_order(self):
+        key = key_for("smaug-t/mode3", "haetae/mode3")
+        doc = impl.example_answers(key, {"smaug-t/mode3": "1.2.0", "haetae/mode3": "1.2.0"})
+        doc["params"] = list(reversed(doc["params"]))
+        r, code, lines, bad = self.run_judge("order", doc)
+        self.assertEqual((r["verdict"], code, bad), ("pass", 0, []))
+        self.assertEqual(r["params"]["params"], ["smaug-t/mode3", "haetae/mode3"])
+        self.assertEqual(r["impl"]["accept"], ["smaug-t/mode3@1.2.0", "haetae/mode3@1.2.0"])
+        self.assertTrue(any(x.startswith("검증 증적 다시 확인: ok") for x in lines))
+
+    def test_rsp_header_of_another_param_verifies(self):
+        text = rsp_text("NTRU+768", excerpt("smaug-t/mode3", "1.2.0"))
+        r, code, lines, bad = self.run_judge("hdr", text=text, names=["smaug-t/mode3"])
+        self.assertEqual((r["verdict"], code, bad), ("undecided", 3, []))
+        self.assertIn("ntruplus/768 의 이름", r["impl"]["problem"])
+
+    def test_text_rules_do_not_follow_the_python_version(self):
+        key = key_for("smaug-t/mode1")
+        good = impl.example_answers(key, {"smaug-t/mode1": "1.2.0"})
+        self.assertIsNone(as_parsed(dict(good, implementation="lib \U0001FAE0 　 build"))["problem"])  # 유니코드 14 글자
+        for bad in ("lib‮build", "lib⁦x", "a​b", "a\x85b", "a b"):
+            with self.subTest(bad=repr(bad)):
+                self.assertIn("인쇄할 수 없는", as_parsed(dict(good, implementation=bad))["problem"])
+        self.assertEqual(impl.shown("a‮b\U0001FAE0\x85\t"), "a\\u202eb\U0001FAE0\\x85\\t")
+        comma = impl.parse_input(b'{"format": "pqproof impl response 1",}')["problem"]
+        self.assertEqual(comma, "답안 JSON 을 읽을 수 없다: 답안: JSON 이 아니다(문법 오류. 위치는 python3 -m json.tool 로 본다)")
+        self.assertEqual(impl.parse_input(b'{"format": 1, "x": }')["problem"], comma)
+        self.assertEqual((impl._q("ab"), impl._q(None), impl._q("\U0001FAE0")), ("'ab'", "None", "'\U0001FAE0'"))
+        dup = impl.parse_input('{"format": 1, "\U0001FAE0": 1, "\U0001FAE0": 2}'.encode("utf-8"))["problem"]
+        self.assertIn("'\U0001FAE0' 가 두 번", dup)
+
+    def test_haetae_sm_in_both_forms(self):
+        key = key_for("haetae/mode3")
+        doc = impl.example_answers(key, {"haetae/mode3": "1.2.0"})
+        rec = excerpt("haetae/mode3", "1.2.0")[0]
+        iid = f"haetae/mode3@1.2.0#{rec['count']}:derand"
+        for sm, want in ((rec["msg"] + rec["sig"], "pass"), (rec["sig"] + rec["msg"], "pass"),
+                         (impl._flip_hex(rec["msg"] + rec["sig"]), "fail")):
+            doc["answers"][iid] = {"sm": sm}
+            self.assertEqual([x["status"] for x in judge(key, doc)], [want])
+        akey = key_for("aimer/128f")  # AIMer 의 sm 은 msg || sig 하나다
+        adoc = impl.example_answers(akey, {"aimer/128f": "3.0"})
+        arec = excerpt("aimer/128f", "3.0")[0]
+        adoc["answers"][f"aimer/128f@3.0#{arec['count']}:derand"] = {"sm": impl.signature_of(arec) + arec["msg"]}
+        self.assertEqual([x["status"] for x in judge(akey, adoc)], ["fail"])
+        self.assertIn("sig || msg for HAETAE", impl.emit_prompt(key)["guide"]["derand"])
+
+    def test_rsp_limits(self):
+        with self.assertRaises(ValueError) as e:
+            impl.parse_rsp("count = 0\n" * (impl.MAX_RSP_RECORDS + 1))
+        self.assertIn("상한 1,000건", str(e.exception))
+        self.assertEqual(len(impl.parse_rsp("count = 0\n" * impl.MAX_RSP_RECORDS)), impl.MAX_RSP_RECORDS)
+        long = impl.parse_input(("# smaugt_mode1\ncount = 0\n" + "a" * 300000 + " = 00\n").encode())
+        self.assertIn("상한 32자", long["problem"])
+        self.assertLess(len(long["problem"]), 200)
+        self.assertIn("키 이름이 아니다: 'a-b'", impl.parse_input(b"# smaugt_mode1\ncount = 0\na-b = 00\n")["problem"])
+        lines = impl.parse_input(b"\n" * 100000 + b"  # smaugt_mode1\r\n" + b"#\n" * 1000)
+        self.assertEqual((lines["problem"], lines["header"], lines["records"]), (None, "smaugt_mode1", []))
+
+    def test_long_output_is_not_kept_whole(self):
+        self.assertEqual(impl.clip_stream(b"ab", b"cd", 4), "abcd")
+        self.assertIn("1,000,000,000 bytes in all", impl.clip_stream(b"x" * 10, b"y" * 10, 10 ** 9))
+        log = []
+        code = "import sys; sys.stdout.buffer.write(b'A' * (3 << 20) + b'\\nEND\\n'); sys.stderr.write('err\\n')"
+        rec = prove.run_logged([sys.executable, "-I", "-c", code], log, "audit", 60, dict(os.environ), self.tmp)
+        self.assertEqual((rec["exit_code"], rec["stderr"], log), (0, "err\n", [rec]))
+        self.assertLessEqual(len(rec["stdout"]), impl.PQV_MAX_TEXT + 200)
+        self.assertTrue(rec["stdout"].endswith("END\n"))
+        self.assertIn(f"{(3 << 20) + 5:,} bytes in all", rec["stdout"])
+        if os.name != "nt":  # communicate 처럼: 끝난 프로세스의 자식이 출력 파이프를 쥐고 있으면 시간 한도에서 시간 초과로 멈춘다
+            t = time.time()
+            rec = prove.run_logged(["/bin/sh", "-c", "sleep 30 & echo started"], log, "audit", 2, dict(os.environ), self.tmp)
+            self.assertLess(time.time() - t, 20)
+            self.assertEqual((rec["timed_out"], rec["exit_code"], rec["stdout"]), (True, None, "started\n"))
+
+    def test_report_cells_carry_no_links(self):
+        self.assertEqual(prove.md_cell("x [k](http://e.example) ![i](u)"), "x [k]\\(http://e.example) ![i]\\(u)")
+        self.assertEqual(prove.md_cell("app/[id]/page.tsx"), "app/[id]/page.tsx")
+        key = key_for("smaug-t/mode1")
+        doc = impl.example_answers(key, {"smaug-t/mode1": "1.2.0"})
+        doc["params"] = doc["params"] + ["x [k](http://e.example)"]
+        r, code, _, bad = self.run_judge("md", doc)
+        self.assertEqual((r["verdict"], code, bad), ("undecided", 3, []))
+        md = pathlib.Path(self.tmp, "md", "tables", "report.md").read_text(encoding="utf-8")
+        self.assertIn("[k]\\(http://e.example)", md)
+        self.assertNotIn("[k](http", md)
+
+    def test_old_version_says_how_to_accept_it(self):
+        key = key_for("aimer/128f")
+        doc = impl.example_answers(key, {"aimer/128f": "aim2-2026-01"})
+        r, code, lines, bad = self.run_judge("aim2", doc)
+        self.assertEqual((r["verdict"], code, bad, r["checks"][0]["status"]), ("pass", 0, [], "review"))
+        self.assertIn("이 판도 받으려면 aimer/128f@aim2-2026-01 항목을 더한다", r["checks"][0]["actual"])
+        text = "\n".join(lines)
+        self.assertIn("aim2-2026-01 = AIMer reference implementation, KpqC final package of 2026-01-30 (AIM2)", text)
+        self.assertIn("3.0 = AIMer reference implementation V3.0 (AIM3)", text)
+        self.assertIn('impl_accept 에 "aimer/128f@aim2-2026-01"', text)
+        accepted = impl.resolve_accept(MANIFEST["params"], ["latest", "aimer@aim2-2026-01"], ["aimer/128f"])
+        self.assertEqual([x["status"] for x in judge(key, doc, accepted)], ["pass"])  # 프로필에 더하면 받아 준다
+
 def rewrite(d, change):
     p = pathlib.Path(d, "receipt.json")
     r = json.loads(p.read_text(encoding="utf-8"))
@@ -701,7 +833,7 @@ def rewrite(d, change):
     p.write_text(rc.dumps(r), encoding="utf-8")
 
 
-def rehash(d, rel, text):
+def rehash(d, rel, text, input_too=True):
     """산출물 하나를 바꾸고 receipt.json 의 해시·receipt_id 를 다시 써서 해시 검사는 통과하게 만든다(위조 흉내)."""
     data = text.encode("utf-8")
     pathlib.Path(d, *rel.split("/")).write_bytes(data)
@@ -714,6 +846,8 @@ def rehash(d, rel, text):
         for part in (r["impl"]["input"], r["impl"]["key"], r["impl"]["prompt"] or {}):
             if part.get("file") == rel:
                 part["file_sha256"] = sha
+        if r["impl"]["input"].get("file") == rel and input_too:  # 답안 사본이면 impl.input 의 바이트 수·해시도(빈틈없는 위조)
+            r["impl"]["input"]["sha256"], r["impl"]["input"]["bytes"] = sha, len(data)
     rewrite(d, change)
 
 

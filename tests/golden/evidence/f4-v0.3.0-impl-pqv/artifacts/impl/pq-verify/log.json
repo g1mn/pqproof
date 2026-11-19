@@ -7,10 +7,10 @@
     "error": null,
     "exit_code": 0,
     "role": "version",
-    "seconds": 0.324,
+    "seconds": 0.322,
     "stderr": "",
     "stdout": "pq-verify 2.19.0\n",
-    "t": 1795094950.856765,
+    "t": 1795103268.282423,
     "timed_out": false,
     "timeout": 60
   },
@@ -27,10 +27,10 @@
     "error": null,
     "exit_code": 0,
     "role": "audit",
-    "seconds": 2.439,
+    "seconds": 2.212,
     "stderr": "",
     "stdout": "  artifact: sha256 21e5cdbd3da1531fe473cb7f0a4da039c551683c8fc8c6e1c400c923eaa9ac28\n====================================================================\n  THIRD-PARTY KEM AUDIT - ML-KEM-768\n  library : libmlkem768_good.dylib\n  keygen  : PQCP_MLKEM_NATIVE_MLKEM768_keypair_derand\n  encaps  : PQCP_MLKEM_NATIVE_MLKEM768_enc_derand\n  decaps  : PQCP_MLKEM_NATIVE_MLKEM768_dec\n  vectors : pinned (NIST ACVP-Server 15c0f3d, ad33b3d)\n====================================================================\n  PASS  keyGen   25/25  byte-exact vs NIST\n  PASS  encaps   25/25  byte-exact vs NIST\n  PASS  decaps   10/10  byte-exact vs NIST\n  PASS  ekCheck  10/10  encapsulation keys classified as NIST does (FIPS 203 §7.2)\n  PASS  dkCheck  10/10  decapsulation keys classified as NIST does (FIPS 203 §7.3)\n  edge cases: Wycheproof 3fa63dd, CCTV 50a8ecf\n  PASS  edgeValid 461/461  edge-case vectors reproduced byte-for-byte\n  PASS  edgeEk    892/892  invalid encapsulation keys refused (every q..4095, every position)\n  PASS  edgeDk    2/2  invalid decapsulation keys refused\n        64 wrong-length vectors not applicable: a C entry point takes fixed-size buffers\n  PASS  accumulated 1/1  10,000 cases: digest 8a518cc63da36632… matches (Go 1.26.1 crypto/mlkem TestAccumulated (published))\n  PASS  bounds   41596 calls, none wrote outside its buffers (64 guard bytes each side)\n====================================================================\n  RESULT: 1436/1436 - VERIFIED\n  This audits the vendor's OWN keygen/encaps/decaps against\n  NIST's published vectors, including the invalid keys it\n  must refuse. It is not a side-channel review.\n====================================================================\n  wrote /tmp/work/impl-out/artifacts/impl/pq-verify/report.json  (report for --audit-kem; artifact: sha256 21e5cdbd3da1531fe473cb7f0a4da039c551683c8fc8c6e1c400c923eaa9ac28)\n  INTEGRITY: nothing this run needed was missing (no field engines were required).\n",
-    "t": 1795094951.1808882,
+    "t": 1795103268.6043189,
     "timed_out": false,
     "timeout": 1800
   }

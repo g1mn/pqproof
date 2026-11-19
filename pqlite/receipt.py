@@ -837,6 +837,17 @@ def _nist_record(root, r):
     if len(audits) > 1 or (n["argv"] is not None) != bool(audits) or (audits and audits[0].get("argv") != n["argv"]):
         return [(False, f"{n['log']} does not hold the one audit run impl.nist.argv names")]
     run = audits[0] if audits else None
+    versions = [e for e in log if e.get("role") == "version"]
+    if n["executable"] is not None:  # tools[] 의 pq-verify 판은 실행 기록의 --version 출력에서 나와야 한다
+        want = (im.pqverify_version(versions[0].get("stdout")) if len(versions) == 1
+                and versions[0].get("argv") == [n["executable"], "--version"] else None)
+        got = [t.get("version") for t in r["tools"] if t.get("name") == im.PQV_NAME]
+        if want is None or got != [want]:
+            return [(False, f"{n['log']} does not hold the one pq-verify --version run that gives the version in tools[] ({got})")]
+    elif versions:
+        return [(False, f"{n['log']} holds a pq-verify --version run, but no pq-verify executable is recorded")]
+    if run is not None and run.get("timeout") != n["timeout"]:
+        return [(False, f"{n['log']}: the audit run's time limit {run.get('timeout')} differs from impl.nist.timeout {n['timeout']}")]
     summary = im.pqverify_summary(n["summary"]["audit"], run, report, n["library"]["sha256"], n["not_run"])
     st, detail = im.pqverify_status(summary)
     row = im.nist_check_row(dict(n, summary=summary))
@@ -917,12 +928,22 @@ def _kpqc_record(root, r):
         out.append((same, f"{x['prompt']['file']} is the question sheet of the answer key" if same else
                     f"{x['prompt']['file']} differs from the question sheet the answer key gives"))
     accept = im.accept_from_list(x["accept"])
-    if x["input"]["file"]:
-        parsed = im.parse_input(_read_nofollow(root, x["input"]["file"]))
+    inp = x["input"]
+    if inp["file"]:
+        raw = _read_nofollow(root, inp["file"])
+        parsed = im.parse_input(raw)
     else:
-        parsed = {"kind": None, "problem": im.oversize_problem(x["input"]["bytes"])}
+        raw, parsed = None, {"kind": None, "problem": im.oversize_problem(inp["bytes"])}
+    # impl.input 의 칸은 답안 사본에서 나와야 한다(receipt.json 만 고쳐 '어느 구현의 답안인가'를 바꾸지 못하게)
+    bad = [k for k in ("kind", "implementation", "header") if inp.get(k) != parsed.get(k)]
+    if raw is not None and (inp["bytes"], inp["sha256"]) != (len(raw), hashlib.sha256(raw).hexdigest()):
+        bad.append("bytes and sha256")
+    if bad:
+        return out + [(False, f"impl.input {', '.join(bad)} differ from the copied answer {inp['file'] or '(none, over the size limit)'}")]
     hint = r["params"]["params"][0] if parsed["kind"] in ("rsp", None) and r["params"]["params"] else None  # 판정 때 --param 을 썼다
-    pids, problem = im.input_params(parsed, im.key_names(key), hint)
+    # 답안 JSON 의 파라미터는 정답 묶음 안 이름으로, .rsp 머리 줄은 판정 때처럼 목록 전체 이름으로 본다(머리 줄이 다른 파라미터의 이름인지)
+    names = im.key_names(key) if parsed["kind"] == "response" else {**manifest["names"], **im.key_names(key)}
+    pids, problem = im.input_params(parsed, names, hint)
     problem = parsed["problem"] or problem
     control, results = (None, []) if problem else (im.control_problem(key, accept, parsed["kind"]), im.match_versions(key, parsed, accept))
     row = im.check_row(results, control, problem)

@@ -247,6 +247,14 @@ class Args(unittest.TestCase):
             self.assertTrue(any(x.startswith(f"pq-verify: {fake} (pq-verify 2.19.0") for x in rep.info))
             rep = deps.pqv_line(deps.Report(), {"PATH": os.path.join(d, "empty")}, need=True)
             self.assertTrue(rep.warnings and "undecided" in rep.warnings[0])
+            # pqproof impl judge 의 미리 알림은 찾기만 한다(인자 검사 전에 pq-verify 를 띄우지 않는다)
+            ran = os.path.join(d, "ran")
+            spy = os.path.join(d, "spy")
+            pathlib.Path(spy).write_text(f"#!/bin/sh\ntouch '{ran}'\necho 'pq-verify 2.19.0'\n", encoding="utf-8")
+            os.chmod(spy, 0o755)
+            self.assertEqual(deps.find_pqverify({"PQ_VERIFY": spy}, run_version=False), (spy, ""))
+            self.assertEqual(deps.pqv_line(deps.Report(), {"PQ_VERIFY": spy}, need=True, run_version=False).warnings, [])
+            self.assertFalse(os.path.exists(ran))
             self.assertFalse(any("pq-verify" in x for x in deps.check({"PQ_VERIFY": fake}, need_tls=False).info))
 
 
@@ -433,6 +441,20 @@ class FakeRuns(unittest.TestCase):
         shutil.copytree(out, d)
         rewrite(d, lambda x: x["impl"]["nist"]["argv"].remove("--require-full-coverage"))
         self.assertIn("impl.nist.argv is not the command pqproof builds", self.fails(d))
+        # 리뷰 A7: tools[] 의 pq-verify 판과 impl.nist.timeout 은 실행 기록(log.json)과 맞아야 한다
+        d = os.path.join(self.tmp, "version-changed")
+        shutil.copytree(out, d)
+
+        def version(x):
+            for t in x["tools"]:
+                if t["name"] == "pq-verify":
+                    t["version"] = "9.9.9"
+        rewrite(d, version)
+        self.assertIn("does not hold the one pq-verify --version run that gives the version in tools[]", self.fails(d))
+        d = os.path.join(self.tmp, "timeout-changed")
+        shutil.copytree(out, d)
+        rewrite(d, lambda x: x["impl"]["nist"].update(timeout=5))
+        self.assertIn("differs from impl.nist.timeout 5", self.fails(d))
 
     def test_usage_errors(self):
         for argv in (["--impl", "judge"], ["--impl", "judge", "--pq-verify", "--live"], ["--impl", "prompt", "--pq-verify", "x"],

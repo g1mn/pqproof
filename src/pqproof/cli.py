@@ -214,8 +214,8 @@ def main(argv=None):
             print("usage: pqproof impl prompt [--param P ...] [-o file] | pqproof impl judge [<answers.json|kat.rsp>] [--param P] "
                   "[--pq-verify \"ARGS\"]", file=sys.stderr)
             return 2
-        if "--pq-verify" in argv[2:]:  # pq-verify 가 없으면 미리 알린다(판정은 i-nist 미판정으로 남는다)
-            for w in deps.pqv_line(deps.Report(), os.environ, need=True).warnings:
+        if "--pq-verify" in argv[2:]:  # pq-verify 가 없으면 미리 알린다(판정은 i-nist 미판정으로 남는다). 찾기만 하고 실행하지 않는다
+            for w in deps.pqv_line(deps.Report(), os.environ, need=True, run_version=False).warnings:
                 print(f"pqproof: warning: {w}", file=sys.stderr)
         return run([sys.executable, "-I", "-B", os.path.join(root, "prove.py"), "--impl"] + argv[1:], child_env(root, entry=True))
     if is_windows():

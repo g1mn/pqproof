@@ -12,17 +12,35 @@ The KpqC reference KATs changed after the final release of January 2026:
 |---|---|---|---|
 | SMAUG-T | `mode1`, `mode3`, `mode5`, `modet` (TiMER) | 1.2.0 | 1.1.1: the official page says it has implementation bugs; every KAT record differs (key generation and encapsulation changed), yet decapsulating the same `sk` and `ct` gives the same `ss` |
 | NTRU+ | `768`, `864`, `1152` | 2026-01 | none |
-| HAETAE | `mode2`, `mode3`, `mode5` | 1.2.0 | 1.1.2: every signature differs; Bouncy Castle 1.85 to 1.87 ships it |
+| HAETAE | `mode2`, `mode3`, `mode5` | 1.2.0 | 1.1.2: every signature differs; the Bouncy Castle test data (bc-test-data, commit 1905b926) carries it |
 | AIMer | `128f`, `128s`, `192f`, `192s`, `256f`, `256s` | 3.0 | `aim2-2026-01` (`pk`, `sk` and the signature all differ from 3.0, and the signature size changed: 5888 to 6944 bytes for `128f`), `bc-round2` (the Bouncy Castle KAT, same `pk` and `sk` as AIM2 but other signatures, which matches no published reference; digests only) |
 
-`scan/kat-kpqc.json` lists every version with its source archive (URL, commit, SHA-256), the SHA-256 of each `.rsp`, a normalized digest of the whole file and one digest per record. `scan/kat/` holds the first five records of each version, which the question sheet is made from. The versions the judge accepts are in `impl_accept` of the `kpqc` profile in `scan/profiles.json` (`latest` by default, or `<parameter>@<version>`, `<algorithm>@<version>`).
+`scan/kat-kpqc.json` lists every version with its source archive (URL, commit, SHA-256), the SHA-256 of each `.rsp`, a normalized digest of the whole file and one digest per record. `scan/kat/` holds the first five records of each version, which the question sheet is made from.
+
+### Which version is accepted, and why the others need review
+
+The judge accepts what `impl_accept` of the `kpqc` profile in `scan/profiles.json` names: `latest` by default, or `<parameter>@<version>`, `<algorithm>@<version>`. `latest` is the version `scan/kat-kpqc.json` marks as the newest reference. Its `sources` say where each one comes from:
+
+- SMAUG-T 1.2.0: the KpqC page (kpqc.cryptolab.co.kr/smaug-t) says "Please use the reference implementation of version 1.2.0" and gives a SHA-256 that matches the archive.
+- HAETAE 1.2.0: the KpqC page (kpqc.cryptolab.co.kr/haetae) offers it as "Hyperball sampler modified." next to 1.1.2, the "Original version announced in the KpqC homepage.", with SHA-256 values that match both archives.
+- NTRU+ 2026-01: the only version. ntruplus.org links to the team repository and publishes no SHA-256.
+- AIMer: `aim2-2026-01` is the KpqC final package of 2026-01-30 (AIM2). `3.0` (AIM3) is the reference the AIMer team put in its GitHub repository afterwards (commit 734cc76, "update AIMer V3.0 reference implementation"); it changed `pk`, `sk` and the signature size. aimer-signature.org links to that repository and publishes no SHA-256, and the list has no KpqC page for AIMer. The list marks 3.0 as latest because it is the newest reference the team published, so an implementation of the KpqC final package needs review by default. Which version Korean standardization will adopt is not recorded here.
+
+A match with another reference version is not a wrong answer. PQ-Proof cannot know which version your project has to follow, so it names the version it matched and leaves the decision to you; the result line says how to accept it. To accept the KpqC final package of AIMer as well, edit `impl_accept` in `scan/profiles.json` (in a clone, or `pqproof/_tool/scan/profiles.json` inside a pip install):
+
+```json
+"impl_accept": ["latest", "aimer@aim2-2026-01"]
+```
+
+The profile is a rule file, so receipts written after that name ruleset `3+modified` and list the changed profile hash in `tools[]`. `--verify` checks `impl.accept` against the profile of the tool that runs it, so verify such a receipt with the same profile.
 
 ## The flow
 
 ```bash
 pqproof impl prompt --param smaug-t/mode3 --param haetae/mode3 -o prompt.json   # 1. question sheet
-python3 -I kpqc_harness.py prompt.json answers.json \
-  --lib smaug-t/mode3=./libsmaugt-mode3.so --lib haetae/mode3=./libhaetae-mode3.so   # 2. your harness
+h=$(python3 -c 'import os, pqproof; print(os.path.join(os.path.dirname(pqproof.__file__), "_tool", "examples", "impl", "kpqc_harness.py"))')
+python3 -I "$h" prompt.json answers.json \
+  --lib smaug-t/mode3=./libsmaugt-mode3.so --lib haetae/mode3=./libhaetae-mode3.so   # 2. your harness (here the example one)
 pqproof impl judge answers.json                                                   # 3. judge
 ```
 
@@ -32,18 +50,18 @@ pqproof impl judge answers.json                                                 
 |---|---|---|
 | KEM `decaps` (required) | `sk`, `ct` | `ss` |
 | signature `verify` (required) | `pk`, `msg`, `sig`, `ctx` | `ok` (true); some items carry a signature with one changed byte and must give false |
-| `derand` (optional) | `seed` (and `msg`, `ctx` for signatures) | KEM `pk`, `sk`, `ct`, `ss`; signature `pk`, `sk`, `sig` or `sm` |
+| `derand` (optional) | `seed` (and `msg`, `ctx` for signatures) | KEM `pk`, `sk`, `ct`, `ss`; signature `pk`, `sk`, `sig` or `sm` (AIMer `msg \|\| sig`; HAETAE `sig \|\| msg` as its reference writes it, `msg \|\| sig` also taken) |
 
 The `derand` items need a build that links the NIST KAT DRBG (`randombytes_init` from the reference `rng.c`). HAETAE KAT signatures use a context string that the `.rsp` does not print, so the sheet carries it; AIMer signs with an empty one. `prompt_sha256` covers the format, the parameter sets, the buffer sizes and the items, so changing the explanatory text does not change it.
 
-**2. Harness.** You answer the sheet with your own code. [examples/impl/kpqc_harness.py](../examples/impl/kpqc_harness.py) loads shared libraries that export the NIST API through Python `ctypes`. A harness in any language works if it writes this JSON:
+**2. Harness.** You answer the sheet with your own code. [examples/impl/kpqc_harness.py](../examples/impl/kpqc_harness.py) (in a pip install, under `pqproof/_tool/examples/impl/`, as the `h=` line above finds it) loads shared libraries that export the NIST API through Python `ctypes`. A harness in any language works if it writes this JSON:
 
 ```json
 {"format": "pqproof impl response 1", "prompt_sha256": "<from the sheet>", "params": ["smaug-t/mode3"],
  "implementation": "libsmaugt 1.2.0, our build 2026-11-19", "answers": {"smaug-t/mode3@1.2.0#0:decaps": {"ss": "8f..."}}}
 ```
 
-The judge reads it strictly: a duplicate key, a byte order mark, an unknown field or a hexadecimal value of odd length leaves the run undecided. `implementation` is free text up to 500 characters, or null, and goes into the evidence.
+The judge reads it strictly: a duplicate key, a byte order mark, an unknown field or a hexadecimal value of odd length leaves the run undecided. `params` may come in any order; the evidence lists them in the order of `scan/kat-kpqc.json`. `implementation` is free text up to 500 characters without control characters, line breaks or bidirectional controls, or null, and goes into the evidence. These text rules do not depend on the Unicode tables of the Python that runs the judge, so the same answer gets the same result on Python 3.9 and 3.15.
 
 **3. Judge.** `judge` compares the answers with every known version. A version is a candidate when every item from it matches. The output folder is `impl-out-YYYYMMDD-HHMMSS` (set another with `OUT=`). The console shows one line per check and one per parameter set:
 
@@ -65,7 +83,7 @@ pqproof impl judge PQCkemKAT_smaugt_mode3.rsp
 pqproof impl judge PQCkemKAT_2336.rsp --param ntruplus/768
 ```
 
-If your build has the reference KAT program, run it and give the judge the `.rsp` it writes. All 100 records are compared with the record digests of each version (`1.2.0 일치(100/100)`). The judge reads the parameter set from the header line; give `--param` when the header does not name a known parameter set (a port that prints its own name, for example). With `--param`, only a header that names another known parameter set stops the run; the header is kept in the evidence. A UTF-8 byte order mark at the start is skipped. HAETAE `smlen`/`sm` (as `sig || msg` or `msg || sig`) and AIMer `siglen`/`sig` forms are read as the reference forms when their length field fits. This path also separates versions that the decaps and verify items alone cannot.
+If your build has the reference KAT program, run it and give the judge the `.rsp` it writes. All 100 records are compared with the record digests of each version (`1.2.0 일치(100/100)`). The judge reads the parameter set from the header line; give `--param` when the header does not name a known parameter set (a port that prints its own name, for example). With `--param`, only a header that names another known parameter set stops the run; the header is kept in the evidence. A UTF-8 byte order mark at the start is skipped. A file with more than 1,000 records, or a field name longer than 32 characters, leaves the run undecided. HAETAE `smlen`/`sm` (as `sig || msg` or `msg || sig`) and AIMer `siglen`/`sig` forms are read as the reference forms when their length field fits. This path also separates versions that the decaps and verify items alone cannot.
 
 ## NIST PQC through pq-verify
 
@@ -113,7 +131,8 @@ The evidence is format 4 (`schemas/receipt-v4.schema.json`) with `params.mode` `
 ## Limits
 
 - **A KAT match, not a certification.** There is no official KpqC test vector program like NIST ACVP yet. The result says which published reference KAT your answers match. It does not say the implementation is correct in every case, and it is not a KCMVP validation.
-- **The algorithms may change again.** The KpqC algorithms are going through Korean standardization (KS), and the announcement says they may still change. A new version means a new KAT list and a new ruleset (below); until then a newer reference fails or needs review.
+- **The reference versions may change again.** The reference KATs already changed after the January 2026 final release (the table above). A new version means a new KAT list and a new ruleset (below); until then a newer reference fails or needs review.
+- **`--verify` reads copies.** It judges the copied answer and the copied pq-verify report again. It does not run pq-verify again or hash the library again, so the library SHA-256, the pq-verify executable record and the run record are what the original run wrote. The evidence is not signed: someone who rewrites every copy and every hash gets a folder that verifies, with another `receipt_id`. Compare `receipt_id` with the one you received through a channel you trust.
 - **Five records per version in the sheet.** The `.rsp` path compares all 100.
 - **No negative decapsulation items.** The decaps items use valid ciphertexts only, so how an implementation handles a broken ciphertext (implicit rejection, or the all-zero secret NTRU+ returns) is not checked. Signatures do get a changed-byte item.
 - **Versions that answer alike.** Builds of SMAUG-T 1.1.1 and 1.2.0 give the same decaps answers, and builds of HAETAE 1.1.2 and 1.2.0 the same verify answers. Without `derand` answers or a `.rsp`, the judge cannot tell them apart and says so (needs review).

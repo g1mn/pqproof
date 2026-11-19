@@ -81,15 +81,16 @@ PQV_ENV_DROP_PREFIX = ("PQV_", "LD_", "DYLD_")
 PQV_ENV_DROP = ("PYTHONPATH", "PYTHONHOME", "PYTHONSTARTUP", "PYTHONINSPECT")
 
 
-def find_pqverify(env):
-    """prove.py pqverify_exe 와 같은 규칙: PQ_VERIFY 를 주면 그것(실행 파일이 아니면 None), 아니면 PATH 의 pq-verify. 반환 (경로 또는 None, 판)."""
+def find_pqverify(env, run_version=True):
+    """prove.py pqverify_exe 와 같은 규칙: PQ_VERIFY 를 주면 그것(실행 파일이 아니면 None), 아니면 PATH 의 pq-verify. 반환 (경로 또는 None, 판).
+    run_version=False 면 --version 을 돌리지 않고 찾기만 한다(판은 '')."""
     given = (env.get("PQ_VERIFY") or "").strip()
     if given:
         path = given if os.path.isfile(given) and os.access(given, os.X_OK) else None
     else:
         path = shutil.which(PQV_NAME, path=env.get("PATH"))
-    if not path:
-        return None, ""
+    if not path or not run_version:
+        return path or None, ""
     # prove.py 가 감사 때 넘기는 환경과 같은 규칙으로 뺀다(pqlite/impl.py pqverify_env): PQV_*·LD_*·DYLD_*·PYTHONPATH 등
     clean = {k: v for k, v in env.items() if not k.startswith(PQV_ENV_DROP_PREFIX) and k not in PQV_ENV_DROP}
     try:
@@ -173,9 +174,10 @@ def check(env=None, inputs=(), bin_dir=None, need_tls=None, need_pqverify=None):
     return rep
 
 
-def pqv_line(rep, env, need=False):
-    """pq-verify 줄: 있으면 경로와 판(info), 없으면 선택 의존(optional) 또는 --pq-verify 를 줬을 때 경고."""
-    path, ver = find_pqverify(env)
+def pqv_line(rep, env, need=False, run_version=True):
+    """pq-verify 줄: 있으면 경로와 판(info), 없으면 선택 의존(optional) 또는 --pq-verify 를 줬을 때 경고. run_version=False 면 실행하지 않고
+    찾기만 한다(pqproof impl judge 의 미리 알림: 인자 검사 전에 pq-verify 를 띄우지 않는다)."""
+    path, ver = find_pqverify(env, run_version)
     if path:
         rep.info.append(f"pq-verify: {path} ({'pq-verify ' + ver if ver else 'version unknown'}; runs the library it audits, "
                         "use a container or VM for untrusted code)")
