@@ -242,6 +242,32 @@ class CliTest(unittest.TestCase):
             rep = deps.check(env={}, bin_dir=None)
         self.assertTrue(rep.errors and "WSL" in rep.errors[0], rep.errors)
 
+    def test_impl_needs_only_python(self):
+        """구현 검증(pqproof impl)은 bash·openssl 점검 없이 이 파이썬으로 prove.py --impl 을 돈다(Windows 에서도)."""
+        err = io.StringIO()
+        with mock.patch.object(cli, "is_windows", return_value=True), mock.patch.object(cli, "run", return_value=0) as run, \
+                contextlib.redirect_stderr(err):
+            self.assertEqual(cli.main(["impl"]), 2)
+            self.assertEqual(cli.main(["impl", "nope"]), 2)
+            self.assertEqual(cli.main(["impl", "judge", "answers.json", "--param", "TiMER"]), 0)
+        cmd = run.call_args_list[0].args[0]
+        self.assertEqual((cmd[0], cmd[-5:]), (sys.executable, ["--impl", "judge", "answers.json", "--param", "TiMER"]))
+        self.assertEqual(run.call_args_list[0].args[1]["PQPROOF_ENTRY"], "pqproof")
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "prompt.json")
+            code = ("import sys; sys.path.insert(0, sys.argv[1]); from pqproof import cli; "
+                    "sys.exit(cli.main(['impl', 'prompt', '--param', 'haetae2', '-o', sys.argv[2]]))")
+            src = os.path.dirname(os.path.dirname(os.path.abspath(cli.__file__)))
+            r = subprocess.run([sys.executable, "-I", "-c", code, src, p], capture_output=True, text=True,
+                               env={"PATH": "", "PQPROOF_HOME": cli.tool_root()}, timeout=120)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertEqual(json.loads(pathlib.Path(p).read_text(encoding="utf-8"))["params"], ["haetae/mode2"])
+
+    def test_doctor_reports_the_kat_list(self):
+        ok, line = cli.kat_status(cli.tool_root())
+        self.assertTrue(ok, line)
+        self.assertIn("16 parameter sets", line)
+
     def test_folder_named_like_a_command_gets_a_warning(self):
         # 원본 폴더 이름이 check 이면 'pqproof check fixed' 는 한 트리 점검으로 읽힌다: 바뀐 뜻을 알려 준다
         here = os.getcwd()

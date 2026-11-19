@@ -1,7 +1,7 @@
 {
  "format": "pqproof mutations 1",
- "about": "Planted defects built from examples/classic and examples/pqc. Each one states the result PQ-Proof must give. run_mutations.py applies them in a temp folder, runs the tool, and compares. A mutation whose setup cannot be applied is SKIP, and SKIP is never counted as PASS.",
- "about_ko": "examples/classic·pqc 에서 만든 심어 둔 결함. 각 항목에 PQ-Proof가 반드시 내야 할 결과를 적었다. run_mutations.py 가 임시 폴더에 적용하고 도구를 돌려 비교한다. 준비를 못 한 항목은 SKIP 이고 SKIP 은 PASS 로 세지 않는다.",
+ "about": "Planted defects built from examples/classic and examples/pqc. Each one states the result PQ-Proof must give. run_mutations.py applies them in a temp folder, runs the tool, and compares. A mutation whose setup cannot be applied is SKIP, and SKIP is never counted as PASS. Cases of kind impl check the implementation check (pqproof impl judge): the answers are built from the reference KAT excerpts with tests/mutations/run_mutations.py and the tool's pqlite/impl.py, then one defect is planted.",
+ "about_ko": "examples/classic·pqc 에서 만든 심어 둔 결함. 각 항목에 PQ-Proof가 반드시 내야 할 결과를 적었다. run_mutations.py 가 임시 폴더에 적용하고 도구를 돌려 비교한다. 준비를 못 한 항목은 SKIP 이고 SKIP 은 PASS 로 세지 않는다. kind impl 사례는 구현 검증(pqproof impl judge)을 본다: 참조 KAT 발췌로 답안을 만든 뒤 결함 하나를 심는다.",
  "mutations": [
   {
    "id": "c01-examples-classic-to-pqc",
@@ -1353,6 +1353,281 @@
     "checks": {
      "a-input": "fail"
     }
+   }
+  },
+  {
+   "id": "i01-impl-latest",
+   "title": "Implementation check: answers of the latest reference versions (SMAUG-T 1.2.0, HAETAE 1.2.0)",
+   "title_ko": "구현 검증: 최신 참조판(SMAUG-T 1.2.0, HAETAE 1.2.0)의 답안은 통과",
+   "kind": "impl",
+   "impl": {
+    "params": [
+     "smaug-t/mode3",
+     "haetae/mode3"
+    ],
+    "as": "latest"
+   },
+   "expect": {
+    "exit": 0,
+    "verdict": "pass",
+    "checks": {
+     "i-kpqc": "pass"
+    },
+    "contains": {
+     "checks[i-kpqc].actual": [
+      "smaug-t/mode3 통과: 1.2.0 일치",
+      "haetae/mode3 통과: 1.2.0 일치"
+     ]
+    },
+    "eq": {
+     "impl.control.ok": true
+    }
+   }
+  },
+  {
+   "id": "i02-impl-old-version",
+   "title": "Implementation check: answers of the old HAETAE 1.1.2 (the version Bouncy Castle ships) need review",
+   "title_ko": "구현 검증: 옛 판 HAETAE 1.1.2 답안은 검토 필요(판 이름을 적는다)",
+   "kind": "impl",
+   "impl": {
+    "params": [
+     "haetae/mode2"
+    ],
+    "as": "1.1.2"
+   },
+   "expect": {
+    "exit": 0,
+    "verdict": "pass",
+    "checks": {
+     "i-kpqc": "review"
+    },
+    "contains": {
+     "checks[i-kpqc].actual": "옛 판 1.1.2 일치"
+    },
+    "stdout_contains": [
+     "needs review: i-kpqc"
+    ]
+   }
+  },
+  {
+   "id": "i02b-impl-old-version-strict",
+   "title": "The same old-version answers with FAIL_ON_REVIEW=1 exit 5",
+   "title_ko": "같은 옛 판 답안, FAIL_ON_REVIEW=1 이면 종료 5",
+   "kind": "impl",
+   "impl": {
+    "params": [
+     "smaug-t/mode1"
+    ],
+    "as": "1.1.1"
+   },
+   "env": {
+    "FAIL_ON_REVIEW": "1"
+   },
+   "expect": {
+    "exit": 5,
+    "verdict": "pass",
+    "checks": {
+     "i-kpqc": "review"
+    },
+    "contains": {
+     "checks[i-kpqc].actual": "옛 판 1.1.1 일치"
+    }
+   }
+  },
+  {
+   "id": "i03-impl-one-byte",
+   "title": "Implementation check: one byte of one decapsulated secret changed",
+   "title_ko": "구현 검증: decaps ss 한 바이트를 바꾼 답안은 실패(첫 불일치 문항)",
+   "kind": "impl",
+   "impl": {
+    "params": [
+     "ntruplus/1152"
+    ],
+    "as": "latest",
+    "edits": [
+     {
+      "op": "flip",
+      "item": "ntruplus/1152@2026-01#3:decaps",
+      "field": "ss"
+     }
+    ]
+   },
+   "expect": {
+    "exit": 1,
+    "verdict": "fail",
+    "checks": {
+     "i-kpqc": "fail"
+    },
+    "contains": {
+     "checks[i-kpqc].actual": "첫 불일치 2026-01: ntruplus/1152@2026-01#3:decaps ss"
+    }
+   }
+  },
+  {
+   "id": "i04-impl-accepts-tampered",
+   "title": "Implementation check: verify accepts a signature with a changed byte",
+   "title_ko": "구현 검증: 바뀐 서명을 받아들인 verify 답은 실패",
+   "kind": "impl",
+   "impl": {
+    "params": [
+     "aimer/128s"
+    ],
+    "as": "latest",
+    "edits": [
+     {
+      "op": "set",
+      "item": "aimer/128s@3.0#2:verify-tampered",
+      "field": "ok",
+      "value": true
+     }
+    ]
+   },
+   "expect": {
+    "exit": 1,
+    "verdict": "fail",
+    "checks": {
+     "i-kpqc": "fail"
+    },
+    "contains": {
+     "checks[i-kpqc].actual": "변조 서명을 받아들임"
+    }
+   }
+  },
+  {
+   "id": "i05-impl-missing-item",
+   "title": "Implementation check: a required answer is missing",
+   "title_ko": "구현 검증: 필수 문항 답이 빠지면 미판정",
+   "kind": "impl",
+   "impl": {
+    "params": [
+     "smaug-t/modet"
+    ],
+    "as": "latest",
+    "edits": [
+     {
+      "op": "drop",
+      "item": "smaug-t/modet@1.2.0#4:decaps"
+     }
+    ]
+   },
+   "expect": {
+    "exit": 3,
+    "verdict": "undecided",
+    "checks": {
+     "i-kpqc": "undecided"
+    },
+    "contains": {
+     "checks[i-kpqc].actual": "답 없는 문항 1개"
+    }
+   }
+  },
+  {
+   "id": "i06-impl-other-sheet",
+   "title": "Implementation check: the answers name another question sheet (prompt_sha256)",
+   "title_ko": "구현 검증: prompt_sha256 이 다른 답안은 미판정",
+   "kind": "impl",
+   "impl": {
+    "params": [
+     "haetae/mode5"
+    ],
+    "as": "latest",
+    "edits": [
+     {
+      "op": "top",
+      "field": "prompt_sha256",
+      "value": "0000000000000000000000000000000000000000000000000000000000000000"
+     }
+    ]
+   },
+   "expect": {
+    "exit": 3,
+    "verdict": "undecided",
+    "checks": {
+     "i-kpqc": "undecided"
+    },
+    "contains": {
+     "checks[i-kpqc].actual": "prompt_sha256"
+    }
+   }
+  },
+  {
+   "id": "i07-impl-rsp-short",
+   "title": "Implementation check: a PQCgenKAT .rsp with 5 of the 100 records",
+   "title_ko": "구현 검증: 100건 중 5건만 든 .rsp 는 미판정(있는 건수와 맞는 판을 적는다)",
+   "kind": "impl",
+   "impl": {
+    "params": [
+     "aimer/192f"
+    ],
+    "rsp": "3.0",
+    "header": "aimer-192f"
+   },
+   "expect": {
+    "exit": 3,
+    "verdict": "undecided",
+    "checks": {
+     "i-kpqc": "undecided"
+    },
+    "contains": {
+     "checks[i-kpqc].actual": "레코드 5건뿐(100건 필요). 있는 5건은 3.0 와 일치"
+    }
+   }
+  },
+  {
+   "id": "i08-impl-rsp-wrong-param",
+   "title": "Implementation check: --param names another parameter set than the .rsp header",
+   "title_ko": "구현 검증: --param 이 .rsp 머리 줄과 다른 파라미터면 미판정",
+   "kind": "impl",
+   "impl": {
+    "params": [
+     "smaug-t/mode5"
+    ],
+    "rsp": "1.2.0",
+    "header": "smaugt_mode5",
+    "param_arg": "smaug-t/mode1"
+   },
+   "expect": {
+    "exit": 3,
+    "verdict": "undecided",
+    "checks": {
+     "i-kpqc": "undecided"
+    },
+    "contains": {
+     "checks[i-kpqc].actual": "이름이 아니다"
+    }
+   }
+  },
+  {
+   "id": "i09-impl-evidence-answer-changed",
+   "title": "Implementation evidence: the copied answer changed and every hash rewritten",
+   "title_ko": "구현 검증 증적: 답안 사본을 고치고 해시를 모두 다시 쓰면 다시 판정에서 걸린다",
+   "kind": "impl",
+   "impl": {
+    "params": [
+     "ntruplus/768"
+    ],
+    "as": "latest"
+   },
+   "evidence_ops": [
+    {
+     "op": "json_set",
+     "file": "artifacts/impl/answer.json",
+     "path": "answers.ntruplus/768@2026-01#0:decaps.ss",
+     "value": "00"
+    },
+    {
+     "op": "rehash_artifact",
+     "file": "artifacts/impl/answer.json"
+    },
+    {
+     "op": "rehash_receipt"
+    }
+   ],
+   "expect": {
+    "verify_exit": "nonzero",
+    "verify_contains": [
+     "judged again"
+    ]
    }
   }
  ],

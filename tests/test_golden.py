@@ -1,6 +1,7 @@
 """하위 호환: 옛 판이 쓴 검증 증적(tests/golden/evidence)을 지금 --verify 가 계속 읽고, 바이트 하나 바뀐 것도 계속 잡는가.
 
-고정물은 첫 공개본, 사람 확인 칸이 생긴 공개본, D1·D2 고침 뒤 0.1.0 전 공개본, 0.1.0(형식 2)이 쓴 증적이다
+고정물은 첫 공개본, 사람 확인 칸이 생긴 공개본, D1·D2 고침 뒤 0.1.0 전 공개본, 0.1.0·0.1.1(형식 2), 0.2.0(형식 3, 두 트리와 한 트리),
+0.3.0(형식 4, 구현 검증)이 쓴 증적이다
 (manifest.json). make_fixture.py 가 개인 경로를 바꾸고 해시를 다시 계산했을 뿐 판정·검사·숫자는 그 판이 쓴 그대로다.
 형식을 바꾸는 릴리스는 지금 판의 증적을 make_fixture.py 로 하나 더 남기고, 이 시험이 계속 통과해야 한다."""
 import json
@@ -38,6 +39,9 @@ class LegacyEvidence(unittest.TestCase):
         self.assertIn(R.NOTE_PUBLIC1, notes)  # 첫 공개본
         self.assertIn(R.NOTE_V2, notes)       # 사람 확인 칸 이후(형식 2 와 그 전 둘째 공개본의 NOTE)
         self.assertIn(2, {fx["format_version"] for fx in MANIFEST["fixtures"]}, "no format 2 fixture yet")
+        modes = {(fx["format_version"], json.loads((GOLD / fx["name"] / "receipt.json").read_text(encoding="utf-8"))["params"].get("mode"))
+                 for fx in MANIFEST["fixtures"]}
+        self.assertLessEqual({(3, "pair"), (3, "check"), (4, "impl")}, modes)  # 형식을 올리기 전 판과 지금 판의 새 꼴
 
     def test_old_page_keeps_its_words(self):
         fx = next(x for x in MANIFEST["fixtures"] if x["name"] == "f1-public-a")

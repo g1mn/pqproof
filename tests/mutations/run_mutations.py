@@ -12,6 +12,9 @@
 #     규칙 묶음 이름(ruleset_version)만 다른 것은 사례별 FAIL 이 아니다. golden 요약 맨 위에 한 줄로 알린다(규칙 파일을 고치는 동안
 #     모든 사례가 '1+modified' 한 칸 때문에 FAIL 이 되어 진짜 판정 이동이 묻히지 않게)
 #   --diff-golden FILE(- 는 화면): golden 과 다른 사례·칸을 Markdown 표로 쓴다. CHANGELOG '판정 영향' 칸의 초안이다
+#   kind impl(구현 검증): 도구의 pqlite/impl.py 로 어느 판 구현이라면 낼 답안(example_answers)이나 발췌만 담은 .rsp 를 만들고 impl 의
+#     edits(flip·set·drop·top)로 결함을 심은 뒤 'prove.sh --impl judge'(깐 명령은 'pqproof impl judge')로 판정한다. evidence_ops 가
+#     있으면 증적을 고친 뒤 --verify 결과를 본다. impl 사례는 golden(트리 사례)에 들지 않는다
 #   --write-golden FILE: 이번 실행으로 고정 기록을 다시 쓴다. 쓰기 전에 그 파일의 지금 내용과 비교한 요약을 먼저 찍는다
 # 상태: PASS · FAIL · SKIP(준비 못 함: 고정물이 낡았거나 의존 도구 없음) · PENDING(고치는 중인 결함, --strict 가 아니면 종료 코드에 안 셈)
 # 건너뛴 것은 통과로 세지 않는다: SKIP 이 하나라도 있으면 종료 코드는 1이다.
@@ -461,6 +464,80 @@ class Runner:
             else:
                 raise Skip(f"unknown evidence op {kind}")
 
+    # 구현 검증(kind impl)
+    def impl_module(self):
+        """도구 쪽 pqlite/impl.py(표준 라이브러리만, 다른 pqlite 모듈을 가져오지 않는다)를 파일로 읽는다."""
+        import importlib.util
+        path = os.path.join(self.root, "pqlite", "impl.py")
+        if not os.path.isfile(path):
+            raise Skip("pqlite/impl.py not found in the tool root")
+        spec = importlib.util.spec_from_file_location("pqproof_impl_for_mutations", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def impl_answer(self, m, mdir):
+        """사례의 답안 파일 경로와 --param 인자. impl.as 는 'latest' 또는 판 이름, impl.rsp 를 주면 그 판 발췌만 담은 .rsp."""
+        mod, spec = self.impl_module(), m["impl"]
+        man = mod.load_manifest(os.path.join(self.root, "scan", "kat-kpqc.json"))
+        unknown = [p for p in spec["params"] if p not in man["params"]]
+        if unknown:
+            raise Skip(f"unknown parameter sets {unknown} (fixture is stale)")
+        if "rsp" in spec:
+            pid, ver = spec["params"][0], spec["rsp"]
+            V = next((v for v in man["params"][pid]["versions"] if v["version"] == ver and v["excerpt"]), None)
+            if V is None:
+                raise Skip(f"{pid}@{ver} has no excerpt")
+            lines = [f"# {spec.get('header', pid)}", ""]
+            for rec in V["excerpt"]:
+                lines += [f"{k} = {v}" for k, v in rec.items()] + [""]
+            path = os.path.join(mdir, "kat.rsp")
+            with open(path, "w", encoding="ascii") as f:
+                f.write("\n".join(lines))
+            return path, (["--param", spec["param_arg"]] if spec.get("param_arg") else [])
+        key = mod.build_key(man, spec["params"])
+        pick = {}
+        for P in key["params"]:
+            want = spec.get("as", "latest")
+            V = next((v for v in P["versions"] if (v["latest"] if want == "latest" else v["version"] == want)), None)
+            if V is None:
+                raise Skip(f"{P['id']} has no version {want}")
+            pick[P["id"]] = V["version"]
+        resp = mod.example_answers(key, pick)
+        for e in spec.get("edits", []):
+            op, item = e["op"], e.get("item")
+            if op != "top" and item not in resp["answers"]:
+                raise Skip(f"answer item {item} not found (fixture is stale)")
+            if op == "flip":
+                resp["answers"][item][e["field"]] = mod._flip_hex(resp["answers"][item][e["field"]])
+            elif op == "set":
+                resp["answers"][item][e["field"]] = e["value"]
+            elif op == "drop":
+                del resp["answers"][item]
+            elif op == "top":
+                resp[e["field"]] = e["value"]
+            else:
+                raise Skip(f"unknown impl edit op {op}")
+        path = os.path.join(mdir, "answers.json")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(mod.dumps(resp))
+        return path, []
+
+    def prove_impl(self, path, extra, out, env_extra):
+        env = {k: v for k, v in os.environ.items() if k not in ("OUT", "PROFILE", "FAIL_ON_REVIEW", "EV_NAME")}
+        env.update({"OUT": out})
+        env.update(env_extra)
+        sub = ["--impl"] if self.cmd[-1].endswith("prove.sh") else ["impl"]
+        t = time.time()
+        try:
+            r = subprocess.run(self.cmd + sub + ["judge", path] + extra, env=env, capture_output=True, text=True, errors="replace",
+                               timeout=self.timeout, stdin=subprocess.DEVNULL)
+        except FileNotFoundError as e:
+            raise Skip(f"cannot start {self.cmd[0]}: {e}") from e
+        except subprocess.TimeoutExpired as e:
+            raise Skip(f"timed out after {self.timeout}s") from e
+        return r.returncode, r.stdout + r.stderr, time.time() - t
+
     # 기대값 비교
     def compare(self, m, code, log, rec, ver, sar):
         exp, bad = m.get("expect", {}), []
@@ -540,13 +617,17 @@ class Runner:
     def one(self, m):
         mdir = os.path.join(self.work, m["id"])
         os.makedirs(mdir)
-        orig, fixed = self.tree(m, mdir)
         env = dict(m.get("env") or {})
-        allow = self.allow_file(m, mdir)
-        if allow:
-            env["ALLOW"] = allow
         out = os.path.join(mdir, "out")
-        code, log, secs = self.prove(orig, fixed, out, env, m.get("mode", "pair"))
+        if m["kind"] == "impl":
+            path, extra = self.impl_answer(m, mdir)
+            code, log, secs = self.prove_impl(path, extra, out, env)
+        else:
+            orig, fixed = self.tree(m, mdir)
+            allow = self.allow_file(m, mdir)
+            if allow:
+                env["ALLOW"] = allow
+            code, log, secs = self.prove(orig, fixed, out, env, m.get("mode", "pair"))
         with open(os.path.join(mdir, "prove.log"), "w", encoding="utf-8") as f:
             f.write(log)
         rec = None
@@ -558,7 +639,7 @@ class Runner:
         if code == 2:
             raise Skip(f"tool usage error (exit 2): {log.strip().splitlines()[-1] if log.strip() else ''}")
         ver = None
-        if m["kind"] == "evidence":
+        if m["kind"] == "evidence" or m.get("evidence_ops"):
             if rec is None:
                 raise Skip("base run produced no receipt.json")
             base_v = self.verify(out)

@@ -179,6 +179,25 @@
     "/opt/pqproof"
    ],
    "report_section_removed": null
+  },
+  {
+   "name": "f4-v0.3.0-impl",
+   "label": "0.3.0 (evidence format 4, ruleset 3), implementation check: answers built from the KAT excerpts as an implementation of the old SMAUG-T 1.1.1 modet would give them: pass, i-kpqc needs review",
+   "format_version": 4,
+   "verdict": "pass",
+   "checks": {
+    "i-kpqc": "review"
+   },
+   "receipt_id": "f9e7d33be37562182fbb4afa001b676458bc9aa2cf5dbbcb4a3f5e79f2e855a7",
+   "source_receipt_id": "3fb4988abb622812fc5349d28a3a82454c489de39718f473c18a68758687f084",
+   "source_receipt_html_sha256": "dcc64df6b55035940ddddc4bb931d14ac528d2e2bfa5803e5263ef2b1892d140",
+   "source_verified_by_this_tool": true,
+   "paths_replaced": [
+    "/tmp/work/impl-out",
+    "/tmp/work",
+    "/opt/pqproof"
+   ],
+   "report_section_removed": null
   }
  ]
 }

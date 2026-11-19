@@ -14,6 +14,28 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 **Verdict impact (판정 영향): none.**
 
+## [0.3.0] - 2026-11-19
+
+Tool 0.3.0, ruleset 3 (new name and hash, fourteen rule files), evidence format 4. New command `pqproof impl` (`prove.sh --impl`): it checks a KpqC implementation (SMAUG-T, NTRU+, HAETAE, AIMer) against pinned reference KAT versions without building or running it. `--verify` still reads evidence formats 1, 2 and 3.
+
+**Verdict impact (판정 영향): none.** Existing verdicts do not move: the 39 golden tree cases of 0.2.0 give the same verdicts, check statuses and counts under ruleset 3 (only the ruleset name in the golden file changed). A new check, `i-kpqc`, exists only in the new implementation check. Ruleset 3 adds three rule files (`pqlite/impl.py`, `scan/kat-kpqc.json` and the excerpts in `scan/kat/`) and the `impl_accept` key of the `kpqc` profile, so its hash and name are new and two-tree receipts now list those files in `tools[]`.
+
+### Added
+
+- `pqproof impl prompt [--param P ...] [-o file]` writes a question sheet from the reference KAT excerpts: per parameter set and known version, decapsulation items (`sk`, `ct`, answer `ss`), verification items (`pk`, `msg`, `sig`, `ctx`, answer `ok`) with a copy whose signature has one changed byte (answer must be false), and optional seed items for a build that links the NIST KAT DRBG (`pk`, `sk`, `ct`, `ss` or `pk`, `sk`, `sig`, `sm`). `prompt_sha256` covers the items, so the answers name the sheet they answer. HAETAE KAT signatures use a context string that the `.rsp` does not print; the sheet carries it, drawn from the record's seed with a pure Python copy of the PQCgenKAT AES-256-CTR DRBG (checked against FIPS 197 and against values replayed from the reference library).
+- `pqproof impl judge <answers.json|kat.rsp> [--param P]` compares the answers with every known version. A version is a candidate when every item from it matches. Accepted versions only: pass. An old version or a known variant (for example HAETAE 1.1.2, which Bouncy Castle 1.85 to 1.87 ships), or answers that cannot tell an accepted version from another one: needs review, with the version named. No candidate, or a changed signature accepted: fail, with the first mismatching item and field. A missing answer, another question sheet, an unknown parameter set, a file over 64 MiB or a failed self-check: undecided. A full PQCgenKAT `.rsp` is compared with the 100 record digests of each version (`n/100`); HAETAE `smlen`/`sm` and AIMer `siglen`/`sig` forms are read as the reference forms.
+- Before judging, the tool checks itself: answers built from the excerpts for an accepted version must pass and the same answers with one byte changed must fail, or the whole check is undecided.
+- `scan/profiles.json`: `impl_accept` in the `kpqc` profile lists the versions `impl judge` accepts (`latest` by default, or `<parameter>@<version>`, `<algorithm>@<version>`).
+- Evidence format 4 (`schemas/receipt-v4.schema.json`): an implementation check receipt has `params.mode` `impl`, the top-level `impl` field (answer copy, answer key copy, question sheet copy, accepted versions, self-check, results per parameter set) and the check `i-kpqc`, with `receipt.html`, `deck.json`, `README.txt`, `tables/report.md`, `tables/summary.csv` and `tables/impl.csv`. `--verify` judges the copied answer again with the copied answer key and, when its own KAT list is the one the receipt used, rebuilds the answer key and the question sheet byte for byte. Two-tree and one-tree receipts keep the fields of format 3. SARIF reports `i-kpqc` as a check without a file position.
+- `examples/impl/kpqc_harness.py`: an example harness (standard library `ctypes`) that answers a question sheet with shared libraries that export the NIST API.
+- `pqproof doctor` reports the KAT list; `pqproof impl` needs Python only, so it also runs on Windows.
+- Tests: `tests/test_impl.py`, nine `impl` cases in the mutation suite (`i01` to `i09`), self-test case S11, two format 3 fixtures written by 0.2.0 and a format 4 implementation check fixture under `tests/golden/evidence/`.
+
+### Changed
+
+- `pqlite/version.py`: `scan/kat` is hashed as one digest over its `*.json` files (`path_sha256`).
+- `tests/golden/make_fixture.py` renders `README.txt` again for format 3 and later.
+
 ## [0.2.0] - 2026-11-19
 
 Tool 0.2.0, ruleset 2 (new name and hash, eleven rule files), evidence format 3. Bypasses from the November review (X01 to X10) are closed, and the rule gaps X11, X18 to X28, X30, X31, X47, X56 to X59 and X62 with them. New commands `pqproof check` and `pqproof inventory`, new settings `PROFILE`, `FAIL_ON_REVIEW`, `REQUIRE_RESOLVED`, `EXPECT_FROM`, `REVIEW_MAX_AGE_DAYS` and `MAX_FILE_MIB`, and exit codes 4 (tool error) and 5 (pass that needs review, only with `FAIL_ON_REVIEW=1`). `--verify` still reads evidence formats 1 and 2 (ruleset 1).

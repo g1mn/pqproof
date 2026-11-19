@@ -24,6 +24,8 @@ bash prove.sh <original folder|zip> <fixed folder|zip>
 
 `bash prove.sh --check <tree>` (`pqproof check`) judges one tree as it is now, with no original: the tree goes in both slots, `params.mode` is `check`, and the checks that compare two trees are "not applicable" (`a-input` keeps only its skipped-folder, link and size findings, `b-weakening` and `r-review` have no change to look at). A code or folder link that points outside the tree leaves `a-input` undecided there too, and fails it under `REQUIRE_REVIEW=1`. Check mode therefore does not catch TLS weakening or a removed verification call; it guards against classical algorithms coming back, and the two-tree run stays the judgment for a pull request. `bash prove.sh --inventory <tree>` (`pqproof inventory`) gives no verdict: it runs the two scanners and `residue.sh` on one tree and writes `inventory.json` (CBOM counts, blocking locations, classical lines per family, PQC name lines, TLS signals, the ruleset) with `tables/cbom.csv` and the raw output.
 
+`bash prove.sh --impl prompt|judge` (`pqproof impl`) checks a KpqC implementation (SMAUG-T, NTRU+, HAETAE, AIMer) against pinned reference KAT versions, without building or running it. `prompt` writes a question sheet from the KAT excerpts in `scan/kat/` (decapsulate, verify a signature and a signature with one changed byte, and optional seed items for a NIST KAT DRBG build). The user's own harness answers it (`examples/impl/kpqc_harness.py` is one), and `judge` compares the answers, or a full PQCgenKAT `.rsp` against the 100 record digests in `scan/kat-kpqc.json`. A version is a candidate when every item from it matches. The run passes when the candidates are versions the profile accepts (`impl_accept` in the `kpqc` profile, the latest version by default), needs review when an old version or a known variant matches or when the answers cannot tell versions apart, fails on no match or when a changed signature is accepted, and is undecided when an answer is missing, the sheet differs or the self-check fails. It is a match with a reference version's KAT, not a conformance test or a certification. The evidence is format 4 with `params.mode` `impl` and one check, `i-kpqc`; it keeps the answer, the answer key and the question sheet, and `--verify` judges the copied answer again.
+
 The inputs are untrusted. The tool reads files and never runs them. zip entries with absolute paths, `..` or backslashes are refused, symlinks inside a zip are recorded by name and not unpacked, and unpacking stops past 1 GiB. A zip that would unpack differently from one machine to the next is an input error (exit 2): the same name twice, two names that differ only in case or Unicode normalization (one file on macOS and Windows), control characters in a name, a file and a folder with the same name, or more than 500,000 entries. A control character (newline, tab) in a file name inside a folder input is an input error too, because the line-based scanners would miss that file. A file over the size limit (`MAX_FILE_MIB`, 1 MiB by default) is skipped whole by `scan.py`, the weakening check and the allowlist check; the grep-based `cbom-scan.sh` and `residue.sh` still read it. Such code and config files are listed in `inputs.*.oversize`, and one in the fixed tree makes `a-input` need review. Folders are skipped by the rules under Skipped folders below. Only `cbom-scan.sh` (grep, awk, openssl) and `residue.sh` (grep, awk) run as subprocesses, plus `tls_probe` and `openssl s_client` for the TLS step.
 
 ## The eight checks
@@ -211,7 +213,7 @@ The probe is a binary on the local disk, and anyone who can write to that folder
 
 ```bash
 bash prove.sh --unit                 # unit tests
-bash prove.sh --selftest             # end-to-end self-test, S1 to S10 below
+bash prove.sh --selftest             # end-to-end self-test, S1 to S11 below
 python3 -I tests/mutations/run_mutations.py --strict --golden tests/golden/verdicts.json
 bash scan/cbom-scan.sh --selftest    # scanner assertions
 ```
@@ -235,6 +237,7 @@ bash scan/cbom-scan.sh --selftest    # scanner assertions
 | S9 | `examples/classic` | `examples/pqc` plus a Go test that builds a P-256 key to check that it is rejected | pass; the test lines are counted apart |
 | S8f | `examples/classic` plus `tools/old_rsa.py` | `examples/pqc` (that file deleted), with a reviewed entry for `tools/old_rsa.py:1-44` | the entry is invalid in the fixed tree and counts as unused; `REQUIRE_REVIEW=1` fails |
 | S10 | `examples/classic` with its Java moved to `src/main/java/com/example/` | (a) the same with only the Python migrated, (b) a Java-only tree migrated to ML-KEM and ML-DSA | (a) fails `a-cbom` and `c-classic`, with no test lines; (b) passes |
+| S11 | `--impl` answers built from the KAT excerpts for SMAUG-T mode1 and AIMer 128f | (a) the latest versions, (b) the same with one decapsulated secret changed by one byte, (c) the old versions | (a) passes, (b) fails, (c) passes with `i-kpqc` needing review; every folder verifies |
 
 `tests/e2e_orders_edge.py` goes further: it builds the orders-edge Go service from a full clone (with `vendor/`), runs it, and measures the original, the fix and an injected weakening over real TLS. It needs that clone and Go, so it is run by hand; CI does not run it, and S4 and S5 cover the same flow offline on every run.
 
@@ -287,6 +290,16 @@ bash scan/cbom-scan.sh --selftest    # scanner assertions
 | `m28-test-keypair` | X06 follow-up: a TLS key and certificate pair under src/test (made with `openssl` at run time) | verdict pass; `a-cbom` pass; both files counted as tests |
 | `m29-check-mode-outside-link` | check mode: a folder link to a path outside the tree | verdict undecided (exit 3); `a-input` undecided |
 | `m29b-check-mode-outside-link-strict` | the same under REQUIRE_REVIEW=1 | verdict fail; `a-input` fail |
+| `i01-impl-latest` | implementation check: answers of the latest reference versions (SMAUG-T 1.2.0, HAETAE 1.2.0) | verdict pass; `i-kpqc` pass; the self-check passed |
+| `i02-impl-old-version` | answers of the old HAETAE 1.1.2 | verdict pass; `i-kpqc` review and names the version |
+| `i02b-impl-old-version-strict` | old SMAUG-T 1.1.1 answers under FAIL_ON_REVIEW=1 | exit 5; `i-kpqc` review |
+| `i03-impl-one-byte` | one byte of one decapsulated secret changed | verdict fail; `i-kpqc` fail and names the first item and field |
+| `i04-impl-accepts-tampered` | verify accepts a signature with a changed byte | verdict fail; `i-kpqc` fail |
+| `i05-impl-missing-item` | a required answer is missing | verdict undecided (exit 3) |
+| `i06-impl-other-sheet` | the answers name another question sheet | verdict undecided (exit 3) |
+| `i07-impl-rsp-short` | a `.rsp` with 5 of the 100 records | verdict undecided (exit 3); the count and the matching version are named |
+| `i08-impl-rsp-wrong-param` | `--param` names another parameter set than the `.rsp` header | verdict undecided (exit 3) |
+| `i09-impl-evidence-answer-changed` | evidence: the copied answer changed and every hash rewritten | `--verify` fails when it judges the answer again |
 
 ### Golden verdicts
 
@@ -326,7 +339,7 @@ A different ruleset name alone (`1+modified` while rule files are being edited) 
 - **Outside the tree.** TLS settings, certificates and services configured outside the given tree (a host's TLS configuration, for example) are out of view, so the verdict can differ from a check that tests the running service. The tool does not open files outside the tree, so the same tree gets the same verdict on every machine: a certificate path in an nginx or Apache setting that points outside the tree becomes a "check" row (인증서(트리 밖 참조)), and an SSH `HostKey` outside the tree is named from its file name. `cbom-scan.sh` run on its own reads those files with `HOST_FILES=1`; `prove.sh` never passes that setting. Before ruleset 2 the scanner read them when they were readable, so a run on a host with the files could fail where a run elsewhere passed.
 - **Symbolic links.** The tool records a link and its target and never follows it. Build tools do follow links, so a link in the fixed tree whose target is outside the tree or in a skipped folder is reported in `a-input`: undecided when the link or target is code, config or a build file or has no extension (it may be a folder), needs review otherwise, and a failure under `REQUIRE_REVIEW=1`. Links in a zip are not unpacked and get the same treatment. A link to a file inside the tree is fine, because that file is checked where it is.
 - **Skipped folders.** A folder named `build`, `target`, `dist` or `vendor` at the top of the tree or next to a build file is treated as build output or vendored dependencies and not checked. Code there shows up only as a count in `inputs.*.skipped` and as "needs review" in `a-input`. Production code kept in such a folder outside `src/main/` is not judged.
-- **No function or performance testing.** Use your own tests for that.
+- **No function or performance testing.** Use your own tests for that. The implementation check (`--impl`) only compares answers that your harness produced with reference KAT versions. It does not run your code, and a match is not a conformance test or a certification (not KCMVP).
 - **Scale.** I have run it only on small services so far, not yet on production codebases.
 
 ## 한국어 요약

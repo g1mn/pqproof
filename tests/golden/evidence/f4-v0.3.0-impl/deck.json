@@ -1,0 +1,37 @@
+{
+ "verdict": "pass",
+ "verdict_text": "통과(검토 필요 검사 i-kpqc)",
+ "verdict_text_en": "pass (needs review: i-kpqc)",
+ "receipt": "f9e7d33be375",
+ "receipt_file": "/tmp/work/impl-out/receipt.json",
+ "mode": "impl",
+ "impl": [
+  {
+   "param": "smaug-t/modet",
+   "name": "SMAUG-T",
+   "status": "review",
+   "matched": [
+    "1.1.1"
+   ],
+   "summary": "옛 판 1.1.1 일치(문항 10/10): 받아 줄 판(1.2.0)이 아니다"
+  }
+ ],
+ "accept": [
+  "smaug-t/modet@1.2.0"
+ ],
+ "control_ok": true,
+ "checks": [
+  {
+   "id": "i-kpqc",
+   "status": "review",
+   "label": "KpqC 참조판 KAT 일치"
+  }
+ ],
+ "verify_cmd": "bash prove.sh --verify /tmp/work/impl-out",
+ "ev": [
+  "out.txt"
+ ],
+ "tool_version": "0.3.0",
+ "ruleset_version": "3",
+ "format_version": 4
+}

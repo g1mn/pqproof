@@ -1,6 +1,6 @@
 {
- "about": "Ruleset versions: a name for each hash of the rule files (pqlite/version.py RULESET_FILES). A run records ruleset_version and ruleset_sha256 in receipt.json. Each version lists sha256, since (the first tool version that shipped it), verdict_impact (yes when the same trees can get a different verdict, check status or count than under the previous ruleset; no when only comments, wording or code layout changed) and files (path and sha256 of each rule file). The file list can differ between versions: ruleset 1 hashed six files, ruleset 2 hashes eleven: it adds scan/skip-dirs, scan/profiles.json, pqlite/rules.py, pqlite/skipdirs.py and pqlite/tlsprobe.py. --verify recomputes a receipt's ruleset_sha256 from the files of the ruleset it names. Changing a rule file needs a new name here, a new current, and a CHANGELOG entry with its verdict impact. A ruleset with verdict_impact yes first ships in a MINOR release (MAJOR from 1.0), never a PATCH release (tests/version_policy.py). pqlite/version.py --ruleset-json prints sha256 and files for the rule files on disk.",
- "current": "2",
+ "about": "Ruleset versions: a name for each hash of the rule files (pqlite/version.py RULESET_FILES). A run records ruleset_version and ruleset_sha256 in receipt.json. Each version lists sha256, since (the first tool version that shipped it), verdict_impact (yes when the same trees can get a different verdict, check status or count than under the previous ruleset; no when only comments, wording or code layout changed) and files (path and sha256 of each rule file). The file list can differ between versions: ruleset 1 hashed six files, ruleset 2 hashes eleven: it adds scan/skip-dirs, scan/profiles.json, pqlite/rules.py, pqlite/skipdirs.py and pqlite/tlsprobe.py. Ruleset 3 hashes fourteen: it adds pqlite/impl.py, scan/kat-kpqc.json and scan/kat (the reference KAT excerpts, one digest over the *.json files of the folder, pqlite/version.py path_sha256). Ruleset 3 hashes fourteen: it adds pqlite/impl.py, scan/kat-kpqc.json and scan/kat (the reference KAT excerpts, one digest over the *.json files of the folder, pqlite/version.py path_sha256). --verify recomputes a receipt's ruleset_sha256 from the files of the ruleset it names. Changing a rule file needs a new name here, a new current, and a CHANGELOG entry with its verdict impact. A ruleset with verdict_impact yes first ships in a MINOR release (MAJOR from 1.0), never a PATCH release (tests/version_policy.py). pqlite/version.py --ruleset-json prints sha256 and files for the rule files on disk.",
+ "current": "3",
  "versions": {
   "1": {
    "sha256": "b0bff18e90b4f981b7b5df07236e5d132d7c0aa3458bc1a79810ca5e10f49645",
@@ -69,6 +69,69 @@
     {
      "path": "scan/profiles.json",
      "sha256": "87c3a27ea4c7cab6c1c729a40cec7ceaca37b75617798193bf4e9fbcd5a4bdba"
+    },
+    {
+     "path": "scan/residue.sh",
+     "sha256": "bb208ec4703b76979fe77beaea551fb6b72ca8f43d34b034e3177f8b862f1fe7"
+    },
+    {
+     "path": "scan/skip-dirs",
+     "sha256": "685fda3e7ac9ead22c216540301847dfc31b043918e920148ec74a08515ae1f7"
+    },
+    {
+     "path": "scan/test-paths.ere",
+     "sha256": "1c57d266eb7365ec1766652c6d43277ce0e59fb9924aa02b6bf3a3a5faf89bfa"
+    }
+   ]
+  },
+  "3": {
+   "sha256": "ec507a9b70caaddf4d56dad62d5c803291267157add69f6d0932836aaf40a206",
+   "since": "0.3.0",
+   "verdict_impact": "no",
+   "files": [
+    {
+     "path": "pqlite/allowlist.py",
+     "sha256": "440e8c9cf43ee2272138e13587c8bb26361bbe036515e5b55d323a2f67a49aa3"
+    },
+    {
+     "path": "pqlite/impl.py",
+     "sha256": "d43f546c84fe4ca61f0c4a4b1e99cfd6d88cb6f1d8f4cd6214015aa7093bb5db"
+    },
+    {
+     "path": "pqlite/rules.py",
+     "sha256": "e7b7a7e5e7646bab294a0af483e441b681d47ad013d063fa4d98b15a4c504b18"
+    },
+    {
+     "path": "pqlite/scan.py",
+     "sha256": "2be4593cd30b6d842c60a693d5ee96bd9496ac167a9b4cad54de07690e95624b"
+    },
+    {
+     "path": "pqlite/skipdirs.py",
+     "sha256": "9316b63f49613d6791c1de2327730e4268437fb39c1046f7d12ec1b6b0f134f2"
+    },
+    {
+     "path": "pqlite/tlsprobe.py",
+     "sha256": "8c85b99d1148ebb570d497ec2b91eab82d7b74d40cb690f0cd02c7b81fb1c443"
+    },
+    {
+     "path": "pqlite/verify.py",
+     "sha256": "dc422c4d734457beae72ac8a8abcb1c3d11a804110cbea38a72aa2ddc8a34489"
+    },
+    {
+     "path": "scan/cbom-scan.sh",
+     "sha256": "1d95037483ee21ea13785b022e908b61abdf8df245ea851bd5717ea1415b965b"
+    },
+    {
+     "path": "scan/kat",
+     "sha256": "182a5384a6acf8f789f2e068d834d1d968d37aff4ae8e0275dbdd96aaef741e9"
+    },
+    {
+     "path": "scan/kat-kpqc.json",
+     "sha256": "628d6e88552908d9a2eaf7c827a698f84278cd320531f1c8f7324f8947bcd9f5"
+    },
+    {
+     "path": "scan/profiles.json",
+     "sha256": "ad5efbc3b1097e64baa484344457a96d17d52099e37bba4940924bc556e16603"
     },
     {
      "path": "scan/residue.sh",
