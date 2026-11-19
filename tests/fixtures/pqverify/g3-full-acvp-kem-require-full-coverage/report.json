@@ -1,0 +1,101 @@
+{
+  "schema": "pq-verify/acvp-result",
+  "schema_version": "1.2",
+  "tool": {
+    "name": "pq-verify",
+    "version": "2.19.0"
+  },
+  "timestamp": "<TIMESTAMP>",
+  "artifact": {
+    "bound": false,
+    "sha256": null,
+    "path": null,
+    "summary": "none - reference-chain conformance, no vendor binary loaded",
+    "detail": "No binary was loaded, so the result is not bound to any artifact."
+  },
+  "side_channel": {
+    "measured": false,
+    "summary": "not measured - execution time, power and electromagnetic behaviour were not observed",
+    "detail": "pq-verify compares values against NIST's published answers. It does not execute the implementation under measurement and cannot detect a timing-dependent, cache-dependent or power-dependent implementation that computes the correct result. Establishing that requires leakage assessment against the deployed binary on the deployed hardware."
+  },
+  "suites": {
+    "ML-KEM (FIPS 203)": {
+      "ran": true,
+      "checks_passed": 240,
+      "checks_total": 240,
+      "verified": true,
+      "vectors": "pinned (NIST ACVP-Server 15c0f3d, ad33b3d)",
+      "reference": "kyber-py 1.2.0"
+    }
+  },
+  "groups": {
+    "ML-KEM (FIPS 203)/keyGen/ML-KEM-512": {
+      "passed": 25,
+      "total": 25
+    },
+    "ML-KEM (FIPS 203)/keyGen/ML-KEM-768": {
+      "passed": 25,
+      "total": 25
+    },
+    "ML-KEM (FIPS 203)/keyGen/ML-KEM-1024": {
+      "passed": 25,
+      "total": 25
+    },
+    "ML-KEM (FIPS 203)/encaps/ML-KEM-512": {
+      "passed": 25,
+      "total": 25
+    },
+    "ML-KEM (FIPS 203)/encaps/ML-KEM-768": {
+      "passed": 25,
+      "total": 25
+    },
+    "ML-KEM (FIPS 203)/encaps/ML-KEM-1024": {
+      "passed": 25,
+      "total": 25
+    },
+    "ML-KEM (FIPS 203)/decaps/ML-KEM-512": {
+      "passed": 10,
+      "total": 10
+    },
+    "ML-KEM (FIPS 203)/decaps/ML-KEM-768": {
+      "passed": 10,
+      "total": 10
+    },
+    "ML-KEM (FIPS 203)/decaps/ML-KEM-1024": {
+      "passed": 10,
+      "total": 10
+    },
+    "ML-KEM (FIPS 203)/decapKeyCheck/ML-KEM-512": {
+      "passed": 10,
+      "total": 10
+    },
+    "ML-KEM (FIPS 203)/encapKeyCheck/ML-KEM-512": {
+      "passed": 10,
+      "total": 10
+    },
+    "ML-KEM (FIPS 203)/decapKeyCheck/ML-KEM-768": {
+      "passed": 10,
+      "total": 10
+    },
+    "ML-KEM (FIPS 203)/encapKeyCheck/ML-KEM-768": {
+      "passed": 10,
+      "total": 10
+    },
+    "ML-KEM (FIPS 203)/decapKeyCheck/ML-KEM-1024": {
+      "passed": 10,
+      "total": 10
+    },
+    "ML-KEM (FIPS 203)/encapKeyCheck/ML-KEM-1024": {
+      "passed": 10,
+      "total": 10
+    }
+  },
+  "summary": {
+    "checks_passed": 240,
+    "checks_total": 240,
+    "findings": 0,
+    "not_run": []
+  },
+  "verified": true,
+  "status": "VERIFIED"
+}

@@ -1,0 +1,33 @@
+  artifact: sha256 c7316191f6131e8f66ebf46558e0966d249d98d043aeabffe1a289fb871968a8
+====================================================================
+  THIRD-PARTY ML-DSA AUDIT - ML-DSA-65
+  library : libpqclean_mldsa65.dylib   (calling convention: pqcrystals)
+  harness : pqv_randombytes linked: randomised APIs audited
+  vectors : pinned (NIST ACVP-Server 2972def, a7f283c)
+====================================================================
+  PASS  keyGen          25/25   via PQCLEAN_MLDSA65_CLEAN_crypto_sign_keypair
+  n/a   sigGenInternal  30 vector(s): no signature_internal entry point
+  PASS  sigGenPure      30/30   via PQCLEAN_MLDSA65_CLEAN_crypto_sign_signature_ctx
+  n/a   sigGenPreHash   30 vector(s): no pre-hash signing entry point
+  n/a   sigGenMu        30 vector(s): no external-mu signing entry point
+  n/a   sigVerInternal  15 vector(s): no verify_internal entry point
+  PASS  sigVerPure      15/15   via PQCLEAN_MLDSA65_CLEAN_crypto_sign_verify_ctx
+  n/a   sigVerPreHash   15 vector(s): no pre-hash verification entry point
+  n/a   sigVerMu        15 vector(s): no external-mu verification entry point
+  n/a   preHashVerify   12 check(s): no pre-hash verification entry point
+  edge cases: Wycheproof 3fa63dd, CCTV 50a8ecf
+  PASS  edge:sigVerify  203/203
+  PASS  edge:sigGen     85/85
+  PASS  edge:edgeLength 3/3
+  n/a   edge        24 vector(s) the API cannot express (fixed-size or out-of-range arguments)
+  PASS  accumulated     1/1   10,000 cases: digest 5ff5e196f0b830c3… matches (C2SP CCTV 50a8ecf ML-DSA/accumulated (published))
+  PASS  bounds   30463 calls, none wrote outside its buffers (64 guard bytes each side)
+====================================================================
+  RESULT: 362/362 - VERIFIED   (171 not applicable to this API)
+  This audits the vendor's OWN keygen/sign/verify against NIST's
+  vectors and Wycheproof's edge cases. It is not a side-channel review.
+====================================================================
+  SCOPE: partial: 362 checked; 171 not applicable (the library exports no entry point for them)
+  FAILING: ML-DSA audit scope is partial and --require-full-coverage was set
+  wrote <OUT>/report.json  (report for --audit-dsa; artifact: sha256 c7316191f6131e8f66ebf46558e0966d249d98d043aeabffe1a289fb871968a8)
+  INTEGRITY: nothing this run needed was missing (no field engines were required).

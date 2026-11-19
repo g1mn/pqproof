@@ -1,0 +1,10 @@
+{
+ "argv": [
+  "pq-verify",
+  "--audit-contained",
+  "<BUILD>/good-mlkemnative/libmlkemnative768_good.dylib",
+  "ML-KEM-768",
+  "--json",
+  "<OUT>/report.json"
+ ]
+}

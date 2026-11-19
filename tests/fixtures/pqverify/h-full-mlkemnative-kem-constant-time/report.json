@@ -1,0 +1,128 @@
+{
+  "schema": "pq-verify/kem-audit-result",
+  "schema_version": "1.2",
+  "tool": {
+    "name": "pq-verify",
+    "version": "2.19.0"
+  },
+  "timestamp": "<TIMESTAMP>",
+  "artifact": {
+    "bound": true,
+    "sha256": "a3caf5a26d4b1bede4d7c86fa28862f7278b125e85fe0cb70e58734e049c60b6",
+    "path": "<BUILD>/good-mlkemnative/libmlkemnative768_good.dylib",
+    "summary": "sha256 a3caf5a26d4b1bede4d7c86fa28862f7278b125e85fe0cb70e58734e049c60b6",
+    "detail": "The audited computation was performed by this file.",
+    "isolation": "child process",
+    "loaded_objects": [
+      {
+        "path": "<PYTHON>/lib/python3.13/lib-dynload/_elementtree.cpython-313-darwin.so",
+        "inode": null,
+        "sha256": "ffed6fdd25a0935b1716fdb403a1a2fed375f21a8d88aeaa5bd11012bffdfdab"
+      },
+      {
+        "path": "<PYTHON>/lib/python3.13/lib-dynload/pyexpat.cpython-313-darwin.so",
+        "inode": null,
+        "sha256": "c7bf4212280d55b01d2746ddae301e87033b2b6e83a4a00928b8f541a0606f9a"
+      },
+      {
+        "path": "<BUILD>/good-mlkemnative/libmlkemnative768_good.dylib",
+        "inode": null,
+        "sha256": "a3caf5a26d4b1bede4d7c86fa28862f7278b125e85fe0cb70e58734e049c60b6"
+      }
+    ]
+  },
+  "side_channel": {
+    "measured": false,
+    "summary": "not measured - execution time, power and electromagnetic behaviour were not observed",
+    "detail": "pq-verify compares values against NIST's published answers. It does not execute the implementation under measurement and cannot detect a timing-dependent, cache-dependent or power-dependent implementation that computes the correct result. Establishing that requires leakage assessment against the deployed binary on the deployed hardware."
+  },
+  "parameter_set": "ML-KEM-768",
+  "library": "<BUILD>/good-mlkemnative/libmlkemnative768_good.dylib",
+  "status": "FINDINGS PRESENT",
+  "verified": false,
+  "symbols": {
+    "keypair": "PQCP_MLKEM_NATIVE_MLKEM768_keypair_derand",
+    "encaps": "PQCP_MLKEM_NATIVE_MLKEM768_enc_derand",
+    "decaps": "PQCP_MLKEM_NATIVE_MLKEM768_dec"
+  },
+  "summary": {
+    "checks_passed": 1436,
+    "checks_total": 1437,
+    "findings": 1
+  },
+  "accumulated": {
+    "cases": 10000,
+    "ok": true,
+    "detail": "10,000 cases: digest 8a518cc63da36632… matches (Go 1.26.1 crypto/mlkem TestAccumulated (published))",
+    "source": "Go 1.26.1 crypto/mlkem TestAccumulated (published)"
+  },
+  "constant_time": {
+    "unavailable": "valgrind's headers (valgrind/memcheck.h) are not installed"
+  },
+  "stages": {
+    "keyGen": {
+      "passed": 25,
+      "total": 25
+    },
+    "encaps": {
+      "passed": 25,
+      "total": 25
+    },
+    "decaps": {
+      "passed": 10,
+      "total": 10
+    },
+    "dkCheck": {
+      "passed": 10,
+      "total": 10
+    },
+    "ekCheck": {
+      "passed": 10,
+      "total": 10
+    },
+    "edgeValid": {
+      "passed": 461,
+      "total": 461
+    },
+    "edgeEk": {
+      "passed": 892,
+      "total": 892
+    },
+    "edgeDk": {
+      "passed": 2,
+      "total": 2
+    },
+    "accumulated": {
+      "passed": 1,
+      "total": 1
+    },
+    "ct:unavailable": {
+      "passed": 0,
+      "total": 1
+    }
+  },
+  "bounds": {
+    "calls": 41596,
+    "outside_total": 0,
+    "outside": [],
+    "guard_bytes": 64
+  },
+  "keycheck": {
+    "dkCheck": {
+      "accepted_invalid": 0,
+      "rejected_valid": 0
+    },
+    "ekCheck": {
+      "accepted_invalid": 0,
+      "rejected_valid": 0
+    }
+  },
+  "edge": {
+    "vectors": "Wycheproof 3fa63dd, CCTV 50a8ecf",
+    "not_applicable": 64,
+    "failures": []
+  },
+  "findings": [
+    "constant time: requested but could not run (valgrind's headers (valgrind/memcheck.h) are not installed)"
+  ]
+}

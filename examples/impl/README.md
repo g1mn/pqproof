@@ -15,3 +15,13 @@ pqproof impl judge answers.json
 - A full PQCgenKAT `.rsp` from your build works too: `pqproof impl judge PQCkemKAT_smaugt_mode3.rsp`.
 
 The result is a match with a reference version's KAT (version name and `.rsp` SHA-256 in `scan/kat-kpqc.json`), not a conformance test or a certification.
+
+## NIST PQC through pq-verify
+
+NIST PQC libraries (ML-KEM, ML-DSA, SLH-DSA) go through pq-verify, a separate tool you install in its own virtual environment. PQ-Proof calls it without a shell and keeps its report in the same receipt (check `i-nist`):
+
+```bash
+PQ_VERIFY=/path/to/venv/bin/pq-verify pqproof impl judge answers.json --pq-verify "--audit-kem ./libmlkem768.so ML-KEM-768"
+```
+
+pq-verify loads and runs that library, so the container advice above applies to it too. Leave out `answers.json` to run only the pq-verify audit.

@@ -1,0 +1,120 @@
+{
+ "about": "pq-verify 2.19.0 output (macOS arm64, Python 3.13, hash-pinned wheel), one folder per run: argv.json, exit_code, stdout.txt, stderr.txt and report.json when written. Paths are replaced by <BUILD>, <OUT>, <VENV>; timestamps by <TIMESTAMP>; inodes by null. expect is the i-nist status PQ-Proof must give; venv full has the extras, min has none. The em dash (U+2014) in pq-verify's text is replaced with a hyphen.",
+ "pq_verify": "2.19.0",
+ "cases": {
+  "a-full-good-kem": {
+   "venv": "full",
+   "library_sha256": "71452938b07768e1c71d385b753a800defefa4f10fcefb69efbca9ef70778479",
+   "expect": "fail",
+   "why": "PQClean ML-KEM-768 clean: input-check stages only (NIST invalid keys accepted)"
+  },
+  "a2-full-mlkemnative-kem": {
+   "venv": "full",
+   "library_sha256": "a3caf5a26d4b1bede4d7c86fa28862f7278b125e85fe0cb70e58734e049c60b6",
+   "expect": "pass",
+   "why": "mlkem-native ML-KEM-768: VERIFIED 1436/1436"
+  },
+  "a3-full-mlkemnative-kem-require-full-coverage": {
+   "venv": "full",
+   "library_sha256": "a3caf5a26d4b1bede4d7c86fa28862f7278b125e85fe0cb70e58734e049c60b6",
+   "expect": "pass",
+   "why": "same with --require-full-coverage"
+  },
+  "b-full-bad-kem": {
+   "venv": "full",
+   "library_sha256": "a1f412c87a1b8c4b911cf24d09b207278fef09c9323cf2f499aa52e8a0b0a6e0",
+   "expect": "fail",
+   "why": "PQClean with ss[0] flipped in decaps"
+  },
+  "b2-full-mlkemnative-bad-kem": {
+   "venv": "full",
+   "library_sha256": "630f4090ca4bc5ce7d7c5b13fc832dfcc4a6748cbe85cd96481982fe0ceb841c",
+   "expect": "fail",
+   "why": "mlkem-native with ss[0] flipped in decaps"
+  },
+  "c-min-good-kem": {
+   "venv": "min",
+   "library_sha256": "71452938b07768e1c71d385b753a800defefa4f10fcefb69efbca9ef70778479",
+   "expect": "fail",
+   "why": "pq-verify without extras: same result as a (library audits use no extras)"
+  },
+  "c2-min-mlkemnative-kem": {
+   "venv": "min",
+   "library_sha256": "a3caf5a26d4b1bede4d7c86fa28862f7278b125e85fe0cb70e58734e049c60b6",
+   "expect": "pass",
+   "why": "pq-verify without extras: same result as a2"
+  },
+  "d-min-good-kem-require-full-coverage": {
+   "venv": "min",
+   "library_sha256": "71452938b07768e1c71d385b753a800defefa4f10fcefb69efbca9ef70778479",
+   "expect": "fail",
+   "why": "c with --require-full-coverage"
+  },
+  "d2-min-mlkemnative-kem-require-full-coverage": {
+   "venv": "min",
+   "library_sha256": "a3caf5a26d4b1bede4d7c86fa28862f7278b125e85fe0cb70e58734e049c60b6",
+   "expect": "pass",
+   "why": "c2 with --require-full-coverage"
+  },
+  "e-input-error-missing-path": {
+   "venv": "full",
+   "library_sha256": null,
+   "expect": "undecided",
+   "why": "library path does not exist: exit 2, no report"
+  },
+  "f-full-dsa65": {
+   "venv": "full",
+   "library_sha256": "c7316191f6131e8f66ebf46558e0966d249d98d043aeabffe1a289fb871968a8",
+   "expect": "undecided",
+   "why": "PQClean ML-DSA-65 (pure interface only): VERIFIED but scope partial (171 not applicable)"
+  },
+  "f2-full-dsa65-require-full-coverage": {
+   "venv": "full",
+   "library_sha256": "c7316191f6131e8f66ebf46558e0966d249d98d043aeabffe1a289fb871968a8",
+   "expect": "undecided",
+   "why": "f with --require-full-coverage: exit 1, status VERIFIED, scope partial"
+  },
+  "f3-min-dsa65": {
+   "venv": "min",
+   "library_sha256": "c7316191f6131e8f66ebf46558e0966d249d98d043aeabffe1a289fb871968a8",
+   "expect": "undecided",
+   "why": "f without extras"
+  },
+  "g-min-acvp-kem": {
+   "venv": "min",
+   "library_sha256": null,
+   "expect": "undecided",
+   "why": "--acvp without kyber-py: CANNOT VERIFY, DEGRADED RUN, not a library audit"
+  },
+  "g2-min-acvp-kem-require-full-coverage": {
+   "venv": "min",
+   "library_sha256": null,
+   "expect": "undecided",
+   "why": "g with --require-full-coverage"
+  },
+  "g3-full-acvp-kem-require-full-coverage": {
+   "venv": "full",
+   "library_sha256": null,
+   "expect": "undecided",
+   "why": "--acvp VERIFIED, but it checks pq-verify's own references, not a library"
+  },
+  "h-full-mlkemnative-kem-constant-time": {
+   "venv": "full",
+   "library_sha256": "a3caf5a26d4b1bede4d7c86fa28862f7278b125e85fe0cb70e58734e049c60b6",
+   "expect": "undecided",
+   "why": "--constant-time on macOS: valgrind missing, reported as a finding"
+  },
+  "i-full-good-kem-symbol-prefix": {
+   "venv": "full",
+   "library_sha256": "71452938b07768e1c71d385b753a800defefa4f10fcefb69efbca9ef70778479",
+   "expect": "fail",
+   "why": "a with --symbol-prefix PQCLEAN_MLKEM768_CLEAN_"
+  },
+  "j-full-mlkemnative-contained": {
+   "venv": "full",
+   "library_sha256": "a3caf5a26d4b1bede4d7c86fa28862f7278b125e85fe0cb70e58734e049c60b6",
+   "expect": "undecided",
+   "why": "--audit-contained on macOS: CANNOT VERIFY, not bound to a file"
+  }
+ }
+}

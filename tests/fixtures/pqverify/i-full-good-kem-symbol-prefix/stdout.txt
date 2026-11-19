@@ -1,0 +1,38 @@
+  artifact: sha256 71452938b07768e1c71d385b753a800defefa4f10fcefb69efbca9ef70778479
+====================================================================
+  THIRD-PARTY KEM AUDIT - ML-KEM-768
+  library : libpqclean_mlkem768.dylib
+  keygen  : PQCLEAN_MLKEM768_CLEAN_crypto_kem_keypair_derand
+  encaps  : PQCLEAN_MLKEM768_CLEAN_crypto_kem_enc_derand
+  decaps  : PQCLEAN_MLKEM768_CLEAN_crypto_kem_dec
+  vectors : pinned (NIST ACVP-Server 15c0f3d, ad33b3d)
+====================================================================
+  PASS  keyGen   25/25  byte-exact vs NIST
+  PASS  encaps   25/25  byte-exact vs NIST
+  PASS  decaps   10/10  byte-exact vs NIST
+  FAIL  ekCheck  5/10  encapsulation keys classified as NIST does (FIPS 203 §7.2)
+        accepted 5 invalid key(s) NIST rejects: this API does not perform the input
+        check, so every caller must
+  FAIL  dkCheck  5/10  decapsulation keys classified as NIST does (FIPS 203 §7.3)
+        accepted 5 invalid key(s) NIST rejects: this API does not perform the input
+        check, so every caller must
+  edge cases: Wycheproof 3fa63dd, CCTV 50a8ecf
+  PASS  edgeValid 461/461  edge-case vectors reproduced byte-for-byte
+  FAIL  edgeEk    0/892  invalid encapsulation keys refused (every q..4095, every position)
+  FAIL  edgeDk    0/2  invalid decapsulation keys refused
+        ✗ wycheproof mlkem_768_encaps_test #2 (CCTV/modulus) ['ModulusOverflow']: invalid encapsulation key accepted
+        ✗ wycheproof mlkem_768_encaps_test #3 (CCTV/modulus) ['ModulusOverflow']: invalid encapsulation key accepted
+        ✗ wycheproof mlkem_768_encaps_test #4 (CCTV/modulus) ['ModulusOverflow']: invalid encapsulation key accepted
+        ... and more; see the JSON report
+        64 wrong-length vectors not applicable: a C entry point takes fixed-size buffers
+  PASS  accumulated 1/1  10,000 cases: digest 8a518cc63da36632… matches (Go 1.26.1 crypto/mlkem TestAccumulated (published))
+  PASS  bounds   41596 calls, none wrote outside its buffers (64 guard bytes each side)
+====================================================================
+  RESULT: 532/1436 - FINDINGS PRESENT
+  This audits the vendor's OWN keygen/encaps/decaps against
+  NIST's published vectors, including the invalid keys it
+  must refuse. It is not a side-channel review.
+====================================================================
+  FAILING: KEM audit FINDINGS PRESENT
+  wrote <OUT>/report.json  (report for --audit-kem; artifact: sha256 71452938b07768e1c71d385b753a800defefa4f10fcefb69efbca9ef70778479)
+  INTEGRITY: nothing this run needed was missing (no field engines were required).

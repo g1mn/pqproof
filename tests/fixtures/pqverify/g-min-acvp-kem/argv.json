@@ -1,0 +1,8 @@
+{
+ "argv": [
+  "pq-verify",
+  "--acvp",
+  "--json",
+  "<OUT>/report.json"
+ ]
+}

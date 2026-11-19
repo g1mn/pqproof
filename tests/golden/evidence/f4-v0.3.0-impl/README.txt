@@ -1,5 +1,5 @@
 PQ-Proof 0.3.0 implementation check (KpqC KAT). Verdict: pass (needs review: i-kpqc)
-판정: 통과(검토 필요 검사 i-kpqc) · 증적 해시(receipt_id): f9e7d33be37562182fbb4afa001b676458bc9aa2cf5dbbcb4a3f5e79f2e855a7
+판정: 통과(검토 필요 검사 i-kpqc) · 증적 해시(receipt_id): f194b5a85e15026308bc639499b0735446a07b2af39e953ad5fbecbc47353602
 
 Open first / 먼저 볼 것
   receipt.html             the evidence as one page (사람이 볼 것)

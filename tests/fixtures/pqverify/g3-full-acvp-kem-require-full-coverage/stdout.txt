@@ -1,0 +1,41 @@
+  vectors: pinned (NIST ACVP-Server 15c0f3d, ad33b3d)
+  reference: kyber-py 1.2.0
+================================================================
+  NIST ACVP END-TO-END ML-KEM VERIFICATION (FIPS 203)
+  Source: pinned/local: <VENV>/lib/python3.13/site-packages/pq_verify/vectors
+  Functional: kyber-py byte-exact | KeyCheck: pq-verify FIPS 203 oracle
+================================================================
+
+  keyGen        (seeds->ek,dk):
+    PASS ML-KEM-1024    25/25   [NIST Level 5]
+    PASS ML-KEM-512     25/25   [NIST Level 1]
+    PASS ML-KEM-768     25/25   [NIST Level 3]
+
+  encapsulation (ek,m->c,K):
+    PASS ML-KEM-1024    25/25   [NIST Level 5]
+    PASS ML-KEM-512     25/25   [NIST Level 1]
+    PASS ML-KEM-768     25/25   [NIST Level 3]
+
+  decapsulation (dk,c->K):
+    PASS ML-KEM-1024    10/10   [NIST Level 5]
+    PASS ML-KEM-512     10/10   [NIST Level 1]
+    PASS ML-KEM-768     10/10   [NIST Level 3]
+
+  encapKeyCheck (FIPS 203 §7.2):
+    PASS ML-KEM-1024    10/10   [NIST Level 5]
+    PASS ML-KEM-512     10/10   [NIST Level 1]
+    PASS ML-KEM-768     10/10   [NIST Level 3]
+
+  decapKeyCheck (FIPS 203 §7.3):
+    PASS ML-KEM-1024    10/10   [NIST Level 5]
+    PASS ML-KEM-512     10/10   [NIST Level 1]
+    PASS ML-KEM-768     10/10   [NIST Level 3]
+
+================================================================
+  ACVP RESULT: 240/240 NIST vectors verified
+  ML-KEM VERIFIED end-to-end vs NIST ACVP-Server - all groups
+  keyGen + encaps + decaps (byte-exact) + KeyCheck (bool-exact)
+  Levels 1, 3, 5
+================================================================
+  wrote <OUT>/report.json  (report for ACVP; artifact: none - reference-chain conformance, no vendor binary loaded)
+  INTEGRITY: nothing this run needed was missing (no field engines were required).

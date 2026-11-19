@@ -23,6 +23,9 @@
 #       (답안 사본·정답 묶음 사본·문제지 사본, 받아 줄 판, 자기 점검, 파라미터별 결과)과 검사 i-kpqc 하나를 가진다(SCHEMA_IMPL).
 #       verify 는 정답 묶음 사본으로 답안 사본을 다시 판정해 결과·검사 행이 같은지 보고(impl_record), 지금 도구의 KAT 목록이 그 증적과
 #       같으면 정답 묶음·문제지를 다시 만들어 바이트까지 맞춘다. 두 트리·한 트리 증적은 형식 3과 같은 꼴이다. 형식 1~3을 계속 읽는다.
+#       pq-verify 다리(검사 i-nist): impl.nist 에 pq-verify 실행(argv·종료 코드)과 보고서 요약·상태를 적고, 보고서(artifacts/impl/pq-verify/
+#       report.json)와 실행 기록(log.json)을 산출물로 둔다. consistency 는 요약으로 상태를 다시 정하고, verify 는 보고서·실행 기록 사본으로
+#       요약부터 다시 뽑아 맞춘다. 답안 없이 pq-verify 만 돌린 증적은 impl.input·key 가 null 이고 i-kpqc 가 해당 없음이다.
 # 수정: 축소판. RFC 8785 정규화(_number·_jcs·canonical)·compute_id·validate·obj·strict·iso·_Artifacts·_read_nofollow·
 #       _hash_refs·_listed_files·verify 뼈대·STYLE·SCRIPT(테마 토글)는 가져오고, microVM 증적용 build·_sandbox·_network·
 #       _proofs·_steps·POLICY·consistency·SCHEMA·render_html은 이 오프라인판용으로 새로 썼다. loop._open_nofollow도 옮겨 왔다.
@@ -188,11 +191,24 @@ IMPL_VERSION = strict(version=STR, role={"enum": ["reference", "known-variant"]}
 IMPL_RESULT = strict(param=STR, name=STR, status={"enum": IMPL_STATUS}, summary=STR, matched=STRS,
                      versions={"type": "array", "items": IMPL_VERSION})
 IMPL_PROMPT = dict(strict(file=PATH, file_sha256=SHA, prompt_sha256=SHA, items=INT), type=["object", "null"])
+BOOL_OR_NULL = {"type": ["boolean", "null"]}
+# pq-verify 보고서에서 판정에 쓰는 칸(pqlite/impl.py pqverify_summary, SUMMARY_KEYS)
+IMPL_PQV_SUMMARY = strict(audit=STR_OR_NULL, problem=STR_OR_NULL, exit_code=INT_OR_NULL, schema=STR_OR_NULL, schema_version=STR_OR_NULL,
+                          tool_version=STR_OR_NULL, status=STR_OR_NULL, verified=BOOL_OR_NULL, bound=BOOL_OR_NULL,
+                          artifact_sha256=STR_OR_NULL, library_sha256=SHA_OR_NULL, target=STR_OR_NULL, param_set=STR_OR_NULL,
+                          checks_passed=INT_OR_NULL, checks_total=INT_OR_NULL, findings=INT_OR_NULL, failed=STRS, missing=STRS,
+                          scope=STR_OR_NULL, scope_complete=BOOL_OR_NULL, degraded=BOOL, unavailable=STRS)
+IMPL_NIST = dict(strict(engine={"const": "pq-verify"}, args=STRS, argv={"type": ["array", "null"], "items": STR}, executable=STR_OR_NULL,
+                        env_removed=STRS, timeout=INT, exit_code=INT_OR_NULL, not_run=STR_OR_NULL,
+                        library=strict(path=STR, sha256=SHA_OR_NULL), report=PATH_OR_NULL, report_sha256=SHA_OR_NULL, log=PATH,
+                        log_sha256=SHA, summary=IMPL_PQV_SUMMARY, status={"enum": ["pass", "fail", "undecided"]}, detail=STR),
+                 type=["object", "null"])
 IMPL = strict(engine={"const": "kpqc-kat"}, kat_manifest_sha256=SHA,
-              input=strict(path=STR, kind={"enum": ["response", "rsp", None]}, bytes=INT, sha256=SHA, file=PATH_OR_NULL,
-                           file_sha256=SHA_OR_NULL, implementation=STR_OR_NULL, header=STR_OR_NULL),
-              prompt=IMPL_PROMPT, key=strict(file=PATH, file_sha256=SHA, params=INT), accept=STRS,
-              control=strict(ok=BOOL, problem=STR_OR_NULL), problem=STR_OR_NULL, results={"type": "array", "items": IMPL_RESULT})
+              input=dict(strict(path=STR, kind={"enum": ["response", "rsp", None]}, bytes=INT, sha256=SHA, file=PATH_OR_NULL,
+                                file_sha256=SHA_OR_NULL, implementation=STR_OR_NULL, header=STR_OR_NULL), type=["object", "null"]),
+              prompt=IMPL_PROMPT, key=dict(strict(file=PATH, file_sha256=SHA, params=INT), type=["object", "null"]), accept=STRS,
+              control=strict(ok=BOOL, problem=STR_OR_NULL), problem=STR_OR_NULL, results={"type": "array", "items": IMPL_RESULT},
+              nist=IMPL_NIST)
 _IMPL_REQ = ["format", "format_version", "tool_version", "ruleset_version", "ruleset_sha256", "receipt_id", "note", "verdict",
              "started_at", "finished_at", "tools", "params", "impl", "checks", "timeline", "artifacts", "deck_meta"]
 SCHEMA_IMPL = obj(_IMPL_REQ,
@@ -690,30 +706,37 @@ def _coverage_problems(a, unused):
 
 
 def _impl_consistency(r):
-    """구현 검증 증적: 판정이 검사에서, 검사 i-kpqc 가 impl 칸(결과·자기 점검·답안 문제)에서 나오는가. 결과마다 상태가 판 기록과 맞는가."""
+    """구현 검증 증적: 판정이 검사에서, 검사 i-kpqc 가 impl 칸(결과·자기 점검·답안 문제)에서, i-nist 가 impl.nist(pq-verify 요약)에서
+    나오는가. 결과마다 상태가 판 기록과 맞는가. 답안 없는 증적(pq-verify 만)은 input·key·prompt·결과가 비어 있어야 한다."""
     out = []
     im = _impl_module()
     want = derive_verdict(r["checks"])
     if r["verdict"] != want:
         out.append(f"verdict is {r['verdict']!r}, but the checks give {want!r}")
-    if [c["id"] for c in r["checks"]] != [im.CHECK_ID]:
-        out.append(f"an impl receipt has exactly one check, {im.CHECK_ID}")
+    ids = [c["id"] for c in r["checks"]]
+    if ids != [im.CHECK_ID, im.NIST_CHECK_ID]:
+        out.append(f"an impl receipt has exactly two checks, {im.CHECK_ID} and {im.NIST_CHECK_ID}, in that order (it has {ids})")
     x = r["impl"]
+    answered = x["input"] is not None
     if x["control"]["ok"] != (x["control"]["problem"] is None):
         out.append("impl.control.ok does not match impl.control.problem")
-    row = im.check_row(x["results"], x["control"]["problem"], x["problem"])
+    row = im.check_row(x["results"], x["control"]["problem"], x["problem"], answered)
     if r["checks"] and r["checks"][0]["status"] != row["status"]:  # 글은 판마다 다를 수 있다. 상태만 본다(글은 impl_record 가 같은 규칙일 때 맞춘다)
         out.append(f"{im.CHECK_ID} is {r['checks'][0]['status']}, but the impl results, self-check and problem give {row['status']}")
     if x["results"] and [res["param"] for res in x["results"]] != r["params"]["params"]:
         out.append("impl.results do not list the parameters in params.params")
     if x["problem"] and x["results"]:
         out.append("impl.problem is set, but there are results")
-    if r["params"]["input"] != x["input"]["kind"]:
+    if r["params"]["input"] != (x["input"]["kind"] if answered else None):
         out.append("params.input differs from impl.input.kind")
-    if (x["prompt"] is not None) != (x["input"]["kind"] == "response" and not x["problem"]):
+    if (x["prompt"] is not None) != (answered and x["input"]["kind"] == "response" and not x["problem"]):
         out.append("impl.prompt must be recorded for a response that was judged, and only then")
-    if x["key"]["params"] != len(r["params"]["params"]):
-        out.append("impl.key.params differs from the number of parameters judged")
+    if answered != (x["key"] is not None) or (x["key"] is not None and x["key"]["params"] != len(r["params"]["params"])):
+        out.append("impl.key must be recorded for an answer, with the number of parameters judged")
+    if not answered and (r["params"]["params"] or x["results"] or x["accept"] or x["problem"] or not x["control"]["ok"]):
+        out.append("impl.input is null (no answer), but parameters, results, accepted versions, a problem or a self-check are recorded")
+    if not answered and x["nist"] is None:
+        out.append("an impl receipt with no answer must carry a pq-verify run (impl.nist)")
     kat = [t.get("sha256") for t in r["tools"] if t.get("name") == "kat-kpqc"]
     if kat != [x["kat_manifest_sha256"]]:
         out.append("tools[] does not list the KAT list (kat-kpqc) with impl.kat_manifest_sha256")
@@ -723,7 +746,47 @@ def _impl_consistency(r):
         st, m = res["status"], set(res["matched"])
         if not m <= known or (st == "pass" and (not m or not m <= acc)) or (st == "review" and not m) or (st in ("fail", "undecided") and m):
             out.append(f"impl result {res['param']}: status {st} does not fit matched versions {sorted(m)} (accepted {sorted(acc)})")
+    out += _nist_consistency(r, im)
     return out
+
+
+def _nist_consistency(r, im):
+    """i-nist 가 impl.nist 의 요약에서 나오는가(pqverify_status 로 다시 정한다), 실행 칸이 요약·tools[] 와 맞는가."""
+    out, n = [], r["impl"]["nist"]
+    nrow = im.nist_check_row(n)
+    if len(r["checks"]) > 1 and r["checks"][1]["status"] != nrow["status"]:
+        out.append(f"{im.NIST_CHECK_ID} is {r['checks'][1]['status']}, but impl.nist gives {nrow['status']}")
+    pqv = [t for t in r["tools"] if t.get("name") == im.PQV_NAME]
+    if n is None:
+        if pqv:
+            out.append("tools[] lists pq-verify, but no pq-verify run is recorded (impl.nist is null)")
+        return out
+    st, detail = im.pqverify_status(n["summary"])
+    if (n["status"], n["detail"]) != (st, detail):
+        out.append(f"impl.nist.status is {n['status']}, but its summary gives {st}")
+    sm = n["summary"]
+    if sm["exit_code"] != n["exit_code"] or sm["library_sha256"] != n["library"]["sha256"]:
+        out.append("impl.nist.summary differs from the run it summarises (exit code or library hash)")
+    if (n["executable"] is None) != (n["argv"] is None) or (n["executable"] is None) != (n["not_run"] is not None):
+        out.append("impl.nist: a run needs an executable and argv, and only a run without an executable has not_run")
+    if [t.get("path") for t in pqv] != ([n["executable"]] if n["executable"] else []):
+        out.append("tools[] must list the pq-verify executable that ran, and only that one")
+    if n["argv"] is not None:
+        try:
+            spec = im.pqverify_args(" ".join(_shell_quote(a) for a in n["args"]))
+        except ValueError as e:
+            spec = None
+            out.append(f"impl.nist.args are not arguments pqproof accepts: {e}")
+        if spec is not None:
+            want = im.pqverify_argv(n["executable"], spec, n["library"]["path"], n["argv"][-1])
+            if n["argv"] != want or spec["audit"] != sm["audit"] or not n["argv"][-1].replace("\\", "/").endswith("/" + (n["report"] or "artifacts/impl/pq-verify/report.json")):
+                out.append("impl.nist.argv is not the command pqproof builds from impl.nist.args")
+    return out
+
+
+def _shell_quote(a):
+    import shlex
+    return shlex.quote(a)
 
 
 def _impl_module():
@@ -739,7 +802,48 @@ def _impl_module():
 
 
 def impl_record(root, r):
-    """구현 검증 증적을 다시 판정한다: [(ok, 무엇)]. 정답 묶음 사본(artifacts/impl/key.json)이 스스로 맞는지 늘 본다. 대조 규칙
+    """구현 검증 증적을 다시 판정한다: [(ok, 무엇)]. 답안이 있으면 KpqC 대조(_kpqc_record), pq-verify 를 돌렸으면 그 보고서(_nist_record)."""
+    out = _kpqc_record(root, r) if r["impl"]["key"] is not None else []
+    return out + _nist_record(root, r)
+
+
+def _same_rules(r):
+    """증적을 쓴 pqlite/impl.py 가 지금 도구의 것과 같은가."""
+    v = _version_module()
+    tools = {t.get("name"): t.get("sha256") for t in r["tools"]}
+    return tools.get("pqlite/impl.py") == v.path_sha256(os.path.join(v.ROOT, "pqlite", "impl.py"))
+
+
+def _nist_record(root, r):
+    """pq-verify 감사를 증적의 사본으로 다시 판정한다: 실행 기록(log.json)의 감사 기록과 보고서 사본으로 요약을 다시 뽑아 impl.nist 의 요약·
+    상태·상세와 검사 행 i-nist 가 같은지 본다. 대조 규칙(pqlite/impl.py)이 다르면 다시 판정하지 않고 그렇게 적는다."""
+    im, n = _impl_module(), r["impl"]["nist"]
+    if n is None:
+        return []
+    if not _same_rules(r):
+        return [(True, f"written with another pqlite/impl.py (ruleset {r['ruleset_version']}): the pq-verify report is not judged again "
+                       "with this tool's rules")]
+    try:
+        log = loads_strict(_read_nofollow(root, n["log"]))
+        report = _read_nofollow(root, n["report"]) if n["report"] else None
+    except (OSError, ValueError) as e:
+        return [(False, f"the pq-verify run record cannot be read: {e}")]
+    if not isinstance(log, list) or not all(isinstance(e, dict) for e in log):
+        return [(False, f"{n['log']} is not a list of runs")]
+    audits = [e for e in log if e.get("role") == "audit"]
+    if len(audits) > 1 or (n["argv"] is not None) != bool(audits) or (audits and audits[0].get("argv") != n["argv"]):
+        return [(False, f"{n['log']} does not hold the one audit run impl.nist.argv names")]
+    run = audits[0] if audits else None
+    summary = im.pqverify_summary(n["summary"]["audit"], run, report, n["library"]["sha256"], n["not_run"])
+    st, detail = im.pqverify_status(summary)
+    row = im.nist_check_row(dict(n, summary=summary))
+    same = summary == n["summary"] and (st, detail) == (n["status"], n["detail"]) and len(r["checks"]) > 1 and r["checks"][1] == row
+    return [(same, f"the pq-verify report judged again gives the same {im.NIST_CHECK_ID} result ({STATUS_KO[st]})" if same else
+             f"the pq-verify report judged again gives {im.NIST_CHECK_ID} {st}: {detail[:200]!r}, which differs from the receipt")]
+
+
+def _kpqc_record(root, r):
+    """KpqC 대조를 다시 판정한다: [(ok, 무엇)]. 정답 묶음 사본(artifacts/impl/key.json)이 스스로 맞는지 늘 본다. 대조 규칙
     (pqlite/impl.py)이 그 증적을 쓴 것과 같으면 문제지 사본이 그 묶음으로 다시 만든 것과 같은지, 답안 사본을 그 묶음으로 다시 판정한
     결과·자기 점검·검사 행이 증적과 같은지 보고, KAT 목록까지 같으면 정답 묶음도 다시 만들어 바이트까지 맞춘다. 대조 규칙이 다르면
     (다른 규칙 묶음의 증적) 다시 판정하지 않고 그렇게 적는다(두 트리 증적도 옛 규칙 묶음의 검사를 다시 돌리지 않는다)."""
@@ -797,7 +901,7 @@ def impl_record(root, r):
     control, results = (None, []) if problem else (im.control_problem(key, accept, parsed["kind"]), im.match_versions(key, parsed, accept))
     row = im.check_row(results, control, problem)
     same = (pids == r["params"]["params"] and problem == x["problem"] and results == x["results"]
-            and {"ok": control is None, "problem": control} == x["control"] and r["checks"] == [row])
+            and {"ok": control is None, "problem": control} == x["control"] and r["checks"][:1] == [row])
     out.append((same, f"the answer judged again gives the same {im.CHECK_ID} result ({STATUS_KO[row['status']]})" if same else
                 f"the answer judged again gives {im.CHECK_ID} {row['status']}: {row['actual'][:200]!r}, which differs from the receipt"))
     return out
@@ -1111,8 +1215,10 @@ def render_readme(r):
 
 def _impl_readme(r, verify_cmd):
     """구현 검증 결과 폴더의 README.txt(형식 4)."""
+    x = r["impl"]
+    what = " and ".join(w for w, on in (("KpqC KAT", x["input"] is not None), ("pq-verify audit", x.get("nist") is not None)) if on)
     lines = [
-        f"PQ-Proof {r.get('tool_version', '')} implementation check (KpqC KAT). Verdict: {verdict_text(r, en=True)}",
+        f"PQ-Proof {r.get('tool_version', '')} implementation check ({what}). Verdict: {verdict_text(r, en=True)}",
         f"판정: {verdict_text(r)} · 증적 해시(receipt_id): {r['receipt_id']}",
         "",
         "Open first / 먼저 볼 것",
@@ -1121,11 +1227,23 @@ def _impl_readme(r, verify_cmd):
         "  tables/report.md         a summary to paste into a document (문서에 붙일 표)",
         "  tables/impl.csv          every parameter set and reference version with its count",
         "  artifacts/impl/          the answer file, the answer key and the question sheet that were compared",
+    ]
+    if x.get("nist") is not None:
+        lines += ["  artifacts/impl/pq-verify/ the pq-verify report (report.json) and its run record (log.json: argv, exit code, output)"]
+    lines += [
         "",
         "What this is / 이것은",
         "  A match with pinned reference KAT versions (scan/kat-kpqc.json). PQ-Proof did not build or run the implementation;",
         "  your harness wrote the answers. It is not a conformance test or a certification (not KCMVP).",
         "  참조판 KAT 와 일치하는지 본 것이다. 표준 준수 시험이나 공인 시험(KCMVP)이 아니다.",
+    ]
+    if x.get("nist") is not None:
+        lines += [
+            "  The NIST audit (i-nist) was run by pq-verify, an external tool you turned on; pq-verify loaded and ran the library.",
+            "  PQ-Proof read its report and exit code. pq-verify is not a sandbox: audit untrusted libraries in a container or VM.",
+            "  NIST 감사는 사용자가 켠 pq-verify 가 라이브러리를 불러 실행했고, PQ-Proof 는 그 보고서만 읽었다.",
+        ]
+    lines += [
         "",
         "Check again / 다시 확인",
         f"  {verify_cmd}",
@@ -1466,6 +1584,9 @@ def render_html(r):
 
 IMPL_NOTE = ("참조판 KAT 와 일치하는지 본 것이다(scan/kat-kpqc.json 의 판 이름과 .rsp SHA-256). PQ-Proof 는 구현을 빌드하거나 실행하지 "
              "않았고 답안은 사용자 하네스가 만들었다. 표준 준수 시험이나 공인 시험(KCMVP)이 아니다.")
+IMPL_PQV_NOTE = ("NIST 구현 감사는 사용자가 켠 바깥 도구 pq-verify 가 대상 라이브러리를 불러 실행했고, PQ-Proof 는 그 JSON 보고서와 종료 "
+                 "코드만 읽었다(셸 없이 부름, --require-full-coverage). pq-verify 는 샌드박스가 아니라서 믿지 못할 라이브러리는 컨테이너나 VM "
+                 "안에서 돌린다. 표준 준수 인증이나 공인 시험이 아니고, 결과는 pq-verify 판과 그 고정 벡터에 따른다.")
 ROLE_KO = {"reference": "참조판", "known-variant": "알려진 변형"}
 
 
@@ -1481,6 +1602,28 @@ def impl_rows(r):
     return rows
 
 
+def nist_rows(r):
+    """pq-verify 감사 표의 (항목, 값)(receipt.html·tables/report.md 가 같이 쓴다). impl.nist 가 없으면 []."""
+    n = r["impl"].get("nist")
+    if n is None:
+        return []
+    s = n["summary"]
+    tool = next((t for t in r["tools"] if t.get("name") == "pq-verify"), None)
+    rows = [("결과", f"{STATUS_KO[n['status']]}: {n['detail']}"),
+            ("pq-verify", (f"{n['executable']} ({(tool or {}).get('version') or '판 모름'})" if n["executable"] else f"없음: {n['not_run']}")),
+            ("감사", f"{s['audit'] or ''} {s['param_set'] or ''}".strip() or "모름"),
+            ("대상", f"{n['library']['path']} (sha256 {n['library']['sha256'] or '못 잼'})"),
+            ("종료 코드", str(n["exit_code"]) if n["exit_code"] is not None else "없음"),
+            ("보고서", f"{s['status'] or '없음'}, verified {s['verified']}, 검사 {s['checks_passed']}/{s['checks_total']}, "
+                     f"schema {s['schema'] or '없음'} {s['schema_version'] or ''}".rstrip()),
+            ("검사 범위", s["scope"] or "모름"),
+            ("통과 못 한 단계", ", ".join(s["failed"]) or "없음")]
+    if s["unavailable"] or s["degraded"]:
+        rows.append(("돌지 못한 검사", "; ".join(s["unavailable"] + (["DEGRADED RUN"] if s["degraded"] else []))))
+    rows.append(("뺀 환경 변수", ", ".join(n["env_removed"]) or "없음"))
+    return rows
+
+
 def render_impl_html(r):
     """구현 검증 증적의 receipt.html."""
     x = r["impl"]
@@ -1488,7 +1631,8 @@ def render_impl_html(r):
     verdict = f'<span class="badge {_e("undecided" if pending_note(r) else r["verdict"])}">{_e(verdict_text(r))}</span>'
     basis = (f"<div><div class=\"muted\">판정 근거</div>pqproof {_e(r.get('tool_version'))} · 규칙 묶음 {_e(r.get('ruleset_version'))} · "
              f"증적 형식 {_num(r['format_version'])}<br>{_short(r.get('ruleset_sha256'))}</div>")
-    answer = (f"<div><div class=\"muted\">답안</div><code>{_e(inp['path'])}</code><br><span class=\"muted\">"
+    answer = ("<div><div class=\"muted\">답안</div>없음(KpqC KAT 대조를 하지 않음)</div>" if inp is None else
+              f"<div><div class=\"muted\">답안</div><code>{_e(inp['path'])}</code><br><span class=\"muted\">"
               f"{_e({'response': '답안 JSON', 'rsp': 'PQCgenKAT .rsp'}.get(inp['kind'], '읽지 않음'))} · {_num(inp['bytes'])}바이트</span> "
               f"{_short(inp['sha256'])}" + (f"<br><span class=\"muted\">구현</span> {_e(inp['implementation'])}" if inp["implementation"] else "")
               + (f"<br><span class=\"muted\">머리 줄</span> <code>{_e(inp['header'])}</code>" if inp["header"] else "") + "</div>")
@@ -1496,28 +1640,38 @@ def render_impl_html(r):
               f"{_e(', '.join(r['params']['params']) or '없음')}<br><span class=\"muted\">받아 줄 판</span> {_e(', '.join(x['accept']) or '없음')}</div>")
     rows = [[f"<code>{_e(a)}</code>", _e(b), _e(c), _e(d), f'<span class="num">{_e(e)}</span>', _e(f), _status(g) if g else "", _e(h)]
             for a, b, c, d, e, f, g, h in impl_rows(r)]
-    ctrl = ("자기 점검 통과: 받아 줄 판의 정답 답안은 통과, 한 바이트 바꾼 답안은 실패" if x["control"]["ok"]
-            else f"자기 점검 실패: {x['control']['problem']}")
+    title = " · ".join(t for t, on in (("KpqC 구현 KAT 대조", inp is not None), ("NIST 구현 감사", x.get("nist") is not None)) if on)
+    ctrl = ("답안이 없어 자기 점검을 하지 않았다" if inp is None else "자기 점검 통과: 받아 줄 판의 정답 답안은 통과, 한 바이트 바꾼 답안은 실패"
+            if x["control"]["ok"] else f"자기 점검 실패: {x['control']['problem']}")
     files = " · ".join(f"{_link(f['file'], label)} {_short(f['file_sha256'])}" for f, label in
                        ((inp, "답안 사본"), (x["key"], "정답 묶음"), (x["prompt"], "문제지")) if f and f.get("file"))
+    n = x.get("nist")
+    nist = "" if n is None else (
+        "<h2>NIST 구현 감사(pq-verify)</h2><section>" + _table(["항목", "값"], [[_e(a), _e(b)] for a, b in nist_rows(r)])
+        + "<p>" + " · ".join(f"{_link(path, label)} {_short(digest)}" for path, digest, label in
+                             ((n["report"], n["report_sha256"], "보고서"), (n["log"], n["log_sha256"], "실행 기록")) if path) + "</p>"
+        + f"<p class=\"muted\">{_e(IMPL_PQV_NOTE)}</p></section>")
     parts = [f"""<!doctype html><html lang="ko" data-theme="dark"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src {SCRIPT_CSP}; img-src 'none'; base-uri 'none'; form-action 'none'">
-<title>KpqC 구현 KAT 대조</title><style>{STYLE}</style></head><body><main>
-<header><h1>KpqC 구현 KAT 대조 증적 {verdict}</h1><button id="theme" type="button">라이트</button></header>
+<title>{_e(title)}</title><style>{STYLE}</style></head><body><main>
+<header><h1>{_e(title)} 증적 {verdict}</h1><button id="theme" type="button">라이트</button></header>
 <section><div class="grid">{answer}
 <div><div class="muted">시작, 끝(UTC)</div><span class="nowrap">{_e(r['started_at'])}</span><br><span class="nowrap">{_e(r['finished_at'])}</span></div>
 {params}
 {basis}</div><p><span class="muted">receipt_id</span><br>{_short(r['receipt_id'])}</p>
 <p class="muted">{_e(r['note'])}</p><pre>{WORDS['verify']}</pre>
-<p>{_e(IMPL_NOTE)}</p></section>"""]
+<p>{_e(IMPL_NOTE if inp is not None else IMPL_PQV_NOTE)}</p></section>"""]
     parts.append("<h2>검사</h2><section>" + _table(["검사", "판정", "기준", "실제"], [
         [f"<b>{_e(c['id'])}</b> {_e(c['title'])}", _status(c["status"]), _e(c["expected"]), _e(c["actual"])] for c in r["checks"]])
         + "</section>")
-    parts.append("<h2>파라미터별 참조판 대조</h2><section>" + (f'<p class="s-undecided">{_e(x["problem"])}</p>' if x["problem"] else "")
-                 + _table(["파라미터", "판", "역할", "받아 줌", "대조", "첫 불일치", "결과", "요약"], rows)
-                 + f'<p class="{"muted" if x["control"]["ok"] else "s-undecided"}">{_e(ctrl)}</p>'
-                 + f"<p>{files}</p></section>")
+    if inp is not None:
+        parts.append("<h2>파라미터별 참조판 대조</h2><section>" + (f'<p class="s-undecided">{_e(x["problem"])}</p>' if x["problem"] else "")
+                     + _table(["파라미터", "판", "역할", "받아 줌", "대조", "첫 불일치", "결과", "요약"], rows)
+                     + f'<p class="{"muted" if x["control"]["ok"] else "s-undecided"}">{_e(ctrl)}</p>'
+                     + f"<p>{files}</p></section>")
+    if nist:
+        parts.append(nist)
     parts.append("<h2>도구</h2><section>" + _table(["이름", "경로", "버전", "SHA-256"], [
         [_e(t["name"]), f"<code>{_e(t['path'])}</code>", _e(t["version"]), _short(t["sha256"])] for t in r["tools"]]) + "</section>")
     parts.append("<h2>시간</h2><section>" + _table(["단계", "시작(UTC)", "끝(UTC)"], [
@@ -1533,7 +1687,7 @@ def render_impl_html(r):
 # deck.json: 발표 자료·대시보드에 옮기기 쉬운 요약. receipt.json만으로 결정적으로 만든다(verify가 다시 만들어 비교).
 CHECK_LABEL = {"a-input": "입력 대조", "a-cbom": "막는 고전 위치 0", "b-weakening": "TLS 약화 없음", "b-tls": "TLS 하이브리드 협상",
                "c-classic": "사유 없는 고전 줄 0", "c-expect": "ML-KEM·ML-DSA 사용", "r-review": "검증 호출 유지",
-               "r-allow": "허용 항목 사람 확인", "i-kpqc": "KpqC 참조판 KAT 일치"}
+               "r-allow": "허용 항목 사람 확인", "i-kpqc": "KpqC 참조판 KAT 일치", "i-nist": "NIST PQC 구현 감사(pq-verify)"}
 HYBRID_WHY = "같은 함수 안 ML-KEM 결합(하이브리드 고전 성분)"
 LEGACY_WHY = "이름 규칙: Legacy*.java 파일이거나 같은 줄에 legacy, 그 줄에 쓰기 연산 없음(옛 자료 읽기·검증)"
 
@@ -1561,6 +1715,15 @@ def _short_where(e):
     return ", ".join(out) or e["where"]
 
 
+def _deck_nist(n):
+    """deck.json 의 pq-verify 감사 요약(없으면 None)."""
+    if n is None:
+        return None
+    s = n["summary"]
+    return {"status": n["status"], "detail": n["detail"], "audit": s["audit"], "param_set": s["param_set"], "tool_version": s["tool_version"],
+            "checks_passed": s["checks_passed"], "checks_total": s["checks_total"]}
+
+
 def deck_view(r):
     """deck.json(요약). 전후 숫자의 뜻:
     cbom.before·after = 고전 공개키 자산 위치(막는 위치 + 허용 + 검토 필요), blocking_* = 그중 막는 위치(판정을 정하는 수).
@@ -1577,6 +1740,7 @@ def deck_view(r):
                 "impl": [{"param": x["param"], "name": x["name"], "status": x["status"], "matched": x["matched"], "summary": x["summary"]}
                          for x in r["impl"]["results"]],
                 "accept": r["impl"]["accept"], "control_ok": r["impl"]["control"]["ok"],
+                "nist": _deck_nist(r["impl"]["nist"]),
                 "checks": [{"id": c["id"], "status": c["status"], "label": CHECK_LABEL.get(c["id"], c["title"])} for c in r["checks"]],
                 "verify_cmd": m["verify_cmd"], "ev": [m["ev"]], "tool_version": r["tool_version"],
                 "ruleset_version": r["ruleset_version"], "format_version": r["format_version"]}

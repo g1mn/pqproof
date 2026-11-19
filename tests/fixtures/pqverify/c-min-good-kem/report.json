@@ -1,0 +1,259 @@
+{
+  "schema": "pq-verify/kem-audit-result",
+  "schema_version": "1.2",
+  "tool": {
+    "name": "pq-verify",
+    "version": "2.19.0"
+  },
+  "timestamp": "<TIMESTAMP>",
+  "artifact": {
+    "bound": true,
+    "sha256": "71452938b07768e1c71d385b753a800defefa4f10fcefb69efbca9ef70778479",
+    "path": "<BUILD>/good/libpqclean_mlkem768.dylib",
+    "summary": "sha256 71452938b07768e1c71d385b753a800defefa4f10fcefb69efbca9ef70778479",
+    "detail": "The audited computation was performed by this file.",
+    "isolation": "child process",
+    "loaded_objects": [
+      {
+        "path": "<BUILD>/good/libpqclean_mlkem768.dylib",
+        "inode": null,
+        "sha256": "71452938b07768e1c71d385b753a800defefa4f10fcefb69efbca9ef70778479"
+      }
+    ]
+  },
+  "side_channel": {
+    "measured": false,
+    "summary": "not measured - execution time, power and electromagnetic behaviour were not observed",
+    "detail": "pq-verify compares values against NIST's published answers. It does not execute the implementation under measurement and cannot detect a timing-dependent, cache-dependent or power-dependent implementation that computes the correct result. Establishing that requires leakage assessment against the deployed binary on the deployed hardware."
+  },
+  "parameter_set": "ML-KEM-768",
+  "library": "<BUILD>/good/libpqclean_mlkem768.dylib",
+  "status": "FINDINGS PRESENT",
+  "verified": false,
+  "symbols": {
+    "keypair": "PQCLEAN_MLKEM768_CLEAN_crypto_kem_keypair_derand",
+    "encaps": "PQCLEAN_MLKEM768_CLEAN_crypto_kem_enc_derand",
+    "decaps": "PQCLEAN_MLKEM768_CLEAN_crypto_kem_dec"
+  },
+  "summary": {
+    "checks_passed": 532,
+    "checks_total": 1436,
+    "findings": 4
+  },
+  "accumulated": {
+    "cases": 10000,
+    "ok": true,
+    "detail": "10,000 cases: digest 8a518cc63da36632… matches (Go 1.26.1 crypto/mlkem TestAccumulated (published))",
+    "source": "Go 1.26.1 crypto/mlkem TestAccumulated (published)"
+  },
+  "stages": {
+    "keyGen": {
+      "passed": 25,
+      "total": 25
+    },
+    "encaps": {
+      "passed": 25,
+      "total": 25
+    },
+    "decaps": {
+      "passed": 10,
+      "total": 10
+    },
+    "dkCheck": {
+      "passed": 5,
+      "total": 10
+    },
+    "ekCheck": {
+      "passed": 5,
+      "total": 10
+    },
+    "edgeValid": {
+      "passed": 461,
+      "total": 461
+    },
+    "edgeEk": {
+      "passed": 0,
+      "total": 892
+    },
+    "edgeDk": {
+      "passed": 0,
+      "total": 2
+    },
+    "accumulated": {
+      "passed": 1,
+      "total": 1
+    }
+  },
+  "bounds": {
+    "calls": 41596,
+    "outside_total": 0,
+    "outside": [],
+    "guard_bytes": 64
+  },
+  "keycheck": {
+    "dkCheck": {
+      "accepted_invalid": 5,
+      "rejected_valid": 0
+    },
+    "ekCheck": {
+      "accepted_invalid": 5,
+      "rejected_valid": 0
+    }
+  },
+  "edge": {
+    "vectors": "Wycheproof 3fa63dd, CCTV 50a8ecf",
+    "not_applicable": 64,
+    "failures": [
+      {
+        "stage": "edgeEk",
+        "case": "wycheproof mlkem_768_encaps_test #2 (CCTV/modulus)",
+        "flags": [
+          "ModulusOverflow"
+        ],
+        "detail": "invalid encapsulation key accepted"
+      },
+      {
+        "stage": "edgeEk",
+        "case": "wycheproof mlkem_768_encaps_test #3 (CCTV/modulus)",
+        "flags": [
+          "ModulusOverflow"
+        ],
+        "detail": "invalid encapsulation key accepted"
+      },
+      {
+        "stage": "edgeEk",
+        "case": "wycheproof mlkem_768_encaps_test #4 (CCTV/modulus)",
+        "flags": [
+          "ModulusOverflow"
+        ],
+        "detail": "invalid encapsulation key accepted"
+      },
+      {
+        "stage": "edgeEk",
+        "case": "wycheproof mlkem_768_encaps_test #5 (CCTV/modulus)",
+        "flags": [
+          "ModulusOverflow"
+        ],
+        "detail": "invalid encapsulation key accepted"
+      },
+      {
+        "stage": "edgeEk",
+        "case": "wycheproof mlkem_768_encaps_test #6 (CCTV/modulus)",
+        "flags": [
+          "ModulusOverflow"
+        ],
+        "detail": "invalid encapsulation key accepted"
+      },
+      {
+        "stage": "edgeEk",
+        "case": "wycheproof mlkem_768_encaps_test #7 (CCTV/modulus)",
+        "flags": [
+          "ModulusOverflow"
+        ],
+        "detail": "invalid encapsulation key accepted"
+      },
+      {
+        "stage": "edgeEk",
+        "case": "wycheproof mlkem_768_encaps_test #8 (CCTV/modulus)",
+        "flags": [
+          "ModulusOverflow"
+        ],
+        "detail": "invalid encapsulation key accepted"
+      },
+      {
+        "stage": "edgeEk",
+        "case": "wycheproof mlkem_768_encaps_test #9 (CCTV/modulus)",
+        "flags": [
+          "ModulusOverflow"
+        ],
+        "detail": "invalid encapsulation key accepted"
+      },
+      {
+        "stage": "edgeEk",
+        "case": "wycheproof mlkem_768_encaps_test #10 (CCTV/modulus)",
+        "flags": [
+          "ModulusOverflow"
+        ],
+        "detail": "invalid encapsulation key accepted"
+      },
+      {
+        "stage": "edgeEk",
+        "case": "wycheproof mlkem_768_encaps_test #11 (CCTV/modulus)",
+        "flags": [
+          "ModulusOverflow"
+        ],
+        "detail": "invalid encapsulation key accepted"
+      },
+      {
+        "stage": "edgeEk",
+        "case": "wycheproof mlkem_768_encaps_test #12 (CCTV/modulus)",
+        "flags": [
+          "ModulusOverflow"
+        ],
+        "detail": "invalid encapsulation key accepted"
+      },
+      {
+        "stage": "edgeEk",
+        "case": "wycheproof mlkem_768_encaps_test #13 (CCTV/modulus)",
+        "flags": [
+          "ModulusOverflow"
+        ],
+        "detail": "invalid encapsulation key accepted"
+      },
+      {
+        "stage": "edgeEk",
+        "case": "wycheproof mlkem_768_encaps_test #114 (FIPS 203)",
+        "flags": [],
+        "detail": "invalid encapsulation key accepted"
+      },
+      {
+        "stage": "edgeEk",
+        "case": "wycheproof mlkem_768_encaps_test #115 (FIPS 203)",
+        "flags": [],
+        "detail": "invalid encapsulation key accepted"
+      },
+      {
+        "stage": "edgeEk",
+        "case": "wycheproof mlkem_768_encaps_test #116 (FIPS 203)",
+        "flags": [],
+        "detail": "invalid encapsulation key accepted"
+      },
+      {
+        "stage": "edgeEk",
+        "case": "wycheproof mlkem_768_encaps_test #117 (FIPS 203)",
+        "flags": [],
+        "detail": "invalid encapsulation key accepted"
+      },
+      {
+        "stage": "edgeEk",
+        "case": "wycheproof mlkem_768_encaps_test #118 (FIPS 203)",
+        "flags": [],
+        "detail": "invalid encapsulation key accepted"
+      },
+      {
+        "stage": "edgeEk",
+        "case": "wycheproof mlkem_768_encaps_test #119 (FIPS 203)",
+        "flags": [],
+        "detail": "invalid encapsulation key accepted"
+      },
+      {
+        "stage": "edgeEk",
+        "case": "wycheproof mlkem_768_encaps_test #120 (FIPS 203)",
+        "flags": [],
+        "detail": "invalid encapsulation key accepted"
+      },
+      {
+        "stage": "edgeEk",
+        "case": "wycheproof mlkem_768_encaps_test #121 (FIPS 203)",
+        "flags": [],
+        "detail": "invalid encapsulation key accepted"
+      }
+    ]
+  },
+  "findings": [
+    "stage dkCheck: accepted 5 key(s) NIST marks invalid (FIPS 203 §7.3); this API does not perform the input check, so every caller must",
+    "stage ekCheck: accepted 5 key(s) NIST marks invalid (FIPS 203 §7.2); this API does not perform the input check, so every caller must",
+    "stage edgeEk: accepted 892 of 892 invalid encapsulation keys (Wycheproof/CCTV, FIPS 203 §7.2)",
+    "stage edgeDk: accepted 2 of 2 invalid decapsulation keys (Wycheproof, FIPS 203 §7.3)"
+  ]
+}

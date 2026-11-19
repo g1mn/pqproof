@@ -1,0 +1,11 @@
+  kyber-py required for functional vectors:
+    pip install "pq-verify[full]"
+  FAILING: ACVP CANNOT VERIFY (0/0)
+  wrote <OUT>/report.json  (report for ACVP; artifact: none - reference-chain conformance, no vendor binary loaded)
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  DEGRADED RUN - this run verified LESS than pq-verify claims:
+    - dependencies missing: kyber-py  (checks depending on these did NOT run)
+    - checks skipped: ML-KEM ACVP
+  A pass here does NOT mean full verification.
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  FAILING: degraded run and --require-full-coverage was set

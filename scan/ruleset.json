@@ -1,5 +1,5 @@
 {
- "about": "Ruleset versions: a name for each hash of the rule files (pqlite/version.py RULESET_FILES). A run records ruleset_version and ruleset_sha256 in receipt.json. Each version lists sha256, since (the first tool version that shipped it), verdict_impact (yes when the same trees can get a different verdict, check status or count than under the previous ruleset; no when only comments, wording or code layout changed) and files (path and sha256 of each rule file). The file list can differ between versions: ruleset 1 hashed six files, ruleset 2 hashes eleven: it adds scan/skip-dirs, scan/profiles.json, pqlite/rules.py, pqlite/skipdirs.py and pqlite/tlsprobe.py. Ruleset 3 hashes fourteen: it adds pqlite/impl.py, scan/kat-kpqc.json and scan/kat (the reference KAT excerpts, one digest over the *.json files of the folder, pqlite/version.py path_sha256). Ruleset 3 hashes fourteen: it adds pqlite/impl.py, scan/kat-kpqc.json and scan/kat (the reference KAT excerpts, one digest over the *.json files of the folder, pqlite/version.py path_sha256). --verify recomputes a receipt's ruleset_sha256 from the files of the ruleset it names. Changing a rule file needs a new name here, a new current, and a CHANGELOG entry with its verdict impact. A ruleset with verdict_impact yes first ships in a MINOR release (MAJOR from 1.0), never a PATCH release (tests/version_policy.py). pqlite/version.py --ruleset-json prints sha256 and files for the rule files on disk.",
+ "about": "Ruleset versions: a name for each hash of the rule files (pqlite/version.py RULESET_FILES). A run records ruleset_version and ruleset_sha256 in receipt.json. Each version lists sha256, since (the first tool version that shipped it), verdict_impact (yes when the same trees can get a different verdict, check status or count than under the previous ruleset; no when only comments, wording or code layout changed) and files (path and sha256 of each rule file). The file list can differ between versions: ruleset 1 hashed six files, ruleset 2 hashes eleven: it adds scan/skip-dirs, scan/profiles.json, pqlite/rules.py, pqlite/skipdirs.py and pqlite/tlsprobe.py. Ruleset 3 hashes fourteen: it adds pqlite/impl.py, scan/kat-kpqc.json and scan/kat (the reference KAT excerpts, one digest over the *.json files of the folder, pqlite/version.py path_sha256). --verify recomputes a receipt's ruleset_sha256 from the files of the ruleset it names. Changing a rule file needs a new name here, a new current, and a CHANGELOG entry with its verdict impact. A ruleset with verdict_impact yes first ships in a MINOR release (MAJOR from 1.0), never a PATCH release (tests/version_policy.py). pqlite/version.py --ruleset-json prints sha256 and files for the rule files on disk.",
  "current": "3",
  "versions": {
   "1": {
@@ -85,7 +85,7 @@
    ]
   },
   "3": {
-   "sha256": "ec507a9b70caaddf4d56dad62d5c803291267157add69f6d0932836aaf40a206",
+   "sha256": "d389e962e9847ceec39182992db25ec305196a951980272436b2511b46c6bca1",
    "since": "0.3.0",
    "verdict_impact": "no",
    "files": [
@@ -95,11 +95,11 @@
     },
     {
      "path": "pqlite/impl.py",
-     "sha256": "d43f546c84fe4ca61f0c4a4b1e99cfd6d88cb6f1d8f4cd6214015aa7093bb5db"
+     "sha256": "b586adc6723e86ce1232d69eba03f904283910170a59f4c6bbbb44277f76ff53"
     },
     {
      "path": "pqlite/rules.py",
-     "sha256": "e7b7a7e5e7646bab294a0af483e441b681d47ad013d063fa4d98b15a4c504b18"
+     "sha256": "382986e6f47c186f3bd1902acc3e621e9a2e08ff2c4e19fa774cf62509bc0310"
     },
     {
      "path": "pqlite/scan.py",

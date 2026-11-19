@@ -1,6 +1,7 @@
 # deps.py: PQ-Proof 가 실행 중에 부르는 바깥 도구를 미리 점검해 알기 쉬운 오류로 바꾼다. 표준 라이브러리만 쓴다.
 # 꼭 있어야 하는 것: bash, grep·awk·sed·find 같은 기본 명령, openssl(3.5 이상 권장).
-# 있으면 쓰는 것: JDK keytool(키스토어 .jks·.p12 읽기), tls_probe(TLS_TARGETS 실측), go 1.27+(tls_probe 빌드).
+# 있으면 쓰는 것: JDK keytool(키스토어 .jks·.p12 읽기), tls_probe(TLS_TARGETS 실측), go 1.27+(tls_probe 빌드),
+#   pq-verify(pqproof impl judge --pq-verify 의 NIST PQC 구현 감사. PQ_VERIFY 또는 PATH, 사용자가 따로 설치한다).
 """Check the external programs PQ-Proof calls at run time and turn a missing one into a clear message."""
 import os
 import platform
@@ -74,6 +75,33 @@ def probe_binary(bin_dir):
     return path if os.path.isfile(path) and os.access(path, os.X_OK) else None
 
 
+PQV_NAME = "pq-verify"  # pqlite/impl.py PQV_NAME 과 같아야 한다(tests/test_pqverify.py)
+# pq-verify 를 부를 때 뺄 환경 변수(pqlite/impl.py _ENV_DROP_PREFIX·_ENV_DROP 과 같아야 한다)
+PQV_ENV_DROP_PREFIX = ("PQV_", "LD_", "DYLD_")
+PQV_ENV_DROP = ("PYTHONPATH", "PYTHONHOME", "PYTHONSTARTUP", "PYTHONINSPECT")
+
+
+def find_pqverify(env):
+    """prove.py pqverify_exe 와 같은 규칙: PQ_VERIFY 를 주면 그것(실행 파일이 아니면 None), 아니면 PATH 의 pq-verify. 반환 (경로 또는 None, 판)."""
+    given = (env.get("PQ_VERIFY") or "").strip()
+    if given:
+        path = given if os.path.isfile(given) and os.access(given, os.X_OK) else None
+    else:
+        path = shutil.which(PQV_NAME, path=env.get("PATH"))
+    if not path:
+        return None, ""
+    # prove.py 가 감사 때 넘기는 환경과 같은 규칙으로 뺀다(pqlite/impl.py pqverify_env): PQV_*·LD_*·DYLD_*·PYTHONPATH 등
+    clean = {k: v for k, v in env.items() if not k.startswith(PQV_ENV_DROP_PREFIX) and k not in PQV_ENV_DROP}
+    try:
+        r = subprocess.run([path, "--version"], capture_output=True, text=True, errors="replace", timeout=60, stdin=subprocess.DEVNULL,
+                           env=clean)
+        code, out = r.returncode, r.stdout + r.stderr
+    except (OSError, subprocess.TimeoutExpired):
+        code, out = None, ""
+    m = re.search(r"\bpq-verify\s+([0-9][0-9A-Za-z.+-]*)", out)
+    return path, (m[1] if code == 0 and m else "")
+
+
 def has_keystores(inputs, limit=20000):
     """입력 폴더·zip 안에 키스토어 파일이 있는지 이름만 본다(여는 일 없음)."""
     seen = 0
@@ -97,7 +125,9 @@ def has_keystores(inputs, limit=20000):
     return False
 
 
-def check(env=None, inputs=(), bin_dir=None, need_tls=None):
+def check(env=None, inputs=(), bin_dir=None, need_tls=None, need_pqverify=None):
+    """바깥 도구 점검(Report). need_pqverify: None 이면 pq-verify 를 보지 않는다(트리 판정은 쓰지 않는다), False 면 있는지·판만 적고(doctor),
+    True 면 --pq-verify 를 준 실행이라 없을 때 경고한다(판정은 i-nist 미판정으로 남고 실행은 막지 않는다)."""
     env = os.environ if env is None else env
     rep = Report()
     if os.name == "nt":  # Git Bash·Cygwin 의 bash 가 PATH 에 있어도 경로·OpenSSL 이 달라 엉뚱하게 실패한다
@@ -138,6 +168,22 @@ def check(env=None, inputs=(), bin_dir=None, need_tls=None):
                           "check them with `shasum -a 256 -c --ignore-missing SHA256SUMS`, and set PROBE_BIN_DIR to that folder.")
     else:
         rep.optional.append("tls_probe: not found (optional, only for TLS_TARGETS live checks; pqproof build-probe)")
+    if need_pqverify is not None:
+        pqv_line(rep, env, need_pqverify)
+    return rep
+
+
+def pqv_line(rep, env, need=False):
+    """pq-verify 줄: 있으면 경로와 판(info), 없으면 선택 의존(optional) 또는 --pq-verify 를 줬을 때 경고."""
+    path, ver = find_pqverify(env)
+    if path:
+        rep.info.append(f"pq-verify: {path} ({'pq-verify ' + ver if ver else 'version unknown'}; runs the library it audits, "
+                        "use a container or VM for untrusted code)")
+    elif need:
+        rep.warnings.append("--pq-verify is given but pq-verify was not found (PQ_VERIFY or PATH): i-nist will be undecided. "
+                            "Install it apart from PQ-Proof (pip install pq-verify in its own virtual environment) and set PQ_VERIFY.")
+    else:
+        rep.optional.append("pq-verify: not found (optional, only for pqproof impl judge --pq-verify; set PQ_VERIFY or put it on PATH)")
     return rep
 
 

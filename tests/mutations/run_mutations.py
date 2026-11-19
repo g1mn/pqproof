@@ -14,7 +14,8 @@
 #   --diff-golden FILE(- 는 화면): golden 과 다른 사례·칸을 Markdown 표로 쓴다. CHANGELOG '판정 영향' 칸의 초안이다
 #   kind impl(구현 검증): 도구의 pqlite/impl.py 로 어느 판 구현이라면 낼 답안(example_answers)이나 발췌만 담은 .rsp 를 만들고 impl 의
 #     edits(flip·set·drop·top)로 결함을 심은 뒤 'prove.sh --impl judge'(깐 명령은 'pqproof impl judge')로 판정한다. evidence_ops 가
-#     있으면 증적을 고친 뒤 --verify 결과를 본다. impl 사례는 golden(트리 사례)에 들지 않는다
+#     있으면 증적을 고친 뒤 --verify 결과를 본다. impl.pq_verify 를 주면 그 글을 --pq-verify 로 넘긴다(env 의 PQ_VERIFY 로 실행 파일을
+#     정한다. 시험 묶음은 진짜 pq-verify 를 부르지 않는다). impl 사례는 golden(트리 사례)에 들지 않는다
 #   --write-golden FILE: 이번 실행으로 고정 기록을 다시 쓴다. 쓰기 전에 그 파일의 지금 내용과 비교한 요약을 먼저 찍는다
 # 상태: PASS · FAIL · SKIP(준비 못 함: 고정물이 낡았거나 의존 도구 없음) · PENDING(고치는 중인 결함, --strict 가 아니면 종료 코드에 안 셈)
 # 건너뛴 것은 통과로 세지 않는다: SKIP 이 하나라도 있으면 종료 코드는 1이다.
@@ -521,7 +522,7 @@ class Runner:
         path = os.path.join(mdir, "answers.json")
         with open(path, "w", encoding="utf-8") as f:
             f.write(mod.dumps(resp))
-        return path, []
+        return path, (["--pq-verify", spec["pq_verify"]] if spec.get("pq_verify") else [])
 
     def prove_impl(self, path, extra, out, env_extra):
         env = {k: v for k, v in os.environ.items() if k not in ("OUT", "PROFILE", "FAIL_ON_REVIEW", "EV_NAME")}
@@ -621,6 +622,7 @@ class Runner:
         out = os.path.join(mdir, "out")
         if m["kind"] == "impl":
             path, extra = self.impl_answer(m, mdir)
+            env = {k: v.replace("{mdir}", mdir) for k, v in env.items()}  # 사례 폴더 안 경로(예: 없는 pq-verify)
             code, log, secs = self.prove_impl(path, extra, out, env)
         else:
             orig, fixed = self.tree(m, mdir)

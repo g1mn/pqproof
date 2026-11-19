@@ -8,6 +8,8 @@
 #   bash prove.sh --impl prompt [--param 이름 ...] [-o 파일]   구현 검증(KpqC): 하네스가 답할 문제지(JSON)를 쓴다
 #   bash prove.sh --impl judge <답안.json|kat.rsp> [--param 이름]   답안을 참조판 KAT 와 대조해 증적 폴더를 쓴다(구현은 실행하지 않음,
 #                          받아 줄 판은 PROFILE=kpqc 의 impl_accept, 기본 최신판. 옛 판·알려진 변형 일치는 검토 필요. 공인 시험 아님)
+#   bash prove.sh --impl judge [답안] --pq-verify "--audit-kem <라이브러리> ML-KEM-768"   사용자가 따로 설치한 pq-verify 로 NIST PQC
+#                          구현 감사도 해서 같은 증적에 담는다(i-nist). 대상 라이브러리를 실행하는 것은 pq-verify 다(믿지 못할 것은 컨테이너·VM)
 #   bash prove.sh --unit [이름]        단위 시험(tests/, 표준 라이브러리 unittest). 'n 통과 · m 건너뜀 · k 실패'로 센다
 #   bash prove.sh sarif <출력 폴더> [-o 파일] [--uri-prefix 경로/]   검증 증적을 SARIF 2.1.0 으로(GitHub code scanning)
 #   bash prove.sh --version            도구 버전, 규칙 묶음 이름, 증적 형식(버전은 src/pqproof/__init__.py 한 곳)
@@ -41,6 +43,8 @@
 #   EXPECT_FROM=names | api   c-expect 를 이름 줄(기본)로 셀지, PQC API 호출 위치(JCA·Node·Go)로 셀지. api 면 상수만 남긴 판이 실패한다
 #   REVIEW_MAX_AGE_DAYS=N  허용 목록의 reviewed_at 이 N일보다 오래되면 사람 확인 전으로 센다
 #   MAX_FILE_MIB=N         scan.py·약화·허용 검사가 읽는 파일 크기 한도(기본 1). 넘은 코드·설정 파일은 a-input 검토 필요로 적는다
+#   PQ_VERIFY=<pq-verify>  --impl judge --pq-verify 가 부를 pq-verify 실행 파일. 비우면 PATH 의 pq-verify. 없으면 i-nist 는 미판정
+#   PQ_VERIFY_TIMEOUT=N    pq-verify 감사 한 번의 시간 한도(초, 기본 1800). 넘으면 프로세스 묶음째 멈추고 i-nist 는 미판정
 #   PROFILE=nist-cat3 | cnsa2 | kpqc   알고리즘 프로필(scan/profiles.json). 기본 nist-cat3: c-expect 가 ML-KEM-768·1024, ML-DSA-65·87 을 센다.
 #                          cnsa2 는 ML-KEM-1024·ML-DSA-87 만 세고 b-tls 가 SecP384r1MLKEM1024 를 홀로 제시한다. kpqc 는 국내 KpqC 도 센다
 # 출력 폴더의 deck.json 은 발표 자료·대시보드용 요약이다(receipt.json에서 결정적으로 만든다)

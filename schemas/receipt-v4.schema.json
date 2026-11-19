@@ -1557,6 +1557,7 @@
             "input",
             "kat_manifest_sha256",
             "key",
+            "nist",
             "problem",
             "prompt",
             "results"
@@ -1570,7 +1571,10 @@
               "pattern": "^[0-9a-f]{64}$"
             },
             "input": {
-              "type": "object",
+              "type": [
+                "object",
+                "null"
+              ],
               "additionalProperties": false,
               "required": [
                 "bytes",
@@ -1661,7 +1665,10 @@
               }
             },
             "key": {
-              "type": "object",
+              "type": [
+                "object",
+                "null"
+              ],
               "additionalProperties": false,
               "required": [
                 "file",
@@ -1805,6 +1812,291 @@
                       }
                     }
                   }
+                }
+              }
+            },
+            "nist": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": false,
+              "required": [
+                "args",
+                "argv",
+                "detail",
+                "engine",
+                "env_removed",
+                "executable",
+                "exit_code",
+                "library",
+                "log",
+                "log_sha256",
+                "not_run",
+                "report",
+                "report_sha256",
+                "status",
+                "summary",
+                "timeout"
+              ],
+              "properties": {
+                "engine": {
+                  "const": "pq-verify"
+                },
+                "args": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "argv": {
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "executable": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "env_removed": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "timeout": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "exit_code": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "not_run": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "library": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "path",
+                    "sha256"
+                  ],
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "sha256": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                "report": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^(?:(?:artifacts|tables)/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}(?:/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}){0,4}|evidence-fragment\\.json)$"
+                },
+                "report_sha256": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "log": {
+                  "type": "string",
+                  "pattern": "^(?:(?:artifacts|tables)/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}(?:/(?!\\.\\.?(?:/|$))[A-Za-z0-9_.-]{1,120}){0,4}|evidence-fragment\\.json)$"
+                },
+                "log_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "summary": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "artifact_sha256",
+                    "audit",
+                    "bound",
+                    "checks_passed",
+                    "checks_total",
+                    "degraded",
+                    "exit_code",
+                    "failed",
+                    "findings",
+                    "library_sha256",
+                    "missing",
+                    "param_set",
+                    "problem",
+                    "schema",
+                    "schema_version",
+                    "scope",
+                    "scope_complete",
+                    "status",
+                    "target",
+                    "tool_version",
+                    "unavailable",
+                    "verified"
+                  ],
+                  "properties": {
+                    "audit": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "problem": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "exit_code": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "schema": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "schema_version": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "tool_version": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "status": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "verified": {
+                      "type": [
+                        "boolean",
+                        "null"
+                      ]
+                    },
+                    "bound": {
+                      "type": [
+                        "boolean",
+                        "null"
+                      ]
+                    },
+                    "artifact_sha256": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "library_sha256": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "target": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "param_set": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "checks_passed": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "checks_total": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "findings": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "failed": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "missing": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "scope": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "scope_complete": {
+                      "type": [
+                        "boolean",
+                        "null"
+                      ]
+                    },
+                    "degraded": {
+                      "type": "boolean"
+                    },
+                    "unavailable": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "status": {
+                  "enum": [
+                    "pass",
+                    "fail",
+                    "undecided"
+                  ]
+                },
+                "detail": {
+                  "type": "string"
                 }
               }
             }

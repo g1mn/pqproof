@@ -1,0 +1,5 @@
+  CANNOT VERIFY: the contained worker needs Linux (seccomp, memfd, /proc); this is darwin
+  SCOPE: nothing checked
+  FAILING: contained audit CANNOT VERIFY
+  wrote <OUT>/report.json  (report for --audit-contained; artifact: none - the contained worker needs Linux (seccomp, memfd, /proc); this is darwin)
+  INTEGRITY: nothing this run needed was missing (no field engines were required).

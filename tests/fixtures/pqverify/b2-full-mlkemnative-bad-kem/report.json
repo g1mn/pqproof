@@ -1,0 +1,236 @@
+{
+  "schema": "pq-verify/kem-audit-result",
+  "schema_version": "1.2",
+  "tool": {
+    "name": "pq-verify",
+    "version": "2.19.0"
+  },
+  "timestamp": "<TIMESTAMP>",
+  "artifact": {
+    "bound": true,
+    "sha256": "630f4090ca4bc5ce7d7c5b13fc832dfcc4a6748cbe85cd96481982fe0ceb841c",
+    "path": "<BUILD>/bad-mlkemnative/libmlkemnative768_bad.dylib",
+    "summary": "sha256 630f4090ca4bc5ce7d7c5b13fc832dfcc4a6748cbe85cd96481982fe0ceb841c",
+    "detail": "The audited computation was performed by this file.",
+    "isolation": "child process",
+    "loaded_objects": [
+      {
+        "path": "<BUILD>/bad-mlkemnative/libmlkemnative768_bad.dylib",
+        "inode": null,
+        "sha256": "630f4090ca4bc5ce7d7c5b13fc832dfcc4a6748cbe85cd96481982fe0ceb841c"
+      }
+    ]
+  },
+  "side_channel": {
+    "measured": false,
+    "summary": "not measured - execution time, power and electromagnetic behaviour were not observed",
+    "detail": "pq-verify compares values against NIST's published answers. It does not execute the implementation under measurement and cannot detect a timing-dependent, cache-dependent or power-dependent implementation that computes the correct result. Establishing that requires leakage assessment against the deployed binary on the deployed hardware."
+  },
+  "parameter_set": "ML-KEM-768",
+  "library": "<BUILD>/bad-mlkemnative/libmlkemnative768_bad.dylib",
+  "status": "FINDINGS PRESENT",
+  "verified": false,
+  "symbols": {
+    "keypair": "PQCP_MLKEM_NATIVE_MLKEM768_keypair_derand",
+    "encaps": "PQCP_MLKEM_NATIVE_MLKEM768_enc_derand",
+    "decaps": "PQCP_MLKEM_NATIVE_MLKEM768_dec"
+  },
+  "summary": {
+    "checks_passed": 1259,
+    "checks_total": 1436,
+    "findings": 3
+  },
+  "accumulated": {
+    "cases": 10000,
+    "ok": false,
+    "detail": "case 0: Decaps(dk, Encaps(ek, m)) returned a different key",
+    "source": "Go 1.26.1 crypto/mlkem TestAccumulated (published)"
+  },
+  "stages": {
+    "keyGen": {
+      "passed": 25,
+      "total": 25
+    },
+    "encaps": {
+      "passed": 25,
+      "total": 25
+    },
+    "decaps": {
+      "passed": 0,
+      "total": 10
+    },
+    "dkCheck": {
+      "passed": 10,
+      "total": 10
+    },
+    "ekCheck": {
+      "passed": 10,
+      "total": 10
+    },
+    "edgeValid": {
+      "passed": 295,
+      "total": 461
+    },
+    "edgeEk": {
+      "passed": 892,
+      "total": 892
+    },
+    "edgeDk": {
+      "passed": 2,
+      "total": 2
+    },
+    "accumulated": {
+      "passed": 0,
+      "total": 1
+    }
+  },
+  "bounds": {
+    "calls": 1600,
+    "outside_total": 0,
+    "outside": [],
+    "guard_bytes": 64
+  },
+  "keycheck": {
+    "dkCheck": {
+      "accepted_invalid": 0,
+      "rejected_valid": 0
+    },
+    "ekCheck": {
+      "accepted_invalid": 0,
+      "rejected_valid": 0
+    }
+  },
+  "edge": {
+    "vectors": "Wycheproof 3fa63dd, CCTV 50a8ecf",
+    "not_applicable": 64,
+    "failures": [
+      {
+        "stage": "edgeValid",
+        "case": "wycheproof mlkem_768_test #1 (CCTV/strcmp)",
+        "flags": [
+          "Strcmp"
+        ],
+        "detail": "K differs"
+      },
+      {
+        "stage": "edgeValid",
+        "case": "wycheproof mlkem_768_test #2 (FIPS 203)",
+        "flags": [],
+        "detail": "K differs"
+      },
+      {
+        "stage": "edgeValid",
+        "case": "wycheproof mlkem_768_test #3 (FIPS 203)",
+        "flags": [],
+        "detail": "K differs"
+      },
+      {
+        "stage": "edgeValid",
+        "case": "wycheproof mlkem_768_test #4 (FIPS 203)",
+        "flags": [],
+        "detail": "K differs"
+      },
+      {
+        "stage": "edgeValid",
+        "case": "wycheproof mlkem_768_test #5 (FIPS 203)",
+        "flags": [],
+        "detail": "K differs"
+      },
+      {
+        "stage": "edgeValid",
+        "case": "wycheproof mlkem_768_test #6 (FIPS 203)",
+        "flags": [],
+        "detail": "K differs"
+      },
+      {
+        "stage": "edgeValid",
+        "case": "wycheproof mlkem_768_test #7 (FIPS 203)",
+        "flags": [],
+        "detail": "K differs"
+      },
+      {
+        "stage": "edgeValid",
+        "case": "wycheproof mlkem_768_test #8 (FIPS 203)",
+        "flags": [],
+        "detail": "K differs"
+      },
+      {
+        "stage": "edgeValid",
+        "case": "wycheproof mlkem_768_test #9 (FIPS 203)",
+        "flags": [],
+        "detail": "K differs"
+      },
+      {
+        "stage": "edgeValid",
+        "case": "wycheproof mlkem_768_test #10 (FIPS 203)",
+        "flags": [],
+        "detail": "K differs"
+      },
+      {
+        "stage": "edgeValid",
+        "case": "wycheproof mlkem_768_test #11 (FIPS 203)",
+        "flags": [],
+        "detail": "K differs"
+      },
+      {
+        "stage": "edgeValid",
+        "case": "wycheproof mlkem_768_test #12 (FIPS 203)",
+        "flags": [],
+        "detail": "K differs"
+      },
+      {
+        "stage": "edgeValid",
+        "case": "wycheproof mlkem_768_test #13 (FIPS 203)",
+        "flags": [],
+        "detail": "K differs"
+      },
+      {
+        "stage": "edgeValid",
+        "case": "wycheproof mlkem_768_test #14 (FIPS 203)",
+        "flags": [],
+        "detail": "K differs"
+      },
+      {
+        "stage": "edgeValid",
+        "case": "wycheproof mlkem_768_test #15 (FIPS 203)",
+        "flags": [],
+        "detail": "K differs"
+      },
+      {
+        "stage": "edgeValid",
+        "case": "wycheproof mlkem_768_test #16 (FIPS 203)",
+        "flags": [],
+        "detail": "K differs"
+      },
+      {
+        "stage": "edgeValid",
+        "case": "wycheproof mlkem_768_test #17 (FIPS 203)",
+        "flags": [],
+        "detail": "K differs"
+      },
+      {
+        "stage": "edgeValid",
+        "case": "wycheproof mlkem_768_test #18 (FIPS 203)",
+        "flags": [],
+        "detail": "K differs"
+      },
+      {
+        "stage": "edgeValid",
+        "case": "wycheproof mlkem_768_test #19 (FIPS 203)",
+        "flags": [],
+        "detail": "K differs"
+      },
+      {
+        "stage": "edgeValid",
+        "case": "wycheproof mlkem_768_test #20 (FIPS 203)",
+        "flags": [],
+        "detail": "K differs"
+      }
+    ]
+  },
+  "findings": [
+    "stage decaps: 0/10 match NIST byte-for-byte",
+    "stage edgeValid: 295/461 Wycheproof/CCTV edge-case vectors reproduced byte-for-byte",
+    "stage accumulated: case 0: Decaps(dk, Encaps(ek, m)) returned a different key"
+  ]
+}

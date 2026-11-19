@@ -1,0 +1,3 @@
+pq-verify==2.19.0 \
+    --hash=sha256:2d492b621bde43fe0fe668bda0481a52568deb9176a5d92c3c6b5e08b45c2139
+    # via -r .github/requirements/pq-verify.in

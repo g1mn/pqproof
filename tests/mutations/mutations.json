@@ -1371,7 +1371,8 @@
     "exit": 0,
     "verdict": "pass",
     "checks": {
-     "i-kpqc": "pass"
+     "i-kpqc": "pass",
+     "i-nist": "na"
     },
     "contains": {
      "checks[i-kpqc].actual": [
@@ -1380,7 +1381,8 @@
      ]
     },
     "eq": {
-     "impl.control.ok": true
+     "impl.control.ok": true,
+     "impl.nist": null
     }
    }
   },
@@ -1628,6 +1630,37 @@
     "verify_contains": [
      "judged again"
     ]
+   }
+  },
+  {
+   "id": "i10-impl-pq-verify-missing",
+   "title": "Implementation check with --pq-verify, but no pq-verify executable: i-nist undecided, the KpqC answers still pass in the same receipt",
+   "title_ko": "구현 검증에 --pq-verify 를 줬는데 pq-verify 실행 파일이 없으면 i-nist 미판정(건너뜀은 통과가 아님), KpqC 답안은 같은 증적에서 통과",
+   "kind": "impl",
+   "impl": {
+    "params": [
+     "ntruplus/864"
+    ],
+    "as": "latest",
+    "pq_verify": "--audit-kem libmlkem768.so ML-KEM-768"
+   },
+   "env": {
+    "PQ_VERIFY": "{mdir}/no-such-pq-verify"
+   },
+   "expect": {
+    "exit": 3,
+    "verdict": "undecided",
+    "checks": {
+     "i-kpqc": "pass",
+     "i-nist": "undecided"
+    },
+    "contains": {
+     "checks[i-nist].actual": "실행 파일이 아니다"
+    },
+    "eq": {
+     "impl.nist.argv": null,
+     "impl.nist.exit_code": null
+    }
    }
   }
  ],

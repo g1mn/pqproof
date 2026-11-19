@@ -11,9 +11,11 @@
 #     (정답 답안은 통과, 한 바이트 바꾼 답안은 실패가 나오는지 먼저 확인), check_row(검사 행 i-kpqc, rules.judge_impl 이 쓴다)
 #   - HAETAE KAT 서명은 .rsp 에 없는 ctx 로 만들어졌다. NIST PQCgenKAT 의 AES-256-CTR DRBG(NistDrbg)를 순수 파이썬으로 따라
 #     seed 에서 ctx 를 다시 뽑아 문제지에 넣는다.
+#   - NIST PQC 는 pq-verify 다리(검사 i-nist, 맨 아래 절): 사용자가 --pq-verify 로 켤 때만 prove.py 가 바깥 도구 pq-verify 를 부르고,
+#     여기 순수 함수가 인자를 검사하고(pqverify_args) 보고서를 읽어 판정한다(pqverify_summary, pqverify_status, nist_check_row).
 # 받는 답안과 .rsp 는 남이 만든 데이터다. 글자로만 읽고, 그 안의 무엇도 실행하지 않는다. 이 파일은 다른 pqlite 모듈을 가져오지 않는다
 # (pqlite/receipt.py 가 --verify 에서 파일 경로로 읽는다).
-"""KpqC implementation check: question sheet, answers, and matching against pinned reference KAT versions."""
+"""Implementation check: KpqC question sheet, answers and matching against pinned reference KAT versions; the pq-verify bridge."""
 from __future__ import annotations  # 맥 기본 python3 3.9
 
 import hashlib
@@ -963,10 +965,13 @@ CHECK_TITLE = "KpqC 구현의 KAT 대조(받아 줄 참조판과 일치하는가
 CHECK_EXPECTED = "파라미터마다 받아 줄 판(프로필의 impl_accept, 기본 최신판)의 KAT 와 일치, 변조 서명 거부, 자기 점검 통과"
 
 
-def check_row(results, control=None, problem=None):
+def check_row(results, control=None, problem=None, answered=True):
     """검사 행 i-kpqc(rules.judge_impl 이 쓰고 --verify 가 다시 만들어 맞춘다). control: 자기 점검 까닭(있으면 미판정),
-    problem: 답안 전체의 문제(읽지 못함, 모르는 파라미터, 있으면 미판정)."""
-    if control:
+    problem: 답안 전체의 문제(읽지 못함, 모르는 파라미터, 있으면 미판정). answered: 답안을 줬는가(안 줬으면 해당 없음, pq-verify 감사만
+    한 실행)."""
+    if not answered:
+        status, actual = "na", "답안을 주지 않았다(KpqC KAT 대조를 하지 않음)"
+    elif control:
         status, actual = "undecided", f"자기 점검 실패: {control}"
     elif problem:
         status, actual = "undecided", problem
@@ -976,3 +981,281 @@ def check_row(results, control=None, problem=None):
         status = combine(r["status"] for r in results)
         actual = " · ".join(f"{r['param']} {STATUS_KO[r['status']]}: {r['summary']}" for r in results)
     return {"id": CHECK_ID, "title": CHECK_TITLE, "status": status, "expected": CHECK_EXPECTED, "actual": actual}
+
+
+# ---------------------------------------------------------------------------------------------
+# pq-verify 다리(검사 i-nist). NIST PQC(FIPS 203·204·205) 구현 감사는 사용자가 켤 때만(pqproof impl judge --pq-verify "<인자>")
+# 바깥 도구 pq-verify(MIT, PyPI)가 한다. 대상 라이브러리를 불러 실행하는 것은 pq-verify 이고 PQ-Proof 는 대상을 빌드하거나 실행하지
+# 않는다. PQ-Proof 는 pq-verify 를 하위 프로세스로 부르고(prove.py, shell 없음, --require-full-coverage 와 --json 을 붙인다) 그 JSON
+# 보고서·종료 코드·출력만 읽는다. 아래는 그 순수 함수다(인자 검사 pqverify_args, 실행 argv pqverify_argv, 넘길 환경 pqverify_env,
+# 보고서 읽기 pqverify_summary, 판정 pqverify_status, 검사 행 nist_check_row). --verify 가 증적의 보고서 사본으로 다시 판정한다.
+# 받은 보고서는 남이 만든 데이터다. JSON 으로 읽고 칸의 꼴을 확인할 뿐 그 안의 무엇도 실행하지 않는다.
+NIST_CHECK_ID = "i-nist"
+PQV_NAME = "pq-verify"  # PATH 에서 찾는 실행 파일 이름(PQ_VERIFY 로 바꾼다). src/pqproof/deps.py 와 같아야 한다
+PQV_TESTED = "2.19.0"  # 실제 출력 고정물(tests/fixtures/pqverify/)로 시험한 판. 다른 판도 읽지만 보고서 꼴(schema 주 버전)이 같아야 한다
+PQV_SCHEMA_MAJOR = "1"
+PQV_MAX_REPORT = 16 << 20  # 보고서 상한(바이트). 넘으면 읽지 않고 미판정
+PQV_MAX_TEXT = 1 << 20  # 실행 기록에 남기는 stdout·stderr 상한(바이트). 넘으면 앞 256 KiB 와 뒤를 남긴다(DEGRADED 줄은 끝에 나온다)
+# 받는 감사(대상 라이브러리를 NIST 벡터와 대조하는 것): 옵션 → 그 감사가 쓰는 보고서 schema. 모두 PATH PARAM_SET 두 값을 받는다
+PQV_AUDITS = {"--audit-kem": "pq-verify/kem-audit-result", "--audit-dsa": "pq-verify/dsa-audit-result",
+              "--audit-slhdsa": "pq-verify/slhdsa-audit-result", "--audit-contained": "pq-verify/contained-audit-result"}
+# 감사와 함께 받는 옵션(값 하나를 받는 것, 값 없는 것). 그 밖의 옵션은 받지 않는다(줄임말도 받지 않는다: pq-verify 의 argparse 는
+# 줄임말을 받아서 '--liv' 가 '--live' 로 읽힌다)
+PQV_VALUE_OPTS = ("--symbol-prefix", "--kem-keypair", "--kem-encaps", "--kem-decaps", "--dsa-abi", "--dsa-symbol", "--slhdsa-symbol",
+                  "--accumulated", "--audit-timeout", "--fresh-seed", "--fresh-count")
+PQV_FLAG_OPTS = ("--constant-time", "--require-full-coverage", "--fail-on-finding")
+# 따로 까닭을 들어 막는 옵션(줄임말 포함)
+PQV_REFUSED = {
+    "--live": "네트워크에서 NIST 벡터를 새로 받는다(결과가 실행마다 달라질 수 있다). 고정 벡터로만 감사한다",
+    "--vector-dir": "고정 벡터 대신 다른 폴더의 벡터로 감사한다",
+    "--json": "보고서 경로는 PQ-Proof 가 증적 폴더 안으로 정해 붙인다",
+    "--sarif": "증적 폴더 밖에 파일을 쓴다(SARIF 는 pqproof sarif 로 증적에서 만든다)",
+    "--prompt-out": "증적 폴더 밖에 파일을 쓴다",
+    "--no-fail": "종료 코드로 문제를 알리지 않게 바꾼다",
+    "--audit-harness": "사용자 명령을 그대로 실행한다",
+    "--audit-source": "소스를 컴파일해 검사한다(CBMC)",
+    "--version": "감사가 아니다",
+    "--help": "감사가 아니다",
+}
+KEM_STAGES = ("keyGen", "encaps", "decaps", "ekCheck", "dkCheck", "edgeValid", "edgeEk", "edgeDk", "accumulated")  # scope 칸이 없는 KEM 감사의 완전성
+INPUT_CHECK_STAGES = frozenset({"ekCheck", "dkCheck", "edgeEk", "edgeDk"})  # FIPS 203 7.2·7.3 입력 검사(API 밖에서 해도 된다)
+_ENV_DROP_PREFIX = ("PQV_", "LD_", "DYLD_")
+_ENV_DROP = frozenset({"PYTHONPATH", "PYTHONHOME", "PYTHONSTARTUP", "PYTHONINSPECT"})
+
+
+def pqverify_args(text):
+    """--pq-verify 에 준 인자 글 → {"args": [인자], "audit": 감사 옵션, "target": 대상 경로(준 그대로), "target_index": args 안 자리,
+    "param_set": 파라미터 이름}. 셸 없이 shlex(POSIX 규칙)로 나눈다. 감사 옵션이 정확히 하나여야 하고, 막는 옵션·모르는 옵션·줄임말·
+    짧은 옵션·자리 인자는 ValueError(까닭)."""
+    import shlex
+    if not isinstance(text, str) or not text.strip():
+        raise ValueError("--pq-verify 에 pq-verify 인자를 준다(예: --pq-verify \"--audit-kem ./libmlkem.so ML-KEM-768\")")
+    try:
+        args = shlex.split(text, posix=True)
+    except ValueError as e:
+        raise ValueError(f"--pq-verify 인자를 나눌 수 없다({e}): 따옴표 짝을 맞춘다") from None
+    known = tuple(PQV_REFUSED) + tuple(PQV_AUDITS) + PQV_VALUE_OPTS + PQV_FLAG_OPTS
+    audit, target, i = None, None, 0
+    while i < len(args):
+        a = args[i]
+        if not a.startswith("-") or a == "-":
+            raise ValueError(f"pq-verify 인자 {a!r}: 옵션 값이 아닌 자리 인자는 받지 않는다")
+        if a == "--":
+            raise ValueError("pq-verify 인자에 '--' 는 받지 않는다")
+        if not a.startswith("--"):
+            raise ValueError(f"pq-verify 옵션 {a!r}: 짧은 옵션은 받지 않는다")
+        name, eq, value = a.partition("=")
+        refused = next((r for r in PQV_REFUSED if r == name or (len(name) > 2 and r.startswith(name))), None)
+        if refused:
+            raise ValueError(f"pq-verify 옵션 {name}" + (f"({refused} 의 줄임말)" if name != refused else "")
+                             + f" 는 받지 않는다: {PQV_REFUSED[refused]}")
+        if name not in known:
+            near = [k for k in known if k.startswith(name)]
+            if near:
+                raise ValueError(f"pq-verify 옵션 {name}: 줄여 쓰지 말고 전체 이름을 쓴다({', '.join(near[:3])})")
+            raise ValueError(f"pq-verify 옵션 {name} 는 받지 않는다. 받는 감사: {', '.join(PQV_AUDITS)}. 함께 받는 옵션: "
+                             f"{', '.join(PQV_VALUE_OPTS + PQV_FLAG_OPTS)}")
+        if name in PQV_AUDITS:
+            if eq:
+                raise ValueError(f"{name} 는 '{name} 경로 파라미터' 꼴로 준다")
+            if audit:
+                raise ValueError(f"감사는 하나만 준다({audit}, {name})")
+            vals = args[i + 1:i + 3]
+            if len(vals) != 2 or any(v.startswith("-") or not v for v in vals):
+                raise ValueError(f"{name} 뒤에 라이브러리 경로와 파라미터 이름(예: ML-KEM-768) 두 값을 준다")
+            audit, target = name, i + 1
+            i += 3
+        elif name in PQV_VALUE_OPTS:
+            if eq:
+                i += 1
+            elif i + 1 < len(args) and args[i + 1] and not args[i + 1].startswith("-"):
+                i += 2
+            else:
+                raise ValueError(f"{name} 뒤에 값을 준다('-' 로 시작하는 값은 {name}=값 꼴로 준다)")
+        else:  # 값 없는 옵션
+            if eq:
+                raise ValueError(f"{name} 는 값을 받지 않는다")
+            i += 1
+    if audit is None:
+        raise ValueError(f"감사 옵션이 없다. 하나를 준다: {', '.join(PQV_AUDITS)} (경로 파라미터)")
+    return {"args": args, "audit": audit, "target": args[target], "target_index": target, "param_set": args[target + 1]}
+
+
+def pqverify_argv(exe, spec, target_abs, report):
+    """실제로 부를 argv(셸 없음): [실행 파일, 사용자 인자(대상 경로는 절대 경로로), --require-full-coverage(없으면), --json 보고서]."""
+    args = list(spec["args"])
+    args[spec["target_index"]] = target_abs
+    if "--require-full-coverage" not in args:
+        args.append("--require-full-coverage")
+    return [exe] + args + ["--json", report]
+
+
+def pqverify_env(env):
+    """pq-verify 에 넘길 환경과 뺀 이름 목록. PQV_*(pq-verify 동작을 바꾼다: PQV_IN_PROCESS, PQV_CFL_SO 는 dlopen 된다), LD_*·DYLD_*
+    (불러올 라이브러리를 바꾼다), PYTHONPATH·PYTHONHOME·PYTHONSTARTUP·PYTHONINSPECT(pq-verify 는 파이썬 프로그램이다)를 뺀다."""
+    drop = sorted(k for k in env if k.startswith(_ENV_DROP_PREFIX) or k in _ENV_DROP)
+    return {k: v for k, v in env.items() if k not in drop}, drop
+
+
+def clip_text(text, limit=PQV_MAX_TEXT):
+    """실행 기록에 남길 글: 상한을 넘으면 앞 256 KiB 와 끝을 남기고 가운데를 줄였다고 적는다."""
+    if len(text) <= limit:
+        return text
+    head = 256 << 10
+    tail = limit - head
+    return text[:head] + f"\n[pqproof: {len(text) - head - tail:,} characters cut]\n" + text[-tail:]
+
+
+def pqverify_version(stdout):
+    """'pq-verify 2.19.0' → '2.19.0'(못 읽으면 '')."""
+    m = re.search(r"\bpq-verify\s+([0-9][0-9A-Za-z.+-]*)", stdout or "")
+    return m[1] if m else ""
+
+
+def _str(v, n=200):
+    return v[:n] if isinstance(v, str) else None
+
+
+def _int(v):
+    return v if isinstance(v, int) and not isinstance(v, bool) else None
+
+
+def _bool(v):
+    return v if isinstance(v, bool) else None
+
+
+SUMMARY_KEYS = ("audit", "problem", "exit_code", "schema", "schema_version", "tool_version", "status", "verified", "bound",
+                "artifact_sha256", "library_sha256", "target", "param_set", "checks_passed", "checks_total", "findings", "failed",
+                "missing", "scope", "scope_complete", "degraded", "unavailable")
+
+
+def pqverify_summary(audit, run, report, library_sha256=None, not_run=None):
+    """pq-verify 한 번의 결과에서 판정에 쓰는 칸만 뽑는다(dict, SUMMARY_KEYS). 증적 impl.nist.summary 에 남고 --verify 가 같은 입력으로
+    다시 뽑아 맞춘다.
+    audit: 감사 옵션(--audit-kem 등, 모르면 None). run: 감사 실행 기록 {exit_code, stdout, timed_out, error} 또는 None(돌리지 못함,
+    not_run 이 까닭). report: 보고서 바이트(쓰지 않았으면 None). library_sha256: PQ-Proof 가 잰 대상 파일 SHA-256(없으면 None)."""
+    s = dict.fromkeys(SUMMARY_KEYS)
+    s.update(audit=audit, library_sha256=library_sha256, failed=[], missing=[], unavailable=[], degraded=False)
+    if run is None:
+        s["problem"] = not_run or "pq-verify 를 돌리지 않았다"
+        return s
+    s["exit_code"] = run.get("exit_code")
+    stdout = run.get("stdout") or ""
+    s["degraded"] = bool(re.search(r"(?m)^\s*DEGRADED RUN\b", stdout))
+    if run.get("timed_out"):
+        s["problem"] = f"시간 초과({run.get('timeout')}초 안에 끝나지 않아 멈췄다)"
+        return s
+    if s["exit_code"] is None:
+        s["problem"] = f"pq-verify 를 띄우지 못했다({(run.get('error') or '').strip()[:200]})"
+        return s
+    if report is None:
+        last = next((x.strip() for x in reversed(stdout.splitlines()) if x.strip()), "")
+        s["problem"] = (f"pq-verify 입력 오류(종료 2): {last[:200]}" if s["exit_code"] == 2 else
+                        f"pq-verify 가 보고서를 쓰지 않았다(종료 {s['exit_code']})")
+        return s
+    if len(report) > PQV_MAX_REPORT:
+        s["problem"] = f"보고서가 {len(report):,}바이트로 상한 {PQV_MAX_REPORT:,}바이트를 넘는다(읽지 않음)"
+        return s
+    try:
+        doc = _loads_strict(report, "pq-verify 보고서")
+    except ValueError as e:
+        s["problem"] = str(e)[:300]
+        return s
+    if not isinstance(doc, dict):
+        s["problem"] = "pq-verify 보고서가 JSON 객체가 아니다"
+        return s
+    tool, art, summ = doc.get("tool"), doc.get("artifact"), doc.get("summary")
+    tool, art, summ = (x if isinstance(x, dict) else {} for x in (tool, art, summ))
+    s.update(schema=_str(doc.get("schema")), schema_version=_str(doc.get("schema_version")), tool_version=_str(tool.get("version")),
+             status=_str(doc.get("status")), verified=_bool(doc.get("verified")), bound=_bool(art.get("bound")),
+             artifact_sha256=_str(art.get("sha256"), 64), target=_str(art.get("path") or doc.get("library"), 500),
+             param_set=_str(doc.get("parameter_set")), checks_passed=_int(summ.get("checks_passed")),
+             checks_total=_int(summ.get("checks_total")), findings=_int(summ.get("findings")))
+    stages = doc.get("stages") if isinstance(doc.get("stages"), dict) else {}
+    for name, st in stages.items():
+        if not isinstance(st, dict) or _int(st.get("passed")) is None or _int(st.get("total")) is None:
+            s["failed"].append(f"{str(name)[:60]} (칸이 틀림)")
+        elif "unavailable" in str(name).lower():  # 'ct:unavailable' 처럼 돌지 못한 검사를 적는 단계: 통과 못 한 단계로 세지 않는다
+            s["unavailable"].append(f"{str(name)[:60]} (돌지 못함)")
+        elif st["passed"] < st["total"]:
+            s["failed"].append(f"{str(name)[:60]} {st['passed']}/{st['total']}")
+    s["failed"] = s["failed"][:40]
+    scope = doc.get("scope")
+    if isinstance(scope, dict):
+        s["scope_complete"] = _bool(scope.get("complete"))
+        s["scope"] = _str(scope.get("statement")) or ("complete" if s["scope_complete"] else "partial")
+    elif s["schema"] == PQV_AUDITS["--audit-kem"]:  # KEM 보고서에는 scope 칸이 없다: 필수 단계 아홉이 모두 돌았는지(total > 0)로 본다
+        s["missing"] = [n for n in KEM_STAGES if not (isinstance(stages.get(n), dict) and (_int(stages[n].get("total")) or 0) > 0)]
+        s["scope_complete"] = not s["missing"]
+        s["scope"] = "KEM 필수 단계 9개 모두 돎" if not s["missing"] else f"돌지 않은 KEM 필수 단계: {', '.join(s['missing'])}"
+    ct = doc.get("constant_time")
+    if isinstance(ct, dict) and ct.get("unavailable"):
+        s["unavailable"].insert(0, f"constant-time: {str(ct['unavailable'])[:160]}")
+    s["unavailable"] = s["unavailable"][:10]
+    return s
+
+
+def _target_text(s):
+    t = s.get("target") or ""
+    name = t.replace("\\", "/").rsplit("/", 1)[-1] if t else "대상 모름"
+    return f"{name} {s.get('param_set') or ''}".strip()
+
+
+def pqverify_status(s):
+    """요약(pqverify_summary) → (상태, 상세 글). 통과: 종료 0, VERIFIED, verified true, 감사 옵션에 맞는 보고서 꼴(schema 주 버전 1),
+    대상 파일에 묶임(artifact.bound, PQ-Proof 가 잰 SHA-256 과 같음), 검사 범위 완전(scope.complete, KEM 은 필수 단계 9개), 모든 검사 통과.
+    실패: 종료 1, FINDINGS PRESENT, verified false, 통과 못 한 검사 단계가 있음(DEGRADED 가 아니고 대상 파일에 묶였을 때. 돌지 못한
+    검사가 함께 있어도 통과 못 한 단계는 실패다). 그 밖은 미판정(건너뛴 검사는 통과가 아니다)."""
+    if s.get("problem"):
+        return "undecided", s["problem"]
+    head = f"{_target_text(s)}: pq-verify {s.get('tool_version') or '판 모름'}"
+    counts = f"검사 {s.get('checks_passed')}/{s.get('checks_total')}"
+    want = PQV_AUDITS.get(s.get("audit"))
+    if want is None:
+        return "undecided", f"{head}, 받는 감사 옵션({', '.join(PQV_AUDITS)})으로 돈 결과가 아니다"
+    if s.get("schema") != want:
+        return "undecided", f"{head}, 보고서 꼴 {s.get('schema')!r} 이 {s['audit']} 의 {want} 가 아니다"
+    if (s.get("schema_version") or "").split(".")[0] != PQV_SCHEMA_MAJOR:
+        return "undecided", f"{head}, 보고서 schema_version {s.get('schema_version')!r} 의 주 버전이 {PQV_SCHEMA_MAJOR} 이 아니다(이 판의 PQ-Proof 가 읽는 꼴이 아니다)"
+    if s.get("degraded"):
+        return "undecided", f"{head}, DEGRADED RUN(빠진 엔진·의존 때문에 돌지 않은 검사가 있다), {counts}"
+    if s.get("exit_code") not in (0, 1):
+        return "undecided", f"{head}, 종료 {s.get('exit_code')}(0 검증됨, 1 문제 있음이 아니다)"
+    if s.get("bound") is not True:
+        return "undecided", f"{head}, 보고서가 대상 파일에 묶이지 않았다(artifact.bound {s.get('bound')}): 대상을 불러 검사하지 못했다"
+    if s.get("library_sha256") and s.get("artifact_sha256") != s["library_sha256"]:
+        return "undecided", (f"{head}, pq-verify 가 감사한 파일(sha256 {str(s.get('artifact_sha256'))[:16]})이 PQ-Proof 가 잰 대상 "
+                             f"(sha256 {s['library_sha256'][:16]})과 다르다")
+    total, passed = s.get("checks_total"), s.get("checks_passed")
+    unavailable = s.get("unavailable") or []
+    if (s["exit_code"] == 0 and s.get("status") == "VERIFIED" and s.get("verified") is True and s.get("scope_complete") is True
+            and not s["failed"] and not unavailable and isinstance(total, int) and total > 0 and passed == total):
+        return "pass", f"{head}, VERIFIED, {counts}, 범위 완전({s.get('scope')})"
+    if s["exit_code"] == 1 and s.get("status") == "FINDINGS PRESENT" and s.get("verified") is False and s["failed"]:
+        names = {f.split(" ")[0] for f in s["failed"]}
+        note = (" (입력 검사 단계만 실패: FIPS 203 7.2·7.3 의 키 검사를 API 안에서 하지 않는다. 표준은 이 검사를 API 밖에서 해도 되지만 "
+                "그때는 호출자가 반드시 해야 한다)" if names <= INPUT_CHECK_STAGES else "")
+        also = f", 돌지 못한 검사도 있다: {'; '.join(unavailable[:3])}" if unavailable else ""
+        return "fail", f"{head}, FINDINGS PRESENT, {counts}, 통과 못 한 단계: {', '.join(s['failed'][:8])}{note}{also}"
+    if unavailable:
+        return "undecided", f"{head}, 돌지 못한 검사: {'; '.join(unavailable[:3])} ({counts})"
+    if s.get("status") == "VERIFIED" and s.get("scope_complete") is not True:
+        return "undecided", f"{head}, VERIFIED 지만 검사 범위가 완전하지 않다({s.get('scope') or '범위 칸 없음'}), {counts}"
+    if s.get("status") == "CANNOT VERIFY":
+        return "undecided", f"{head}, CANNOT VERIFY(pq-verify 가 검증하지 못했다), {counts}"
+    return "undecided", (f"{head}, 종료 {s['exit_code']} 와 보고서 status {s.get('status')!r}·verified {s.get('verified')} 가 통과나 실패 꼴이 "
+                         f"아니다, {counts}" + (f", 통과 못 한 단계: {', '.join(s['failed'][:8])}" if s["failed"] else ""))
+
+
+NIST_TITLE = "NIST PQC 구현 감사(pq-verify, 사용자가 켠 바깥 도구)"
+NIST_EXPECTED = ("pq-verify 감사(--require-full-coverage)가 종료 0·VERIFIED·검사 범위 완전이면 통과, 통과 못 한 검사 단계가 있으면 실패, "
+                 "그 밖(입력 오류, DEGRADED, 범위 불완전, 돌지 못한 검사, 실행 파일 없음, 보고서 깨짐)은 미판정")
+
+
+def nist_check_row(nist):
+    """검사 행 i-nist. nist: 증적 impl.nist(없으면 None: --pq-verify 를 주지 않아 해당 없음)."""
+    if nist is None:
+        status, actual = "na", "--pq-verify 를 주지 않았다(NIST 구현 감사를 하지 않음)"
+    else:
+        status, actual = pqverify_status(nist["summary"])
+    return {"id": NIST_CHECK_ID, "title": NIST_TITLE, "status": status, "expected": NIST_EXPECTED, "actual": actual}

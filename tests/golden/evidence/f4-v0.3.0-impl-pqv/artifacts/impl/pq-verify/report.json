@@ -1,0 +1,109 @@
+{
+  "schema": "pq-verify/kem-audit-result",
+  "schema_version": "1.2",
+  "tool": {
+    "name": "pq-verify",
+    "version": "2.19.0"
+  },
+  "timestamp": "2026-11-19T12:04:02.168946+00:00",
+  "artifact": {
+    "bound": true,
+    "sha256": "21e5cdbd3da1531fe473cb7f0a4da039c551683c8fc8c6e1c400c923eaa9ac28",
+    "path": "/tmp/work/lib/libmlkem768_good.dylib",
+    "summary": "sha256 21e5cdbd3da1531fe473cb7f0a4da039c551683c8fc8c6e1c400c923eaa9ac28",
+    "detail": "The audited computation was performed by this file.",
+    "isolation": "child process",
+    "loaded_objects": [
+      {
+        "path": "/tmp/work/lib/libmlkem768_good.dylib",
+        "inode": 102037427,
+        "sha256": "21e5cdbd3da1531fe473cb7f0a4da039c551683c8fc8c6e1c400c923eaa9ac28"
+      }
+    ]
+  },
+  "side_channel": {
+    "measured": false,
+    "summary": "not measured \u2014 execution time, power and electromagnetic behaviour were not observed",
+    "detail": "pq-verify compares values against NIST's published answers. It does not execute the implementation under measurement and cannot detect a timing-dependent, cache-dependent or power-dependent implementation that computes the correct result. Establishing that requires leakage assessment against the deployed binary on the deployed hardware."
+  },
+  "parameter_set": "ML-KEM-768",
+  "library": "/tmp/work/lib/libmlkem768_good.dylib",
+  "status": "VERIFIED",
+  "verified": true,
+  "symbols": {
+    "keypair": "PQCP_MLKEM_NATIVE_MLKEM768_keypair_derand",
+    "encaps": "PQCP_MLKEM_NATIVE_MLKEM768_enc_derand",
+    "decaps": "PQCP_MLKEM_NATIVE_MLKEM768_dec"
+  },
+  "summary": {
+    "checks_passed": 1436,
+    "checks_total": 1436,
+    "findings": 0
+  },
+  "accumulated": {
+    "cases": 10000,
+    "ok": true,
+    "detail": "10,000 cases: digest 8a518cc63da36632\u2026 matches (Go 1.26.1 crypto/mlkem TestAccumulated (published))",
+    "source": "Go 1.26.1 crypto/mlkem TestAccumulated (published)"
+  },
+  "stages": {
+    "keyGen": {
+      "passed": 25,
+      "total": 25
+    },
+    "encaps": {
+      "passed": 25,
+      "total": 25
+    },
+    "decaps": {
+      "passed": 10,
+      "total": 10
+    },
+    "dkCheck": {
+      "passed": 10,
+      "total": 10
+    },
+    "ekCheck": {
+      "passed": 10,
+      "total": 10
+    },
+    "edgeValid": {
+      "passed": 461,
+      "total": 461
+    },
+    "edgeEk": {
+      "passed": 892,
+      "total": 892
+    },
+    "edgeDk": {
+      "passed": 2,
+      "total": 2
+    },
+    "accumulated": {
+      "passed": 1,
+      "total": 1
+    }
+  },
+  "bounds": {
+    "calls": 41596,
+    "outside_total": 0,
+    "outside": [],
+    "guard_bytes": 64
+  },
+  "keycheck": {
+    "dkCheck": {
+      "accepted_invalid": 0,
+      "rejected_valid": 0
+    },
+    "ekCheck": {
+      "accepted_invalid": 0,
+      "rejected_valid": 0
+    }
+  },
+  "edge": {
+    "vectors": "Wycheproof 3fa63dd, CCTV 50a8ecf",
+    "not_applicable": 64,
+    "failures": []
+  },
+  "findings": []
+}

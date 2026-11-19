@@ -1,0 +1,140 @@
+{
+  "schema": "pq-verify/dsa-audit-result",
+  "schema_version": "1.2",
+  "tool": {
+    "name": "pq-verify",
+    "version": "2.19.0"
+  },
+  "timestamp": "<TIMESTAMP>",
+  "artifact": {
+    "bound": true,
+    "sha256": "c7316191f6131e8f66ebf46558e0966d249d98d043aeabffe1a289fb871968a8",
+    "path": "<BUILD>/dsa/libpqclean_mldsa65.dylib",
+    "summary": "sha256 c7316191f6131e8f66ebf46558e0966d249d98d043aeabffe1a289fb871968a8",
+    "detail": "The audited computation was performed by this file.",
+    "isolation": "child process",
+    "loaded_objects": [
+      {
+        "path": "<BUILD>/dsa/libpqclean_mldsa65.dylib",
+        "inode": null,
+        "sha256": "c7316191f6131e8f66ebf46558e0966d249d98d043aeabffe1a289fb871968a8"
+      }
+    ]
+  },
+  "side_channel": {
+    "measured": false,
+    "summary": "not measured - execution time, power and electromagnetic behaviour were not observed",
+    "detail": "pq-verify compares values against NIST's published answers. It does not execute the implementation under measurement and cannot detect a timing-dependent, cache-dependent or power-dependent implementation that computes the correct result. Establishing that requires leakage assessment against the deployed binary on the deployed hardware."
+  },
+  "parameter_set": "ML-DSA-65",
+  "library": "<BUILD>/dsa/libpqclean_mldsa65.dylib",
+  "verified": true,
+  "status": "VERIFIED",
+  "calling_convention": "pqcrystals",
+  "randomness_harness": true,
+  "symbols": {
+    "keypair": "PQCLEAN_MLDSA65_CLEAN_crypto_sign_keypair",
+    "sign_ctx": "PQCLEAN_MLDSA65_CLEAN_crypto_sign_signature_ctx",
+    "verify_ctx": "PQCLEAN_MLDSA65_CLEAN_crypto_sign_verify_ctx",
+    "rng": "pqv_rng_set"
+  },
+  "stages": {
+    "keyGen": {
+      "passed": 25,
+      "total": 25,
+      "via": "PQCLEAN_MLDSA65_CLEAN_crypto_sign_keypair"
+    },
+    "sigGenPure": {
+      "passed": 30,
+      "total": 30,
+      "via": "PQCLEAN_MLDSA65_CLEAN_crypto_sign_signature_ctx"
+    },
+    "sigVerPure": {
+      "passed": 15,
+      "total": 15,
+      "via": "PQCLEAN_MLDSA65_CLEAN_crypto_sign_verify_ctx"
+    },
+    "edge:sigVerify": {
+      "passed": 203,
+      "total": 203,
+      "via": null
+    },
+    "edge:sigGen": {
+      "passed": 85,
+      "total": 85,
+      "via": null
+    },
+    "edge:edgeLength": {
+      "passed": 3,
+      "total": 3,
+      "via": null
+    },
+    "accumulated": {
+      "passed": 1,
+      "total": 1,
+      "via": null
+    }
+  },
+  "not_applicable": {
+    "sigGenPreHash": {
+      "count": 30,
+      "reason": "no pre-hash signing entry point"
+    },
+    "sigGenMu": {
+      "count": 30,
+      "reason": "no external-mu signing entry point"
+    },
+    "sigGenInternal": {
+      "count": 30,
+      "reason": "no signature_internal entry point"
+    },
+    "sigVerPreHash": {
+      "count": 15,
+      "reason": "no pre-hash verification entry point"
+    },
+    "sigVerMu": {
+      "count": 15,
+      "reason": "no external-mu verification entry point"
+    },
+    "sigVerInternal": {
+      "count": 15,
+      "reason": "no verify_internal entry point"
+    },
+    "preHashVerify": {
+      "count": 12,
+      "reason": "no pre-hash verification entry point"
+    }
+  },
+  "edge": {
+    "vectors": "Wycheproof 3fa63dd, CCTV 50a8ecf",
+    "not_applicable": 24,
+    "failures": []
+  },
+  "bounds": {
+    "calls": 30463,
+    "outside_total": 0,
+    "outside": [],
+    "guard_bytes": 64
+  },
+  "accumulated": {
+    "cases": 10000,
+    "ok": true,
+    "detail": "10,000 cases: digest 5ff5e196f0b830c3… matches (C2SP CCTV 50a8ecf ML-DSA/accumulated (published))",
+    "source": "C2SP CCTV 50a8ecf ML-DSA/accumulated (published)"
+  },
+  "failures": [],
+  "findings": [],
+  "summary": {
+    "checks_passed": 362,
+    "checks_total": 362,
+    "not_applicable": 171,
+    "findings": 0
+  },
+  "scope": {
+    "complete": false,
+    "checked": 362,
+    "not_applicable": 171,
+    "not_run": 0,
+    "statement": "partial: 362 checked; 171 not applicable (the library exports no entry point for them)"
+  }
+}

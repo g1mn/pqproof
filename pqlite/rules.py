@@ -970,11 +970,13 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
 
 
 # ---------------------------------------------------------------------------------------------
-# 구현 검증(impl, KpqC KAT 대조): 검사 한 줄 i-kpqc 와 판정. 파라미터별 판정(어느 참조판과 맞는가, 받아 줄 판인가)은 pqlite/impl.py 의
-# match_versions·control_problem 이 하고, 검사 행은 impl.check_row 가 만든다(--verify 가 같은 함수로 다시 만들어 맞춘다).
-def judge_impl(results, control, problem, derive_verdict):
+# 구현 검증(impl): 검사 두 줄 i-kpqc(KpqC KAT 대조)·i-nist(pq-verify 다리)와 판정. 파라미터별 판정(어느 참조판과 맞는가, 받아 줄 판인가)은
+# pqlite/impl.py 의 match_versions·control_problem 이, pq-verify 보고서 판정은 pqverify_status 가 하고, 검사 행은 impl.check_row·
+# impl.nist_check_row 가 만든다(--verify 가 같은 함수로 다시 만들어 맞춘다).
+def judge_impl(results, control, problem, derive_verdict, nist=None, answered=True):
     """(checks, verdict). results: impl.match_versions 결과(파라미터마다), control: 자기 점검 까닭(None 이면 통과), problem: 답안 전체의
     문제(읽지 못함, 모르는 파라미터, 64 MiB 상한). 자기 점검 실패와 답안 문제는 미판정이다(건너뛴 대조는 통과가 아니다).
-    derive_verdict 는 pqlite/receipt.py 의 것(실패 > 미판정 > 통과, 검토 필요는 판정을 바꾸지 않는다)."""
-    checks = [impl.check_row(results, control, problem)]
+    nist: 증적 impl.nist(--pq-verify 를 안 줬으면 None, i-nist 해당 없음). answered: 답안을 줬는가(안 줬으면 i-kpqc 해당 없음).
+    derive_verdict 는 pqlite/receipt.py 의 것(실패 > 미판정 > 통과, 검토 필요·해당 없음은 판정을 바꾸지 않는다)."""
+    checks = [impl.check_row(results, control, problem, answered), impl.nist_check_row(nist)]
     return checks, derive_verdict(checks)

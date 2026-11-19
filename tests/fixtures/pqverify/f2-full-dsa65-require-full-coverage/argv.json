@@ -1,0 +1,11 @@
+{
+ "argv": [
+  "pq-verify",
+  "--audit-dsa",
+  "<BUILD>/dsa/libpqclean_mldsa65.dylib",
+  "ML-DSA-65",
+  "--require-full-coverage",
+  "--json",
+  "<OUT>/report.json"
+ ]
+}

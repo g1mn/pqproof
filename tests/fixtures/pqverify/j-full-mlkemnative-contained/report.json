@@ -1,0 +1,54 @@
+{
+  "schema": "pq-verify/contained-audit-result",
+  "schema_version": "1.2",
+  "tool": {
+    "name": "pq-verify",
+    "version": "2.19.0"
+  },
+  "timestamp": "<TIMESTAMP>",
+  "artifact": {
+    "bound": false,
+    "sha256": null,
+    "path": null,
+    "summary": "none - the contained worker needs Linux (seccomp, memfd, /proc); this is darwin",
+    "detail": "No binary was loaded, so the result is not bound to any artifact."
+  },
+  "side_channel": {
+    "measured": false,
+    "summary": "not measured - execution time, power and electromagnetic behaviour were not observed",
+    "detail": "pq-verify compares values against NIST's published answers. It does not execute the implementation under measurement and cannot detect a timing-dependent, cache-dependent or power-dependent implementation that computes the correct result. Establishing that requires leakage assessment against the deployed binary on the deployed hardware."
+  },
+  "protocol": "crucible-jsonl (pq-verify's contained worker)",
+  "parameter_set": "ML-KEM-768",
+  "implementation": null,
+  "command": null,
+  "vectors": null,
+  "deterministic": null,
+  "harness_notes": null,
+  "calls": null,
+  "status": "CANNOT VERIFY",
+  "verified": false,
+  "stages": {},
+  "not_applicable": {},
+  "failures": [],
+  "findings": [
+    "cannot verify: the contained worker needs Linux (seccomp, memfd, /proc); this is darwin"
+  ],
+  "summary": {
+    "checks_passed": 0,
+    "checks_total": 0,
+    "not_applicable": 0,
+    "findings": 1
+  },
+  "scope": {
+    "complete": false,
+    "checked": 0,
+    "not_applicable": 0,
+    "not_run": 0,
+    "statement": "nothing checked"
+  },
+  "library": "<BUILD>/good-mlkemnative/libmlkemnative768_good.dylib",
+  "symbols": null,
+  "containment": null,
+  "fresh": null
+}

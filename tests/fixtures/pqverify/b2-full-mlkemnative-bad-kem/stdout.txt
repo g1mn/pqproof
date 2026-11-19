@@ -1,0 +1,34 @@
+  artifact: sha256 630f4090ca4bc5ce7d7c5b13fc832dfcc4a6748cbe85cd96481982fe0ceb841c
+====================================================================
+  THIRD-PARTY KEM AUDIT - ML-KEM-768
+  library : libmlkemnative768_bad.dylib
+  keygen  : PQCP_MLKEM_NATIVE_MLKEM768_keypair_derand
+  encaps  : PQCP_MLKEM_NATIVE_MLKEM768_enc_derand
+  decaps  : PQCP_MLKEM_NATIVE_MLKEM768_dec
+  vectors : pinned (NIST ACVP-Server 15c0f3d, ad33b3d)
+====================================================================
+  PASS  keyGen   25/25  byte-exact vs NIST
+  PASS  encaps   25/25  byte-exact vs NIST
+  FAIL  decaps   0/10  byte-exact vs NIST
+  PASS  ekCheck  10/10  encapsulation keys classified as NIST does (FIPS 203 §7.2)
+  PASS  dkCheck  10/10  decapsulation keys classified as NIST does (FIPS 203 §7.3)
+  edge cases: Wycheproof 3fa63dd, CCTV 50a8ecf
+  FAIL  edgeValid 295/461  edge-case vectors reproduced byte-for-byte
+  PASS  edgeEk    892/892  invalid encapsulation keys refused (every q..4095, every position)
+  PASS  edgeDk    2/2  invalid decapsulation keys refused
+        ✗ wycheproof mlkem_768_test #1 (CCTV/strcmp) ['Strcmp']: K differs
+        ✗ wycheproof mlkem_768_test #2 (FIPS 203) []: K differs
+        ✗ wycheproof mlkem_768_test #3 (FIPS 203) []: K differs
+        ... and more; see the JSON report
+        64 wrong-length vectors not applicable: a C entry point takes fixed-size buffers
+  FAIL  accumulated 0/1  case 0: Decaps(dk, Encaps(ek, m)) returned a different key
+  PASS  bounds   1600 calls, none wrote outside its buffers (64 guard bytes each side)
+====================================================================
+  RESULT: 1259/1436 - FINDINGS PRESENT
+  This audits the vendor's OWN keygen/encaps/decaps against
+  NIST's published vectors, including the invalid keys it
+  must refuse. It is not a side-channel review.
+====================================================================
+  FAILING: KEM audit FINDINGS PRESENT
+  wrote <OUT>/report.json  (report for --audit-kem; artifact: sha256 630f4090ca4bc5ce7d7c5b13fc832dfcc4a6748cbe85cd96481982fe0ceb841c)
+  INTEGRITY: nothing this run needed was missing (no field engines were required).

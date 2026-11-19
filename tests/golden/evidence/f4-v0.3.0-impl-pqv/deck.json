@@ -1,0 +1,51 @@
+{
+ "verdict": "pass",
+ "verdict_text": "통과(검토 필요 검사 i-kpqc)",
+ "verdict_text_en": "pass (needs review: i-kpqc)",
+ "receipt": "747800c9ab01",
+ "receipt_file": "/tmp/work/impl-out/receipt.json",
+ "mode": "impl",
+ "impl": [
+  {
+   "param": "smaug-t/modet",
+   "name": "SMAUG-T",
+   "status": "review",
+   "matched": [
+    "1.1.1"
+   ],
+   "summary": "옛 판 1.1.1 일치(문항 10/10): 받아 줄 판(1.2.0)이 아니다"
+  }
+ ],
+ "accept": [
+  "smaug-t/modet@1.2.0"
+ ],
+ "control_ok": true,
+ "nist": {
+  "status": "pass",
+  "detail": "libmlkem768_good.dylib ML-KEM-768: pq-verify 2.19.0, VERIFIED, 검사 1436/1436, 범위 완전(KEM 필수 단계 9개 모두 돎)",
+  "audit": "--audit-kem",
+  "param_set": "ML-KEM-768",
+  "tool_version": "2.19.0",
+  "checks_passed": 1436,
+  "checks_total": 1436
+ },
+ "checks": [
+  {
+   "id": "i-kpqc",
+   "status": "review",
+   "label": "KpqC 참조판 KAT 일치"
+  },
+  {
+   "id": "i-nist",
+   "status": "pass",
+   "label": "NIST PQC 구현 감사(pq-verify)"
+  }
+ ],
+ "verify_cmd": "bash prove.sh --verify /tmp/work/impl-out",
+ "ev": [
+  "impl-out.txt"
+ ],
+ "tool_version": "0.3.0",
+ "ruleset_version": "3",
+ "format_version": 4
+}

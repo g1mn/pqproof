@@ -1,0 +1,40 @@
+{
+  "schema": "pq-verify/acvp-result",
+  "schema_version": "1.2",
+  "tool": {
+    "name": "pq-verify",
+    "version": "2.19.0"
+  },
+  "timestamp": "<TIMESTAMP>",
+  "artifact": {
+    "bound": false,
+    "sha256": null,
+    "path": null,
+    "summary": "none - reference-chain conformance, no vendor binary loaded",
+    "detail": "No binary was loaded, so the result is not bound to any artifact."
+  },
+  "side_channel": {
+    "measured": false,
+    "summary": "not measured - execution time, power and electromagnetic behaviour were not observed",
+    "detail": "pq-verify compares values against NIST's published answers. It does not execute the implementation under measurement and cannot detect a timing-dependent, cache-dependent or power-dependent implementation that computes the correct result. Establishing that requires leakage assessment against the deployed binary on the deployed hardware."
+  },
+  "suites": {
+    "ML-KEM (FIPS 203)": {
+      "ran": false,
+      "checks_passed": 0,
+      "checks_total": 0,
+      "verified": false
+    }
+  },
+  "groups": {},
+  "summary": {
+    "checks_passed": 0,
+    "checks_total": 0,
+    "findings": 0,
+    "not_run": [
+      "ML-KEM (FIPS 203)"
+    ]
+  },
+  "verified": false,
+  "status": "CANNOT VERIFY"
+}

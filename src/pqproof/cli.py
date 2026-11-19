@@ -5,7 +5,8 @@
 #   pqproof doctor          바깥 도구 점검표(bash, openssl, keytool, tls_probe, go)
 #   pqproof build-probe     tls_probe 를 사용자 캐시 폴더에 빌드(Go 1.27+, 인터넷 없음)
 #   pqproof mutations [--strict]   심어 둔 결함 시험 묶음
-#   pqproof impl prompt|judge ...  구현 검증(KpqC KAT 대조). 파이썬만 쓴다(bash 없이, Windows 에서도). 구현은 실행하지 않는다
+#   pqproof impl prompt|judge ...  구현 검증(KpqC KAT 대조). 파이썬만 쓴다(bash 없이, Windows 에서도). 구현은 실행하지 않는다.
+#                                  judge --pq-verify "<인자>" 는 사용자가 따로 설치한 pq-verify 로 NIST PQC 구현 감사도 한다(i-nist)
 # 도구 본체는 패키지 데이터 pqproof/_tool(설치본) 또는 저장소 루트(소스에서 실행)에서 찾는다. PQPROOF_HOME 으로 바꿀 수 있다.
 # prove.sh 는 이 파이썬(sys.executable)으로 돌게 PYTHON 을 넘긴다. 판정 출력의 다시 확인 안내가 pqproof 로 나오게 PQPROOF_ENTRY 도 넘긴다.
 # 재검증(--verify)·--version·sarif·--env 는 bash 없이 이 파이썬으로만 돈다(Windows 에서도). 스캔·시험은 bash·grep·awk·OpenSSL 이
@@ -23,9 +24,11 @@ USAGE = """usage:
   pqproof check <dir|zip>                          judge one tree as it is now (no original: after the migration, in CI)
   pqproof inventory <dir|zip>                      no verdict: CBOM rows, classical lines per family, PQC name lines
   pqproof impl prompt [--param P ...] [-o file]    KpqC implementation check: write the question sheet your harness answers
-  pqproof impl judge <answers.json|kat.rsp> [--param P]
+  pqproof impl judge [<answers.json|kat.rsp>] [--param P] [--pq-verify "ARGS"]
                                                    compare the answers with pinned reference KAT versions, write the evidence
-                                                   folder (PQ-Proof does not run your code; a KAT match, not a certification)
+                                                   folder (PQ-Proof does not run your code; a KAT match, not a certification).
+                                                   --pq-verify "--audit-kem LIB ML-KEM-768" also runs pq-verify (installed apart,
+                                                   PQ_VERIFY or PATH) on a NIST PQC library: pq-verify runs that library
   pqproof --verify <out dir>                       re-check an evidence folder (schema, receipt_id, file hashes, HTML)
   pqproof --unit [name]                            unit tests (standard library unittest)
   pqproof --selftest                               offline self-test on the bundled examples
@@ -131,7 +134,7 @@ def preflight(root, inputs=(), quiet=False):
 
 
 def doctor(root):
-    rep = deps.check(bin_dir=probe_dir(root), need_tls=False)
+    rep = deps.check(bin_dir=probe_dir(root), need_tls=False, need_pqverify=False)
     print(f"PQ-Proof {__version__}")
     print(f"tool: {root}")
     print(f"python: {sys.executable} ({sys.version.split()[0]})")
@@ -208,9 +211,12 @@ def main(argv=None):
         return run([sys.executable, "-I", "-B", os.path.join(root, "pqlite", "receipt.py"), "verify", argv[1]], dict(os.environ))
     if first == "impl":  # 구현 검증: 파이썬만 쓴다(bash·openssl 점검 없이, Windows 에서도)
         if len(argv) < 2 or argv[1] not in ("prompt", "judge"):
-            print("usage: pqproof impl prompt [--param P ...] [-o file] | pqproof impl judge <answers.json|kat.rsp> [--param P]",
-                  file=sys.stderr)
+            print("usage: pqproof impl prompt [--param P ...] [-o file] | pqproof impl judge [<answers.json|kat.rsp>] [--param P] "
+                  "[--pq-verify \"ARGS\"]", file=sys.stderr)
             return 2
+        if "--pq-verify" in argv[2:]:  # pq-verify 가 없으면 미리 알린다(판정은 i-nist 미판정으로 남는다)
+            for w in deps.pqv_line(deps.Report(), os.environ, need=True).warnings:
+                print(f"pqproof: warning: {w}", file=sys.stderr)
         return run([sys.executable, "-I", "-B", os.path.join(root, "prove.py"), "--impl"] + argv[1:], child_env(root, entry=True))
     if is_windows():
         print(WINDOWS, file=sys.stderr)

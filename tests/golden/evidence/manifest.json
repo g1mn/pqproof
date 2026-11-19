@@ -182,15 +182,16 @@
   },
   {
    "name": "f4-v0.3.0-impl",
-   "label": "0.3.0 (evidence format 4, ruleset 3), implementation check: answers built from the KAT excerpts as an implementation of the old SMAUG-T 1.1.1 modet would give them: pass, i-kpqc needs review",
+   "label": "0.3.0 (evidence format 4, ruleset 3), implementation check: answers built from the KAT excerpts as an implementation of the old SMAUG-T 1.1.1 modet would give them, no --pq-verify: pass, i-kpqc needs review, i-nist not applicable",
    "format_version": 4,
    "verdict": "pass",
    "checks": {
-    "i-kpqc": "review"
+    "i-kpqc": "review",
+    "i-nist": "na"
    },
-   "receipt_id": "f9e7d33be37562182fbb4afa001b676458bc9aa2cf5dbbcb4a3f5e79f2e855a7",
-   "source_receipt_id": "3fb4988abb622812fc5349d28a3a82454c489de39718f473c18a68758687f084",
-   "source_receipt_html_sha256": "dcc64df6b55035940ddddc4bb931d14ac528d2e2bfa5803e5263ef2b1892d140",
+   "receipt_id": "f194b5a85e15026308bc639499b0735446a07b2af39e953ad5fbecbc47353602",
+   "source_receipt_id": "be85cd46194cac30bce1458704c32cb8bb45e09b65bc8a988784b4489c2e5518",
+   "source_receipt_html_sha256": "59f26e32cddd90a1d04b6032ab3636d32d8cdbdfeea792df7fb21b1147f37cf3",
    "source_verified_by_this_tool": true,
    "paths_replaced": [
     "/tmp/work/impl-out",
@@ -198,6 +199,31 @@
     "/opt/pqproof"
    ],
    "report_section_removed": null
+  },
+  {
+   "name": "f4-v0.3.0-impl-pqv",
+   "label": "0.3.0 (evidence format 4, ruleset 3), implementation check with --pq-verify: the same SMAUG-T 1.1.1 modet answers and a pq-verify 2.19.0 --audit-kem run on an mlkem-native ML-KEM-768 library: pass, i-kpqc needs review, i-nist pass",
+   "format_version": 4,
+   "verdict": "pass",
+   "checks": {
+    "i-kpqc": "review",
+    "i-nist": "pass"
+   },
+   "receipt_id": "747800c9ab015765cdc50a32492b7d964a4734f826f8f6972284adeb3cc0ed20",
+   "source_receipt_id": "e49ce70bfd236c0441da4a0c53de00a3bc8fd2d72b2bf0ebee2ea6578e841ed9",
+   "source_receipt_html_sha256": "945abf34f7dbcdf8eaea59700e00c1253729d0e802f9c63e622ebb819a8c9303",
+   "source_verified_by_this_tool": true,
+   "paths_replaced": [
+    "/tmp/work/impl-out",
+    "/tmp/work",
+    "/opt/pq-verify",
+    "/opt/pqproof"
+   ],
+   "report_section_removed": null,
+   "strings_replaced": {
+    "count": 1,
+    "why": "em dash (U+2014) in pq-verify output replaced with a hyphen"
+   }
   }
  ]
 }

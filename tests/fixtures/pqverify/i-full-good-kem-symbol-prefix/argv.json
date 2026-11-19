@@ -1,0 +1,12 @@
+{
+ "argv": [
+  "pq-verify",
+  "--audit-kem",
+  "<BUILD>/good/libpqclean_mlkem768.dylib",
+  "ML-KEM-768",
+  "--symbol-prefix",
+  "PQCLEAN_MLKEM768_CLEAN_",
+  "--json",
+  "<OUT>/report.json"
+ ]
+}

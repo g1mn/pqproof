@@ -1,0 +1,11 @@
+{
+ "argv": [
+  "pq-verify",
+  "--audit-kem",
+  "<BUILD>/good-mlkemnative/libmlkemnative768_good.dylib",
+  "ML-KEM-768",
+  "--require-full-coverage",
+  "--json",
+  "<OUT>/report.json"
+ ]
+}
