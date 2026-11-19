@@ -1,0 +1,98 @@
+[
+  {
+    "algorithm": "ML-KEM-768",
+    "auto_fix": false,
+    "blocks_hybrid": false,
+    "component": "java",
+    "detail": "PQC 이름: ML-KEM-768",
+    "kind": "pqc-parameter",
+    "line": 17,
+    "nist": "ML-KEM (FIPS 203)",
+    "path": "src/main/java/demo/sealer/Sealer.java",
+    "threat": "pqc"
+  },
+  {
+    "algorithm": "ML-DSA-65",
+    "auto_fix": false,
+    "blocks_hybrid": false,
+    "component": "java",
+    "detail": "PQC 이름: ML-DSA-65",
+    "kind": "pqc-parameter",
+    "line": 18,
+    "nist": "ML-DSA (FIPS 204)",
+    "path": "src/main/java/demo/sealer/Sealer.java",
+    "threat": "pqc"
+  },
+  {
+    "algorithm": "ML-KEM-768",
+    "auto_fix": false,
+    "blocks_hybrid": false,
+    "component": "java",
+    "detail": "KeyPairGenerator.getInstance(상수): ML-KEM-768",
+    "kind": "key-generation",
+    "line": 22,
+    "nist": "ML-KEM (FIPS 203)",
+    "path": "src/main/java/demo/sealer/Sealer.java",
+    "threat": "pqc"
+  },
+  {
+    "algorithm": "ML-DSA-65",
+    "auto_fix": false,
+    "blocks_hybrid": false,
+    "component": "java",
+    "detail": "KeyPairGenerator.getInstance(상수): ML-DSA-65",
+    "kind": "key-generation",
+    "line": 26,
+    "nist": "ML-DSA (FIPS 204)",
+    "path": "src/main/java/demo/sealer/Sealer.java",
+    "threat": "pqc"
+  },
+  {
+    "algorithm": "ML-KEM",
+    "auto_fix": false,
+    "blocks_hybrid": false,
+    "component": "java",
+    "detail": "KEM.getInstance: ML-KEM(매개변수는 다른 줄)",
+    "kind": "key-encapsulation",
+    "line": 30,
+    "nist": "ML-KEM (FIPS 203)",
+    "path": "src/main/java/demo/sealer/Sealer.java",
+    "threat": "pqc"
+  },
+  {
+    "algorithm": "ML-KEM",
+    "auto_fix": false,
+    "blocks_hybrid": false,
+    "component": "java",
+    "detail": "KEM.getInstance: ML-KEM(매개변수는 다른 줄)",
+    "kind": "key-encapsulation",
+    "line": 39,
+    "nist": "ML-KEM (FIPS 203)",
+    "path": "src/main/java/demo/sealer/Sealer.java",
+    "threat": "pqc"
+  },
+  {
+    "algorithm": "ML-DSA-65",
+    "auto_fix": false,
+    "blocks_hybrid": false,
+    "component": "java",
+    "detail": "Signature.getInstance(상수): ML-DSA-65",
+    "kind": "signature",
+    "line": 46,
+    "nist": "ML-DSA (FIPS 204)",
+    "path": "src/main/java/demo/sealer/Sealer.java",
+    "threat": "pqc"
+  },
+  {
+    "algorithm": "ML-DSA-65",
+    "auto_fix": false,
+    "blocks_hybrid": false,
+    "component": "java",
+    "detail": "Signature.getInstance(상수): ML-DSA-65",
+    "kind": "signature",
+    "line": 53,
+    "nist": "ML-DSA (FIPS 204)",
+    "path": "src/main/java/demo/sealer/Sealer.java",
+    "threat": "pqc"
+  }
+]

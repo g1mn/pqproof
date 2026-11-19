@@ -129,6 +129,56 @@
     "/opt/pqproof"
    ],
    "report_section_removed": null
+  },
+  {
+   "name": "f3-v0.2.0",
+   "label": "0.2.0 (evidence format 3, ruleset 2), examples/classic against examples/pqc with the example allowlist, whose two entries name files that are not in this tree (invalid): pass",
+   "format_version": 3,
+   "verdict": "pass",
+   "checks": {
+    "a-input": "pass",
+    "a-cbom": "pass",
+    "b-weakening": "pass",
+    "b-tls": "na",
+    "c-classic": "pass",
+    "c-expect": "pass",
+    "r-review": "pass",
+    "r-allow": "na"
+   },
+   "receipt_id": "ce6c4c9d6cb7027e5553cb290984cd83d37ed21c560f1289c505dbdf28b06b47",
+   "source_receipt_id": "fa7cf95195dd3f10d0d50a5e66a62b1967c049b85d640b430df65ae8325f7142",
+   "source_receipt_html_sha256": "a447612370fdfafdaa01f0fe0785437def61e5ac45e6afdbd48cdece45b633f7",
+   "source_verified_by_this_tool": true,
+   "paths_replaced": [
+    "/tmp/work/proof-out",
+    "/opt/pqproof"
+   ],
+   "report_section_removed": null
+  },
+  {
+   "name": "f3-v0.2.0-check",
+   "label": "0.2.0 (evidence format 3, ruleset 2), check mode (params.mode check) on examples/pqc: pass, the two-tree checks not applicable",
+   "format_version": 3,
+   "verdict": "pass",
+   "checks": {
+    "a-input": "na",
+    "a-cbom": "pass",
+    "b-weakening": "na",
+    "b-tls": "na",
+    "c-classic": "pass",
+    "c-expect": "pass",
+    "r-review": "na",
+    "r-allow": "na"
+   },
+   "receipt_id": "2b1bd9ea8758d38ec42d1ee514cd14e51272b5c84cc9e5313c02170367868a72",
+   "source_receipt_id": "cef4889a6a50b930c5940cbd9330921d7d8c2bc5123f9820221b41cc7cca7c0e",
+   "source_receipt_html_sha256": "7a7046bcf5448f8983279cb955fd6d5c1c3215b0ed3ebd9dc5b0a8ce84801c88",
+   "source_verified_by_this_tool": true,
+   "paths_replaced": [
+    "/tmp/work/check-out",
+    "/opt/pqproof"
+   ],
+   "report_section_removed": null
   }
  ]
 }

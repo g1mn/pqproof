@@ -9,7 +9,8 @@
 #   3) --replace 를 주면 그 JSON({"why": 이유, "pairs": [[옛 글, 새 글], ...]})의 글을 차례로 바꾼다. 공개하지 않을 글에만
 #      맞춘 식별자·설명을 중립 문구로 바꾸려는 것이다. 옛 글은 manifest 에 적지 않고 개수와 이유만 적는다. 이 JSON 은 저장소에 넣지 않는다.
 #   4) --strip-report-from 을 주면 tables/report.md 에서 그 줄부터 끝까지 뺀다(공개하지 않을 부분).
-#   5) 바뀐 파일의 바이트 수·SHA-256, *_sha256 짝, receipt_id 를 다시 계산하고 receipt.html·deck.json 을 다시 그린 뒤 verify 한다.
+#   5) 바뀐 파일의 바이트 수·SHA-256, *_sha256 짝, receipt_id 를 다시 계산하고 receipt.html·deck.json(형식 3부터 README.txt 도)을
+#      다시 그린 뒤 verify 한다. verify 가 실패하면 만든 폴더를 남기지 않는다.
 #   6) tests/golden/evidence/manifest.json 에 한 줄 적는다(같은 이름이 있으면 그 자리에서 바꾼다).
 # 판정·검사·숫자 칸은 건드리지 않는다. 바꾼 경로·글자·문구와 뺀 표 말고는 원본 그대로다.
 """Turn an evidence folder into a backward-compatibility fixture under tests/golden/evidence/."""
@@ -117,8 +118,12 @@ def main(argv):
     if "deck_meta" in r:
         with open(os.path.join(dst, "deck.json"), "w", encoding="utf-8") as f:
             f.write(R.render_deck(r))
+    if R.format_version(r) >= 3:  # 형식 3부터 README.txt 도 receipt 에서 나온다(receipt_id 가 바뀌었으니 다시 쓴다)
+        with open(os.path.join(dst, "README.txt"), "w", encoding="utf-8") as f:
+            f.write(R.render_readme(r))
     bad = [w for ok, w in R.verify(dst) if not ok]
     if bad:
+        shutil.rmtree(dst)  # 이 실행이 방금 복사해 만든 고정물 폴더만 지운다
         print("fixture does not verify:\n  " + "\n  ".join(bad[:5]), file=sys.stderr)
         return 1
     try:

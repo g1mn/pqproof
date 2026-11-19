@@ -1,0 +1,86 @@
+[
+  {
+    "algorithm": "RSA",
+    "auto_fix": false,
+    "blocks_hybrid": false,
+    "component": "java",
+    "detail": "KeyPairGenerator.getInstance: 양자 컴퓨터로 깨지는 공개키 알고리즘",
+    "kind": "key-generation",
+    "line": 16,
+    "nist": "quantum-vulnerable: deprecated after 2030, disallowed after 2035 (NIST IR 8547, Tables 2 and 4)",
+    "path": "src/main/java/demo/sealer/Sealer.java",
+    "threat": "shor"
+  },
+  {
+    "algorithm": "EC",
+    "auto_fix": false,
+    "blocks_hybrid": false,
+    "component": "java",
+    "detail": "KeyPairGenerator.getInstance: 양자 컴퓨터로 깨지는 공개키 알고리즘",
+    "kind": "key-generation",
+    "line": 22,
+    "nist": "quantum-vulnerable: deprecated after 2030, disallowed after 2035 (NIST IR 8547, Tables 2 and 4)",
+    "path": "src/main/java/demo/sealer/Sealer.java",
+    "threat": "shor"
+  },
+  {
+    "algorithm": "EC secp256r1",
+    "auto_fix": false,
+    "blocks_hybrid": false,
+    "component": "java",
+    "detail": "new ECGenParameterSpec: 양자 컴퓨터로 깨지는 공개키 알고리즘",
+    "kind": "key-generation",
+    "line": 23,
+    "nist": "quantum-vulnerable: deprecated after 2030, disallowed after 2035 (NIST IR 8547, Tables 2 and 4)",
+    "path": "src/main/java/demo/sealer/Sealer.java",
+    "threat": "shor"
+  },
+  {
+    "algorithm": "RSA/ECB/OAEPWithSHA-256AndMGF1Padding",
+    "auto_fix": false,
+    "blocks_hybrid": false,
+    "component": "java",
+    "detail": "Cipher.getInstance: 양자 컴퓨터로 깨지는 공개키 알고리즘",
+    "kind": "key-encryption",
+    "line": 28,
+    "nist": "quantum-vulnerable: deprecated after 2030, disallowed after 2035 (NIST IR 8547, Tables 2 and 4)",
+    "path": "src/main/java/demo/sealer/Sealer.java",
+    "threat": "shor"
+  },
+  {
+    "algorithm": "RSA/ECB/OAEPWithSHA-256AndMGF1Padding",
+    "auto_fix": false,
+    "blocks_hybrid": false,
+    "component": "java",
+    "detail": "Cipher.getInstance: 양자 컴퓨터로 깨지는 공개키 알고리즘",
+    "kind": "key-encryption",
+    "line": 34,
+    "nist": "quantum-vulnerable: deprecated after 2030, disallowed after 2035 (NIST IR 8547, Tables 2 and 4)",
+    "path": "src/main/java/demo/sealer/Sealer.java",
+    "threat": "shor"
+  },
+  {
+    "algorithm": "SHA256withECDSA",
+    "auto_fix": false,
+    "blocks_hybrid": false,
+    "component": "java",
+    "detail": "Signature.getInstance: 양자 컴퓨터로 깨지는 공개키 알고리즘",
+    "kind": "signature",
+    "line": 40,
+    "nist": "quantum-vulnerable: deprecated after 2030, disallowed after 2035 (NIST IR 8547, Tables 2 and 4)",
+    "path": "src/main/java/demo/sealer/Sealer.java",
+    "threat": "shor"
+  },
+  {
+    "algorithm": "SHA256withECDSA",
+    "auto_fix": false,
+    "blocks_hybrid": false,
+    "component": "java",
+    "detail": "Signature.getInstance: 양자 컴퓨터로 깨지는 공개키 알고리즘",
+    "kind": "signature",
+    "line": 47,
+    "nist": "quantum-vulnerable: deprecated after 2030, disallowed after 2035 (NIST IR 8547, Tables 2 and 4)",
+    "path": "src/main/java/demo/sealer/Sealer.java",
+    "threat": "shor"
+  }
+]
