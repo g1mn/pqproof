@@ -76,7 +76,7 @@ Tool 0.2.0, ruleset 2 (new name and hash, eleven rule files), evidence format 3.
 - `README.txt` in every result folder (format 3): the verdict, what to open first, the re-check command and what to check before sharing. `--verify` renders it again and compares.
 - The release workflow ships the `SHA256SUMS` of its `tls_probe` builds in the package; a TLS run records whether the probe binary is the release build (`tls.probe_build`: `release`, `local` or `unchecked`) and says so on the `b-tls` line (X47).
 - `pqproof check <tree>` (`prove.sh --check`): judge one tree with no original, to keep classical algorithms from coming back after the migration. The two-tree checks are not applicable, so check mode does not look at TLS weakening (`b-weakening`) or removed verification (`r-review`); keep the two-tree run on pull requests. `a-input` still reports counted folders, oversize files and links, and a code link outside the tree leaves it undecided (exit 3, a failure under `REQUIRE_REVIEW=1`). `receipt.json` records `params.mode`. `pqproof inventory <tree>` (`prove.sh --inventory`): no verdict, `inventory.json` with the CBOM and the counts, in `inventory-out-<time>` by default (X13). The Action takes `mode: check` and `profile`, and `examples/github-actions/pqproof-check.yml` shows a weekly check.
-- Ten more code mutants (40 in all) for the rule changes of this release; every one fails a behaviour or sync test.
+- Fourteen more code mutants (44 in all) for the rule changes of this release; every one fails a behaviour or sync test.
 - `tests/test_options.py`: the new settings, exit codes 4 and 5, expiry, review age, the size limit and unresolved key material, each with a re-verified evidence folder.
 
 ### Changed

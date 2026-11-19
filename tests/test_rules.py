@@ -709,6 +709,31 @@ class Bypasses(unittest.TestCase):
         self.assertIn("링크 src/main/java/demo/sealer/One.java -> ../../../../../../outside/Sealer.java · 트리 밖 · zip 에서 풀지 않음",
                       r["inputs"]["fixed"]["skipped"])
 
+    def test_check_mode_link_outside_the_tree_is_undecided(self):
+        # 한 트리 점검은 a-input 이 na 로 시작한다. 트리 밖 코드 링크는 짝 판정과 같이 미판정이어야 한다(0.2.0 공개 전 리뷰)
+        fx = os.path.join(self.tmp, "check-link")
+        shutil.copytree(EXAMPLES / "pqc", fx, symlinks=True)
+        self.link_out(fx)
+        e = {"ALLOW": "none", "RECON": "none"}
+        r, code, _ = prove.run(fx, fx, prove.Params(e, mode="check"), os.path.join(self.tmp, "out-check-link"), quiet=True)
+        self.assertEqual((r["verdict"], code), ("undecided", 3))
+        self.assertEqual({c["id"]: c["status"] for c in r["checks"]}["a-input"], "undecided")
+
+    def test_key_pair_in_a_test_path_keeps_the_test_flag(self):
+        # 인증서 짝 비고를 붙여도 시험 표시는 비고 맨 앞에 남는다(rules.cbom_flags 는 맨 앞만 읽는다, 0.2.0 공개 전 리뷰)
+        root = os.path.join(self.tmp, "pair")
+        res = os.path.join(root, "src", "test", "resources")
+        os.makedirs(res)
+        openssl = prove.default_openssl()
+        subprocess.run([openssl, "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:P-256", "-nodes",
+                        "-keyout", os.path.join(res, "server.key"), "-out", os.path.join(res, "server.crt"), "-subj", "/CN=t",
+                        "-days", "1"], capture_output=True, check=True)
+        ok, _, rows = prove.run_cbom_scan(prove.CBOM_SCAN, root, os.path.join(self.tmp, "pair-out"), openssl)
+        self.assertTrue(ok)
+        key = [x for x in rows if x["위치"] == "src/test/resources/server.key:1"]
+        self.assertTrue(key and "인증서 짝" in key[0]["근거·비고"], rows)
+        self.assertEqual(rules.cbom_flags(key[0]["근거·비고"]), {"테스트·예제"}, key[0]["근거·비고"])
+
     def test_certificate_and_host_key_outside_the_tree_are_not_read(self):
         root = os.path.join(self.tmp, "x05")
         cert = os.path.join(self.tmp, "x05-host", "server.pem")

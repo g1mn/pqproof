@@ -56,8 +56,8 @@ MUTANTS = [
      "비고 맨 앞이 아닌 '테스트·예제'도 표시로(X06)"),
     ("m28", "pqlite/rules.py", 'if norm == ".." or norm.startswith("../"):', 'if norm == "..":', "상대 경로로 트리 밖을 가리키는 링크를 놓치게(X04)"),
     ("m29", "pqlite/rules.py", "                again += 1\n", "                continue\n", "residue 가 허용한 쓰기 경로 줄을 다시 세지 않게(X01)"),
-    ("m30", "pqlite/skipdirs.py", "        if not parent_rel or not self.build_files.isdisjoint(sibling_files):",
-     "        if True:", "산출물 이름 폴더를 어디서나 건너뛰게(X02·X03·X09)"),
+    ("m30", "pqlite/skipdirs.py", "        if not parent_rel or beside_build:\n            return \"output\"",
+     "        if True:\n            return \"output\"", "산출물 이름 폴더를 어디서나 건너뛰게(X02·X03·X09)"),
     # 규칙 묶음 2, 나머지(교차 리뷰 X11·X18·X19·X22·X23·X24·X26·X27·X30)
     ("m31", "pqlite/rules.py", '    if c and c[1] != "44":\n        return COMPOSITE_REASON', "", "복합 서명을 다른 허용 규칙으로 넘기게(X26)"),
     ("m32", "scan/residue.sh", "    if (index(substr(t, 4), d) == 0) INDOC = d\n", "", "여러 줄 독스트링을 첫 줄만 주석으로(X22)"),
@@ -73,6 +73,15 @@ MUTANTS = [
      "열지 못한 키 자료를 다시 '확인'으로(X27)"),
     ("m40", "scan/residue.sh", "|(^|[^A-Za-z0-9])(ed25519|ed448|eddsa|curve25519|ED25519|ED448)@@", "@@",
      "G-EDDSA 가 소문자 ed25519 를 놓치게(X19)"),
+    # 0.2.0 공개 전 리뷰(main 아래 의존성 이름 폴더, 시험 경로 키 짝, 한 트리 점검 링크)
+    ("m41", "pqlite/skipdirs.py", '                return "output" if beside_build else None', '                return "any"',
+     "main 아래 venv 같은 이름 폴더를 늘 건너뛰게"),
+    ("m42", "pqlite/skipdirs.py", '            return "any" if not parent_rel or beside_build else "output"', '            return "any"',
+     "엉뚱한 곳의 의존성 폴더를 세지 않게"),
+    ("m43", "scan/cbom-scan.sh", '      $8 = f n (r == "" ? "" : sep r) }', '      $8 = n ($8 == "" ? "" : sep $8) }',
+     "인증서 짝 비고를 시험 표시 앞에 붙이게"),
+    ("m44", "pqlite/rules.py", 'elif in_st in ("pass", "review", "na"):', 'elif in_st in ("pass", "review"):',
+     "한 트리 점검에서 트리 밖 코드 링크를 미판정으로 안 올리게"),
 ]
 
 
