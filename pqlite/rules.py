@@ -12,6 +12,7 @@ import re
 import stat
 
 from . import allowlist as al
+from . import impl
 from . import scan as scanmod
 from . import tlsprobe
 from . import verify
@@ -26,7 +27,9 @@ PROFILES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__f
 
 
 def load_profiles(path=PROFILES_FILE):
-    """scan/profiles.json → (기본 이름, {이름: {title, kem, sig, tls_group, cert_keys}})."""
+    """scan/profiles.json → (기본 이름, {이름: {title, kem, sig, tls_group, cert_keys, impl_accept(선택)}}).
+    impl_accept: 구현 검증(impl)이 받아 줄 KpqC 참조판('latest', '<파라미터>@<판>', '<알고리즘>@<판>' 목록, pqlite/impl.resolve_accept).
+    목록이 가리키는 판이 실제로 있는지는 impl 이 KAT 목록과 맞춰 본다."""
     with open(path, encoding="utf-8") as f:
         doc = json.load(f)
     profiles = doc["profiles"]
@@ -34,6 +37,9 @@ def load_profiles(path=PROFILES_FILE):
         bad = [x for x in p["kem"] + p["sig"] if x not in EXPECT_IDS]
         if bad or not p["kem"] or not p["sig"] or not p.get("tls_group") or not p.get("cert_keys"):
             raise ValueError(f"scan/profiles.json: profile {name} is incomplete or names unknown EXPECT rules {bad}")
+        acc = p.get("impl_accept")
+        if acc is not None and (not isinstance(acc, list) or not acc or not all(isinstance(x, str) and x for x in acc)):
+            raise ValueError(f"scan/profiles.json: profile {name} impl_accept must be a non-empty list of strings")
     if doc["default"] not in profiles:
         raise ValueError("scan/profiles.json: the default profile is not listed")
     return doc["default"], profiles
@@ -961,3 +967,14 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
               " · ".join(x for x in (head, unused_txt, exp_txt, name_txt) if x))
     verdict = derive_verdict(checks)
     return checks, verdict, pending, unused, live, name_only
+
+
+# ---------------------------------------------------------------------------------------------
+# 구현 검증(impl, KpqC KAT 대조): 검사 한 줄 i-kpqc 와 판정. 파라미터별 판정(어느 참조판과 맞는가, 받아 줄 판인가)은 pqlite/impl.py 의
+# match_versions·control_problem 이 하고, 검사 행은 impl.check_row 가 만든다(--verify 가 같은 함수로 다시 만들어 맞춘다).
+def judge_impl(results, control, problem, derive_verdict):
+    """(checks, verdict). results: impl.match_versions 결과(파라미터마다), control: 자기 점검 까닭(None 이면 통과), problem: 답안 전체의
+    문제(읽지 못함, 모르는 파라미터, 64 MiB 상한). 자기 점검 실패와 답안 문제는 미판정이다(건너뛴 대조는 통과가 아니다).
+    derive_verdict 는 pqlite/receipt.py 의 것(실패 > 미판정 > 통과, 검토 필요는 판정을 바꾸지 않는다)."""
+    checks = [impl.check_row(results, control, problem)]
+    return checks, derive_verdict(checks)

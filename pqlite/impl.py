@@ -1,11 +1,24 @@
-# impl.py: 구현 검증(pqproof impl)의 순수 함수(표준 라이브러리만). 지금은 NIST PQCgenKAT 응답 파일(.rsp)을 읽어 정규화하고
-#   digest 를 만드는 세 함수(parse_rsp, record_digest, rsp_digest)만 있다. 다음 단계가 문제지·답안 대조를 이 파일에 더한다.
-# 참조판 목록(scan/kat-kpqc.json)과 발췌(scan/kat/)는 tools/make_kat_manifest.py 가 이 함수들로 만든다.
-# 받는 .rsp 는 남이 만든 데이터다. 글자로만 읽고, 그 안의 무엇도 실행하지 않는다.
-"""Read NIST PQCgenKAT response files (.rsp) and give normalized per-record and per-file digests."""
+# impl.py: 구현 검증(pqproof impl)의 순수 함수(표준 라이브러리만, tlsprobe.py 와 같은 꼴). 이 파일은 규칙 묶음 해시에 든다.
+#   KpqC 네 알고리즘(SMAUG-T, NTRU+, HAETAE, AIMer)의 구현이 어느 참조판(판 이름 + .rsp SHA-256)의 KAT 와 일치하는지 본다.
+#   PQ-Proof 는 검사 대상 구현을 빌드하거나 실행하지 않는다. 문제지(emit_prompt)를 내고, 사용자가 자기 하네스로 만든 답안
+#   (답안 JSON 또는 PQCgenKAT .rsp)을 참조 KAT 와 대조만 한다(match_versions). 표준 준수나 공인 시험(KCMVP)이 아니다.
+#   - .rsp 읽기와 digest: parse_rsp, record_digest, rsp_digest(참조판 목록을 만드는 tools/make_kat_manifest.py 도 쓴다)
+#   - 참조판 목록 읽기: load_manifest(scan/kat-kpqc.json + scan/kat/ 발췌, 깨졌으면 ManifestError), build_key(판정할 파라미터만 담은
+#     정답 묶음, 증적에 사본으로 남아 --verify 가 다시 판정한다), check_key
+#   - 문제지와 답안: emit_prompt, parse_input(답안 JSON 또는 .rsp, 64 MiB 상한), example_answers(어느 판 구현이라면 낼 답안. 자기
+#     점검과 시험이 쓴다)
+#   - 판정: match_versions(판마다 문항이 모두 맞으면 후보, 받아 줄 판이면 통과, 옛 판·알려진 변형이면 검토 필요), control_problem
+#     (정답 답안은 통과, 한 바이트 바꾼 답안은 실패가 나오는지 먼저 확인), check_row(검사 행 i-kpqc, rules.judge_impl 이 쓴다)
+#   - HAETAE KAT 서명은 .rsp 에 없는 ctx 로 만들어졌다. NIST PQCgenKAT 의 AES-256-CTR DRBG(NistDrbg)를 순수 파이썬으로 따라
+#     seed 에서 ctx 를 다시 뽑아 문제지에 넣는다.
+# 받는 답안과 .rsp 는 남이 만든 데이터다. 글자로만 읽고, 그 안의 무엇도 실행하지 않는다. 이 파일은 다른 pqlite 모듈을 가져오지 않는다
+# (pqlite/receipt.py 가 --verify 에서 파일 경로로 읽는다).
+"""KpqC implementation check: question sheet, answers, and matching against pinned reference KAT versions."""
 from __future__ import annotations  # 맥 기본 python3 3.9
 
 import hashlib
+import json
+import os
 import re
 
 # 10진 정수 칸. PQCgenKAT 가 길이와 번호를 10진으로 쓴다(KEM 은 count 만, 서명은 mlen 과 smlen 또는 siglen)
@@ -14,6 +27,15 @@ _KEY_RE = re.compile(r"[a-z][a-z0-9_]*")
 _HEX_RE = re.compile(r"[0-9A-Fa-f]*")
 _DEC_RE = re.compile(r"[0-9]+")
 _DIGEST_RE = re.compile(r"[0-9a-f]{64}")
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 저장소 루트, 또는 설치본의 pqproof/_tool
+KAT_FILE = os.path.join(ROOT, "scan", "kat-kpqc.json")
+MAX_INPUT = 64 << 20  # 답안 파일 상한(바이트). 넘으면 읽지 않고 미판정
+PROMPT_FORMAT = "pqproof impl prompt 1"
+RESPONSE_FORMAT = "pqproof impl response 1"
+KEY_FORMAT = "pqproof impl key 1"
+ENGINE = "kpqc-kat"
+CHECK_ID = "i-kpqc"
 
 
 def _norm_field(key, value, where=""):
@@ -117,3 +139,840 @@ def rsp_digest(records):
             d = record_digest(r)
         h.update(d.encode("ascii") + b"\n")
     return h.hexdigest()
+
+
+def dumps(obj):
+    """문제지·정답 묶음·답안 파일을 쓰는 꼴(키 정렬, 들여쓰기 1). 같은 값이면 바이트까지 같다."""
+    return json.dumps(obj, indent=1, sort_keys=True, ensure_ascii=False) + "\n"
+
+
+def _digest(body):
+    """문제지 본문(format, params, sizes, items)의 SHA-256. 키 정렬·공백 없는 JSON 이다. 값이 문자열·참거짓·목록·객체뿐이고 키가 ASCII 라
+    RFC 8785 정규형과 같다."""
+    return hashlib.sha256(json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
+def _loads_strict(data, where):
+    """JSON 을 엄격하게 읽는다: UTF-8(BOM 없음), 중복 키·NaN·Infinity 거부. 틀리면 ValueError(까닭에 where 를 붙인다)."""
+    def pairs(items):
+        out = {}
+        for k, v in items:
+            if k in out:
+                raise ValueError(f"{where}: 키 {k!r} 가 두 번 있다")
+            out[k] = v
+        return out
+
+    def constant(name):
+        raise ValueError(f"{where}: {name} 는 JSON 숫자가 아니다")
+    if isinstance(data, (bytes, bytearray)):
+        if bytes(data[:3]) == b"\xef\xbb\xbf":
+            raise ValueError(f"{where}: UTF-8 BOM 으로 시작한다")
+        try:
+            data = bytes(data).decode("utf-8")
+        except UnicodeDecodeError as e:
+            raise ValueError(f"{where}: UTF-8 이 아니다(위치 {e.start})") from None
+    try:
+        return json.loads(data, object_pairs_hook=pairs, parse_constant=constant)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"{where}: JSON 이 아니다({e})") from None
+
+
+# ---------------------------------------------------------------------------------------------
+# NIST PQCgenKAT 의 DRBG(kat/rng.c 의 randombytes_init, randombytes, AES256_CTR_DRBG_Update). AES-256 은 FIPS 197 을 그대로 짠
+# 순수 파이썬이다(블록 하나 암호화만, 상수 시간이 아니다: 공개 KAT seed 에만 쓴다). tests/test_impl.py 가 FIPS 197 C.3 벡터와
+# 참조 라이브러리로 다시 뽑은 HAETAE ctx 로 확인한다.
+def _xtime(a):
+    return ((a << 1) ^ 0x1B) & 0xFF if a & 0x80 else a << 1
+
+
+def _make_sbox():
+    """AES S-box(FIPS 197 5.1.1): 3 의 거듭제곱 p 와 그 역원 q 를 함께 돌며 q 에 아핀 변환을 한다. 0 의 값은 0x63."""
+    sbox = [0x63] * 256
+    p = q = 1
+    while True:
+        p ^= _xtime(p)
+        q ^= q << 1
+        q ^= q << 2
+        q ^= q << 4
+        q &= 0xFF
+        if q & 0x80:
+            q ^= 0x09
+        x = q ^ ((q << 1) | (q >> 7)) ^ ((q << 2) | (q >> 6)) ^ ((q << 3) | (q >> 5)) ^ ((q << 4) | (q >> 4))
+        sbox[p] = (x ^ 0x63) & 0xFF
+        if p == 1:
+            return sbox
+
+
+_SBOX = _make_sbox()
+
+
+def _aes256_round_keys(key):
+    """AES-256 키 확장(FIPS 197 5.2): 라운드 키 15개, 각 16바이트 목록."""
+    w = [list(key[i:i + 4]) for i in range(0, 32, 4)]
+    rcon = 1
+    for i in range(8, 60):
+        t = list(w[i - 1])
+        if i % 8 == 0:
+            t = [_SBOX[b] for b in t[1:] + t[:1]]
+            t[0] ^= rcon
+            rcon = _xtime(rcon)
+        elif i % 8 == 4:
+            t = [_SBOX[b] for b in t]
+        w.append([a ^ b for a, b in zip(w[i - 8], t)])
+    return [sum(w[4 * r:4 * r + 4], []) for r in range(15)]
+
+
+def _aes256_encrypt(round_keys, block):
+    """블록 하나(16바이트) 암호화. 상태는 열 우선(바이트 i 가 열 i//4, 행 i%4)."""
+    s = [b ^ k for b, k in zip(block, round_keys[0])]
+    for r in range(1, 15):
+        s = [_SBOX[b] for b in s]
+        s = [s[(i + 4 * (i % 4)) % 16] for i in range(16)]  # ShiftRows: 행 c 를 c 칸 왼쪽으로
+        if r != 14:
+            mixed = []
+            for c in range(4):
+                a = s[4 * c:4 * c + 4]
+                t = a[0] ^ a[1] ^ a[2] ^ a[3]
+                mixed += [a[j] ^ t ^ _xtime(a[j] ^ a[(j + 1) % 4]) for j in range(4)]
+            s = mixed
+        s = [b ^ k for b, k in zip(s, round_keys[r])]
+    return bytes(s)
+
+
+class NistDrbg:
+    """NIST PQCgenKAT 의 AES-256-CTR DRBG. NistDrbg(seed 48바이트)가 randombytes_init(seed, NULL, 256), take(n) 이
+    randombytes(x, n) 한 번이다(끝에 Update 를 한 번 하므로 몇 바이트씩 나눠 뽑는지가 결과를 바꾼다)."""
+
+    def __init__(self, seed):
+        seed = bytes(seed)
+        if len(seed) != 48:
+            raise ValueError("DRBG seed 는 48바이트다")
+        self._key, self._v = bytes(32), bytes(16)
+        self._update(seed)
+
+    def _block(self, round_keys):
+        self._v = ((int.from_bytes(self._v, "big") + 1) & ((1 << 128) - 1)).to_bytes(16, "big")
+        return _aes256_encrypt(round_keys, self._v)
+
+    def _update(self, data):
+        rk = _aes256_round_keys(self._key)
+        t = b"".join([self._block(rk) for _ in range(3)])
+        if data is not None:
+            t = bytes(a ^ b for a, b in zip(t, data))
+        self._key, self._v = t[:32], t[32:]
+
+    def take(self, n):
+        rk = _aes256_round_keys(self._key)
+        out = b"".join([self._block(rk) for _ in range((n + 15) // 16)])
+        self._update(None)
+        return out[:n]
+
+
+def haetae_context(seed_hex):
+    """HAETAE PQCgenKAT 가 그 레코드를 서명할 때 쓴 ctx(대문자 16진수). randombytes_init(seed) 뒤 키 seed 32바이트, rnd 32바이트,
+    ctxlen 1바이트, ctx ctxlen 바이트를 한 번씩 뽑는다(kat/PQCgenKAT_sign.c). 서명은 pre = ctxlen || ctx 로 만들어졌고 .rsp 에는
+    ctx 가 없다."""
+    d = NistDrbg(bytes.fromhex(seed_hex))
+    d.take(32)
+    d.take(32)
+    return d.take(d.take(1)[0]).hex().upper()
+
+
+CONTEXT = {"haetae": haetae_context}  # 알고리즘 → seed 에서 ctx 를 뽑는 함수. 없는 서명 알고리즘(AIMer)은 빈 ctx 로 서명했다
+
+
+def context_of(alg, seed_hex):
+    f = CONTEXT.get(alg)
+    return f(seed_hex) if f else ""
+
+
+# ---------------------------------------------------------------------------------------------
+# 참조판 목록과 정답 묶음
+class ManifestError(ValueError):
+    """참조판 목록(scan/kat-kpqc.json), 발췌(scan/kat/), 또는 증적에 남은 정답 묶음 사본이 깨졌다."""
+
+
+KEM_FIELDS = ["count", "seed", "pk", "sk", "ct", "ss"]
+SIG_BASE = ["count", "seed", "mlen", "msg", "pk", "sk"]
+SIG_FIELDS = (SIG_BASE + ["siglen", "sig"], SIG_BASE + ["smlen", "sm"])  # HAETAE 꼴, AIMer 꼴(sm = msg || sig)
+ROLES = ("reference", "known-variant")
+VERSION_KEYS = ("version", "latest", "role", "source", "rsp_sha256", "digest", "records", "record_digests", "sizes")
+_PID_RE = re.compile(r"[a-z0-9][a-z0-9+_-]*/[a-z0-9][a-z0-9_-]*")
+_VER_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
+_EXCERPT_RE = re.compile(r"scan/kat/[a-z0-9+_-]+/[a-z0-9_-]+/[A-Za-z0-9][A-Za-z0-9._-]*\.json")
+
+
+def signature_of(rec):
+    """레코드의 서명만(HAETAE 는 sig 칸, AIMer 는 sm = msg || sig 에서 msg 를 뗀 것)."""
+    if "sig" in rec:
+        return rec["sig"]
+    return rec["sm"][2 * int(rec["mlen"]):]
+
+
+def signed_message_of(rec):
+    """레코드의 sm(AIMer 는 sm 칸, HAETAE 는 참조 crypto_sign 이 쓰는 꼴 sig || msg)."""
+    if "sm" in rec:
+        return rec["sm"]
+    return rec["sig"] + rec["msg"]
+
+
+def _size_problem(P, V, rec):
+    """레코드 칸 길이가 판의 sizes·길이 칸과 맞는가(틀린 칸 이름, 맞으면 None)."""
+    sizes = V["sizes"]
+
+    def n(f):
+        return len(rec[f]) // 2
+    if P["kind"] == "kem":
+        return next((f for f in ("pk", "sk", "ct", "ss") if f in sizes and n(f) != sizes[f]), None)
+    bad = next((f for f in ("pk", "sk") if f in sizes and n(f) != sizes[f]), None)
+    if bad:
+        return bad
+    if n("msg") != int(rec["mlen"]):
+        return "mlen"
+    if "sig" in rec:
+        if int(rec["siglen"]) != n("sig"):
+            return "siglen"
+    elif int(rec["smlen"]) != n("sm") or not rec["sm"].startswith(rec["msg"]):
+        return "smlen"
+    return "sig" if "sig" in sizes and len(signature_of(rec)) // 2 != sizes["sig"] else None
+
+
+def _check_param(P, where):
+    """정답 묶음 꼴의 파라미터 하나를 검사한다(틀리면 ManifestError). 판마다 record_digests 로 digest 를 다시 계산하고, 발췌 레코드는
+    정규화된 값인지, count 가 0 부터 이어지는지, record_digest 가 그 자리의 record_digests 와 같은지, 길이가 sizes 와 맞는지 본다."""
+    if not isinstance(P, dict):
+        raise ManifestError(f"{where}: 파라미터가 객체가 아니다")
+    pid = P.get("id")
+    if not isinstance(pid, str) or not _PID_RE.fullmatch(pid):
+        raise ManifestError(f"{where}: 파라미터 이름이 아니다: {pid!r}")
+    w = f"{where} {pid}"
+    kind, fields = P.get("kind"), P.get("fields")
+    if (kind, fields) not in [("kem", KEM_FIELDS)] + [("sig", f) for f in SIG_FIELDS]:
+        raise ManifestError(f"{w}: kind {kind!r} 와 fields {fields!r} 가 아는 꼴이 아니다")
+    if P.get("alg") != pid.split("/", 1)[0] or not isinstance(P.get("name"), str):
+        raise ManifestError(f"{w}: alg 는 이름 앞부분, name 은 글이어야 한다")
+    if not isinstance(P.get("aliases"), list) or not all(isinstance(a, str) and a for a in P["aliases"]):
+        raise ManifestError(f"{w}: aliases 는 글 목록이어야 한다")
+    versions = P.get("versions")
+    if not isinstance(versions, list) or not versions:
+        raise ManifestError(f"{w}: 판이 없다")
+    names = []
+    for V in versions:
+        if not isinstance(V, dict) or set(V) != set(VERSION_KEYS) | {"excerpt"}:
+            raise ManifestError(f"{w}: 판 기록의 칸이 {sorted(VERSION_KEYS) + ['excerpt']} 가 아니다")
+        name = V["version"]
+        wv = f"{w}@{name}"
+        if not isinstance(name, str) or not _VER_RE.fullmatch(name) or name in names:
+            raise ManifestError(f"{wv}: 판 이름이 틀렸거나 두 번 있다")
+        names.append(name)
+        if not isinstance(V["latest"], bool) or V["role"] not in ROLES or not isinstance(V["source"], str):
+            raise ManifestError(f"{wv}: latest·role·source 가 틀렸다")
+        if not isinstance(V["rsp_sha256"], str) or not _DIGEST_RE.fullmatch(V["rsp_sha256"]):
+            raise ManifestError(f"{wv}: rsp_sha256 이 SHA-256 이 아니다")
+        rd = V["record_digests"]
+        if (not isinstance(V["records"], int) or isinstance(V["records"], bool) or V["records"] < 1 or not isinstance(rd, list)
+                or len(rd) != V["records"] or not all(isinstance(d, str) and _DIGEST_RE.fullmatch(d) for d in rd)):
+            raise ManifestError(f"{wv}: records 와 record_digests 가 맞지 않는다")
+        if rsp_digest(rd) != V["digest"]:
+            raise ManifestError(f"{wv}: record_digests 로 다시 계산한 digest 가 {V['digest']!r} 가 아니다")
+        if not isinstance(V["sizes"], dict) or not all(isinstance(k, str) and isinstance(v, int) for k, v in V["sizes"].items()):
+            raise ManifestError(f"{wv}: sizes 가 틀렸다")
+        ex = V["excerpt"]
+        if ex is None:
+            continue
+        if not isinstance(ex, list) or not ex or len(ex) > len(rd):
+            raise ManifestError(f"{wv}: 발췌 레코드 목록이 틀렸다")
+        for i, rec in enumerate(ex):
+            if not isinstance(rec, dict) or set(rec) != set(fields):
+                raise ManifestError(f"{wv}: 발췌 {i} 의 칸이 {fields} 가 아니다")
+            for k, v in rec.items():
+                if _norm_field(k, v, f"{wv} 발췌 {i}: ") != (k, v):
+                    raise ManifestError(f"{wv}: 발췌 {i} 의 {k} 가 정규화된 값이 아니다")
+            if rec["count"] != str(i):
+                raise ManifestError(f"{wv}: 발췌 {i} 의 count 가 {rec['count']} 다")
+            if record_digest(rec) != rd[i]:
+                raise ManifestError(f"{wv}: 발췌 {i} 의 record_digest 가 record_digests[{i}] 와 다르다")
+            bad = _size_problem(P, V, rec)
+            if bad:
+                raise ManifestError(f"{wv}: 발췌 {i} 의 {bad} 길이가 sizes 와 맞지 않는다")
+    if sum(1 for V in versions if V["latest"]) != 1:
+        raise ManifestError(f"{w}: latest 판이 정확히 하나여야 한다")
+
+
+def _names(params):
+    """{소문자 이름: 파라미터}. 정식 이름과 별칭 모두. 다른 파라미터와 겹치면 ManifestError."""
+    out = {}
+    for P in params:
+        for a in [P["id"]] + P["aliases"]:
+            k = a.lower()
+            if out.get(k, P["id"]) != P["id"]:
+                raise ManifestError(f"별칭 {a!r} 가 {out[k]} 와 {P['id']} 에 함께 있다")
+            out[k] = P["id"]
+    return out
+
+
+def load_manifest(path=KAT_FILE):
+    """scan/kat-kpqc.json 과 그것이 가리키는 scan/kat/ 발췌를 읽어 검사한다(rules.load_profiles 처럼, 틀리면 ManifestError).
+    반환: {"sha256": 목록 파일의 SHA-256, "params": {파라미터: 정답 묶음 꼴}, "order": [파라미터](목록 순서), "names": {소문자 이름:
+    파라미터}}. 정답 묶음 꼴은 {id, alg, name, kind, fields, aliases, versions: [{version, latest, role, source, rsp_sha256, digest,
+    records, record_digests, sizes, excerpt(레코드 목록 또는 None)}]}."""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(path)))
+    rel = "scan/kat-kpqc.json"
+    try:
+        with open(path, "rb") as f:
+            raw = f.read()
+        doc = _loads_strict(raw, rel)
+    except (OSError, ValueError) as e:
+        raise ManifestError(f"{rel}: 읽을 수 없다({e})") from None
+    if not isinstance(doc, dict) or doc.get("format") != 1 or not isinstance(doc.get("algorithms"), dict) \
+            or not isinstance(doc.get("sources"), dict):
+        raise ManifestError(f"{rel}: format 1 의 algorithms·sources 가 없다")
+    params, order = {}, []
+    for alg, A in doc["algorithms"].items():
+        if not isinstance(A, dict) or not isinstance(A.get("params"), dict):
+            raise ManifestError(f"{rel}: 알고리즘 {alg} 에 params 가 없다")
+        for pid, src in A["params"].items():
+            if not isinstance(src, dict) or not isinstance(src.get("variants"), list):
+                raise ManifestError(f"{rel}: {pid} 에 variants 가 없다")
+            P = {"id": pid, "alg": alg, "name": A.get("name"), "kind": A.get("kind"), "fields": A.get("fields"),
+                 "aliases": src.get("aliases"), "versions": []}
+            for v in src["variants"]:
+                if not isinstance(v, dict):
+                    raise ManifestError(f"{rel}: {pid} 의 판 기록이 객체가 아니다")
+                if v.get("source") not in doc["sources"]:
+                    raise ManifestError(f"{rel}: {pid}@{v.get('version')} 의 source {v.get('source')!r} 가 sources 에 없다")
+                excerpt = None
+                if v.get("excerpt") is not None:
+                    ep = v["excerpt"]
+                    if not isinstance(ep, str) or not _EXCERPT_RE.fullmatch(ep) or ".." in ep.split("/"):
+                        raise ManifestError(f"{rel}: {pid}@{v.get('version')} 의 발췌 경로가 scan/kat/ 안 파일이 아니다: {ep!r}")
+                    try:
+                        with open(os.path.join(root, *ep.split("/")), "rb") as f:
+                            ex = _loads_strict(f.read(), ep)
+                    except (OSError, ValueError) as e:
+                        raise ManifestError(f"{ep}: 읽을 수 없다({e})") from None
+                    meta = (ex.get("param"), ex.get("version"), ex.get("digest"), ex.get("rsp_sha256")) if isinstance(ex, dict) else None
+                    if meta != (pid, v.get("version"), v.get("digest"), v.get("rsp_sha256")):
+                        raise ManifestError(f"{ep}: param·version·digest·rsp_sha256 이 목록의 {pid}@{v.get('version')} 과 다르다")
+                    excerpt = ex.get("records")
+                P["versions"].append(dict({k: v.get(k) for k in VERSION_KEYS}, excerpt=excerpt))
+            _check_param(P, rel)
+            if pid in params:
+                raise ManifestError(f"{rel}: {pid} 가 두 번 있다")
+            params[pid] = P
+            order.append(pid)
+    if not params:
+        raise ManifestError(f"{rel}: 파라미터가 없다")
+    return {"sha256": hashlib.sha256(raw).hexdigest(), "params": params, "order": order, "names": _names(params.values())}
+
+
+def build_key(manifest, pids):
+    """판정할 파라미터만 담은 정답 묶음(목록 순서). 증적에 artifacts/impl/key.json 으로 남아 --verify 가 이것으로 다시 판정한다."""
+    want = set(pids)
+    return {"format": KEY_FORMAT, "params": [manifest["params"][p] for p in manifest["order"] if p in want]}
+
+
+def check_key(key):
+    """정답 묶음(증적의 사본)이 스스로 맞는가: 문제 목록([] 이면 맞다)."""
+    if not isinstance(key, dict) or set(key) != {"format", "params"} or key.get("format") != KEY_FORMAT \
+            or not isinstance(key.get("params"), list):
+        return [f"정답 묶음이 {KEY_FORMAT!r} 꼴이 아니다"]
+    try:
+        for P in key["params"]:
+            _check_param(P, "정답 묶음")
+        _names(key["params"])
+    except ManifestError as e:
+        return [str(e)]
+    ids = [P["id"] for P in key["params"]]
+    return ["정답 묶음에 같은 파라미터가 두 번 있다"] if len(ids) != len(set(ids)) else []
+
+
+def key_names(key):
+    """정답 묶음에 든 파라미터의 {소문자 이름: 파라미터}(--verify 가 판정 때와 같은 범위로 이름을 푼다)."""
+    return _names(key["params"])
+
+
+def resolve_accept(params, spec, pids):
+    """받아 줄 판 {파라미터: [판 이름](목록 순서)}. params: {파라미터: 정답 묶음 꼴}(목록 전체), spec: 프로필의 impl_accept 목록.
+    'latest' 는 파라미터마다 latest 판, '<파라미터>@<판>' 은 그 판, '<알고리즘>@<판>' 은 그 알고리즘 모든 파라미터의 그 판.
+    아무 판도 가리키지 않는 항목은 ValueError(오타가 조용히 '받아 줄 판 없음'이 되지 않게)."""
+    if not isinstance(spec, list) or not spec or not all(isinstance(x, str) for x in spec):
+        raise ValueError("impl_accept 는 비지 않은 글 목록이어야 한다")
+    hits = {pid: set() for pid in params}
+    for item in spec:
+        hit = False
+        for pid, P in params.items():
+            for V in P["versions"]:
+                if (item == "latest" and V["latest"]) or item in (f"{pid}@{V['version']}", f"{P['alg']}@{V['version']}"):
+                    hits[pid].add(V["version"])
+                    hit = True
+        if not hit:
+            raise ValueError(f"impl_accept 의 {item!r} 가 가리키는 판이 없다")
+    return {pid: [V["version"] for V in params[pid]["versions"] if V["version"] in hits[pid]] for pid in pids if pid in params}
+
+
+def accept_list(accept):
+    """{파라미터: [판]} → ['파라미터@판'](증적 impl.accept)."""
+    return [f"{pid}@{v}" for pid in accept for v in accept[pid]]
+
+
+def accept_from_list(items):
+    out = {}
+    for x in items:
+        pid, _, v = x.rpartition("@")
+        out.setdefault(pid, []).append(v)
+    return out
+
+
+# ---------------------------------------------------------------------------------------------
+# 문제지
+PROMPT_ABOUT = (
+    "PQ-Proof KpqC question sheet. Run each item through your own implementation and write a response JSON: "
+    "{\"format\": \"pqproof impl response 1\", \"prompt_sha256\": <prompt_sha256 of this sheet>, \"params\": <params of this sheet>, "
+    "\"implementation\": <free text or null>, \"answers\": {<item id>: {<field>: <value>}}}, then run "
+    "`pqproof impl judge <response.json>`. Values are hexadecimal in any case; ok is true or false. PQ-Proof compares the answers "
+    "with pinned reference KAT versions (scan/kat-kpqc.json). It does not build or run your code, and the result is a match "
+    "with a reference version's KAT, not a conformance test or a certification.")
+ANSWER_GUIDE = {
+    "decaps": "decapsulate ct with sk and give ss (answer: ss). Required.",
+    "verify": "verify sig on msg under pk with the context string ctx (hex, empty for none) and give ok: true or false (answer: ok). "
+              "Required. Some items carry a changed signature on purpose; do not read meaning into item ids.",
+    "sizes": "byte lengths for buffers per parameter set: pk, sk, ct, ss of the latest reference version, and the longest sig.",
+    "derand": "optional: call randombytes_init(seed, NULL, 256) of the NIST KAT DRBG that your build links, then keypair and encaps "
+              "(KEM: pk, sk, ct, ss) or keypair and sign msg with ctx (signature: pk, sk, sig, or sm). Give any of these fields, or leave "
+              "the item out. These answers tell reference versions apart when decaps and verify answers cannot.",
+}
+DERAND_FIELDS = {"kem": ["pk", "sk", "ct", "ss"], "sig": ["pk", "sk", "sig", "sm"]}
+
+
+def _flip_hex(h):
+    """16진수 글의 첫 바이트 마지막 비트를 바꾼다(변조 서명 문항, 한 바이트 바꾼 답안)."""
+    return f"{int(h[:2], 16) ^ 1:02X}" + h[2:]
+
+
+def _item_base(P, V, rec):
+    return f"{P['id']}@{V['version']}#{rec['count']}"
+
+
+def _expected(P, V, rec):
+    """레코드 하나에서 나오는 문항의 기대 답 {문항 id: {칸: 값}}."""
+    base = _item_base(P, V, rec)
+    if P["kind"] == "kem":
+        return {base + ":decaps": {"ss": rec["ss"]},
+                base + ":derand": {"pk": rec["pk"], "sk": rec["sk"], "ct": rec["ct"], "ss": rec["ss"]}}
+    return {base + ":verify": {"ok": True}, base + ":verify-tampered": {"ok": False},
+            base + ":derand": {"pk": rec["pk"], "sk": rec["sk"], "sig": signature_of(rec), "sm": signed_message_of(rec)}}
+
+
+def emit_prompt(key):
+    """정답 묶음 → 문제지(결정적). 파라미터마다, 발췌가 있는 판마다, 레코드마다
+    KEM: decaps(sk, ct → ss, 필수), derand(seed → pk·sk·ct·ss, 선택)
+    서명: verify(pk, msg, sig, ctx → ok, 필수, 기대 true), verify-tampered(서명 첫 바이트를 바꾼 것, 기대 false), derand(seed, msg, ctx
+    → pk·sk·sig·sm, 선택). sizes 는 하네스 버퍼 크기. prompt_sha256 은 format·params·sizes·items 의 해시라 설명 글이 바뀌어도
+    그대로다."""
+    items = []
+    for P in key["params"]:
+        for V in P["versions"]:
+            for rec in V["excerpt"] or ():
+                base = _item_base(P, V, rec)
+                if P["kind"] == "kem":
+                    items.append({"id": base + ":decaps", "param": P["id"], "op": "decaps", "sk": rec["sk"], "ct": rec["ct"],
+                                  "answer": ["ss"], "optional": []})
+                    items.append({"id": base + ":derand", "param": P["id"], "op": "derand", "seed": rec["seed"], "answer": [],
+                                  "optional": DERAND_FIELDS["kem"]})
+                    continue
+                ctx, sig = context_of(P["alg"], rec["seed"]), signature_of(rec)
+                for suffix, s in ((":verify", sig), (":verify-tampered", _flip_hex(sig))):
+                    items.append({"id": base + suffix, "param": P["id"], "op": "verify", "pk": rec["pk"], "msg": rec["msg"], "sig": s,
+                                  "ctx": ctx, "answer": ["ok"], "optional": []})
+                items.append({"id": base + ":derand", "param": P["id"], "op": "derand", "seed": rec["seed"], "msg": rec["msg"],
+                              "ctx": ctx, "answer": [], "optional": DERAND_FIELDS["sig"]})
+    body = {"format": PROMPT_FORMAT, "params": [P["id"] for P in key["params"]], "sizes": {P["id"]: _buffer_sizes(P) for P in key["params"]},
+            "items": items}
+    return dict(body, about=PROMPT_ABOUT, guide=ANSWER_GUIDE, prompt_sha256=_digest(body))
+
+
+def _buffer_sizes(P):
+    """하네스의 버퍼 크기(바이트): 최신판의 pk·sk·ct·ss, 서명은 판 가운데 가장 긴 sig(서명 함수가 실제 길이를 돌려준다)."""
+    latest = next(V for V in P["versions"] if V["latest"])
+    out = {f: latest["sizes"][f] for f in ("pk", "sk", "ct", "ss") if f in latest["sizes"]}
+    if P["kind"] == "sig":
+        out["sig"] = max(V["sizes"].get("sig", 0) for V in P["versions"])
+    return out
+
+
+def example_answers(key, pick, implementation="example answers built from the reference KAT excerpts"):
+    """pick({파라미터: 판}) 판의 구현이라면 낼 답안. 그 판 문항은 기대 답 그대로, 다른 판 문항은 decaps 가 그 문항 기대 ss 의 첫 바이트를
+    바꾼 값, verify 는 false, derand 는 같은 count 의 고른 판 값(seed 가 판마다 같다)이다. 자기 점검(control_problem)과 시험이 쓴다."""
+    prompt = emit_prompt(key)
+    exp, own = {}, {}
+    for P in key["params"]:
+        for V in P["versions"]:
+            for rec in V["excerpt"] or ():
+                e = _expected(P, V, rec)
+                for iid, val in e.items():
+                    exp[iid] = (P["id"], V["version"], rec["count"], val)
+                if pick.get(P["id"]) == V["version"]:
+                    own[(P["id"], rec["count"])] = e[_item_base(P, V, rec) + ":derand"]
+    answers = {}
+    for it in prompt["items"]:
+        pid, ver, count, val = exp[it["id"]]
+        if pick.get(pid) == ver:
+            answers[it["id"]] = dict(val)
+        elif it["op"] == "decaps":
+            answers[it["id"]] = {"ss": _flip_hex(val["ss"])}
+        elif it["op"] == "verify":
+            answers[it["id"]] = {"ok": False}
+        elif (pid, count) in own:
+            answers[it["id"]] = dict(own[(pid, count)])
+    return {"format": RESPONSE_FORMAT, "prompt_sha256": prompt["prompt_sha256"], "params": prompt["params"],
+            "implementation": implementation, "answers": answers}
+
+
+# ---------------------------------------------------------------------------------------------
+# 답안 읽기
+RESPONSE_KEYS = {"format", "prompt_sha256", "params", "implementation", "answers"}
+HEX_ANSWERS = {"ss", "pk", "sk", "ct", "sig", "sm"}
+
+
+def oversize_problem(n):
+    """상한을 넘는 답안의 까닭(파일은 읽지 않고 증적에 사본도 남기지 않는다)."""
+    return f"답안이 {n:,}바이트로 상한 {MAX_INPUT:,}바이트(64 MiB)를 넘는다"
+
+
+def parse_input(data):
+    """답안 바이트 → {"kind": "response"|"rsp"|None, "problem": 까닭 또는 None, ...}. 꼴이 틀렸으면 예외 대신 problem 에 적는다
+    (판정은 미판정). 맨 앞(공백 뒤) 글자가 '{' 면 답안 JSON, 아니면 PQCgenKAT .rsp 로 읽는다.
+    답안 JSON: params, prompt_sha256, implementation, answers({문항 id: {칸: 값}}, 16진수는 대문자로).
+    .rsp: header(맨 앞 '#' 줄의 이름 또는 None), records(parse_rsp)."""
+    if len(data) > MAX_INPUT:
+        return {"kind": None, "problem": oversize_problem(len(data))}
+    head = bytes(data).lstrip()
+    if head[:1] == b"{" or head.startswith(b"\xef\xbb\xbf{"):  # BOM 붙은 JSON 은 JSON 으로 읽고 BOM 을 까닭으로 적는다
+        return _parse_response(data)
+    return _parse_rsp_input(data)
+
+
+def _parse_response(data):
+    out = {"kind": "response", "problem": None, "params": [], "prompt_sha256": None, "implementation": None, "answers": {}}
+
+    def bad(msg):
+        return dict(out, problem=msg)
+    try:
+        doc = _loads_strict(data, "답안")
+    except ValueError as e:
+        return bad(f"답안 JSON 을 읽을 수 없다: {e}")
+    if not isinstance(doc, dict):
+        return bad("답안 JSON 이 객체가 아니다")
+    if doc.get("format") != RESPONSE_FORMAT:
+        return bad(f"답안 format 이 {RESPONSE_FORMAT!r} 가 아니다")
+    extra = sorted(set(doc) - RESPONSE_KEYS)
+    if extra:
+        return bad(f"답안에 모르는 칸이 있다: {', '.join(extra[:4])}")
+    ps, params, impl, answers = doc.get("prompt_sha256"), doc.get("params"), doc.get("implementation"), doc.get("answers")
+    if not isinstance(ps, str) or not _DIGEST_RE.fullmatch(ps):
+        return bad("prompt_sha256 이 소문자 16진수 64자가 아니다")
+    if not isinstance(params, list) or not params or not all(isinstance(p, str) for p in params) or len(set(params)) != len(params):
+        return bad("params 가 겹치지 않는 파라미터 이름 목록이 아니다")
+    if impl is not None and (not isinstance(impl, str) or len(impl) > 500):
+        return bad("implementation 은 500자 이하 글이거나 null 이어야 한다")
+    if not isinstance(answers, dict):
+        return bad("answers 가 객체가 아니다")
+    norm = {}
+    for iid, a in answers.items():
+        if not isinstance(a, dict):
+            return bad(f"답 {iid}: 객체가 아니다")
+        got = {}
+        for k, v in a.items():
+            if k == "ok":
+                if not isinstance(v, bool):
+                    return bad(f"답 {iid}: ok 는 true 나 false 여야 한다")
+                got[k] = v
+            elif k in HEX_ANSWERS:
+                if not isinstance(v, str) or not _HEX_RE.fullmatch(v.strip()) or len(v.strip()) % 2:
+                    return bad(f"답 {iid}: {k} 가 짝수 자리 16진수가 아니다")
+                got[k] = v.strip().upper()
+            else:
+                return bad(f"답 {iid}: 모르는 칸 {k!r}")
+        norm[iid] = got
+    return dict(out, params=params, prompt_sha256=ps, implementation=impl, answers=norm)
+
+
+def _parse_rsp_input(data):
+    out = {"kind": "rsp", "problem": None, "header": None, "records": []}
+    try:
+        text = bytes(data).decode("ascii")
+    except UnicodeDecodeError as e:
+        return dict(out, problem=f".rsp 에 ASCII 밖의 바이트가 있다(위치 {e.start})")
+    for line in text.lstrip("﻿").replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        s = line.strip()
+        if s:
+            out["header"] = (s[1:].strip()[:200] or None) if s.startswith("#") else None
+            break
+    try:
+        out["records"] = parse_rsp(text)
+    except ValueError as e:
+        return dict(out, problem=f".rsp 를 읽을 수 없다: {e}")
+    return out
+
+
+def input_params(parsed, names, hint=None):
+    """판정할 파라미터와 입력 문제: ([파라미터], 까닭 또는 None). names: {소문자 이름: 파라미터}(목록 전체 또는 정답 묶음).
+    답안 JSON 은 params 칸을 정식 이름으로 읽고, .rsp 는 hint(--param, 정식 이름) 또는 머리 줄 이름을 쓴다."""
+    if parsed["kind"] == "response":
+        known = [p for p in parsed["params"] if names.get(p.lower()) == p]
+        unknown = [p for p in parsed["params"] if p not in known]
+        if unknown:
+            return known, (f"모르는 파라미터 {', '.join(unknown[:4])}(문제지는 pqproof impl prompt 가 낸 정식 이름을 쓴다)")
+        return known, None
+    if parsed["kind"] != "rsp":
+        return ([hint] if hint else []), None
+    header = parsed.get("header")
+    if hint:
+        if header and names.get(header.lower()) != hint:
+            return [hint], f"머리 줄 '# {header}' 이 {hint} 의 이름이 아니다(다른 파라미터의 .rsp 이거나 --param 이 틀렸다)"
+        return [hint], None
+    pid = names.get(header.lower()) if header else None
+    if pid is None:
+        return [], ("파라미터를 정할 수 없다: " + (f"머리 줄 '# {header}' 이 아는 이름이 아니다" if header else ".rsp 에 머리 줄이 없다")
+                    + ". --param 으로 준다")
+    return [pid], None
+
+
+# ---------------------------------------------------------------------------------------------
+# 판정
+STATUS_KO = {"pass": "통과", "fail": "실패", "undecided": "미판정", "review": "검토 필요"}
+
+
+def combine(statuses):
+    """파라미터 결과를 하나로: 실패 > 미판정 > 검토 필요 > 통과. 결과가 없으면 미판정(건너뜀은 통과가 아니다)."""
+    statuses = list(statuses)
+    return next((s for s in ("fail", "undecided", "review") if s in statuses), "pass" if statuses else "undecided")
+
+
+def _label(V):
+    if V["role"] == "known-variant":
+        return f"알려진 변형 {V['version']}"
+    return f"{'최신판' if V['latest'] else '옛 판'} {V['version']}"
+
+
+def _row(V, acc, stat):
+    return {"version": V["version"], "role": V["role"], "latest": V["latest"], "accepted": V["version"] in acc,
+            "checked": stat["checked"], "ok": stat["ok"], "records": stat.get("records"), "first_mismatch": stat["first"]}
+
+
+def _result(P, status, summary, rows, matched=()):
+    return {"param": P["id"], "name": P["name"], "status": status, "summary": summary, "matched": list(matched), "versions": rows}
+
+
+def _decide(P, cands, acc, rows, unit):
+    """후보 판 목록으로 상태를 정한다. unit: 'items'(문항 n/m) 또는 'records'(레코드 n/100)."""
+    def count(r):
+        return r["records"] if unit == "records" else f"문항 {r['ok']}/{r['checked']}"
+    by = {r["version"]: r for r in rows}
+    if not cands:
+        shown = [r for r in rows if r["checked"]]
+        lead = next((r for r in rows if r["accepted"] and r["first_mismatch"]), None) or next((r for r in rows if r["first_mismatch"]), None)
+        return _result(P, "fail", "맞는 판 없음(" + ", ".join(f"{r['version']} {count(r)}" for r in shown) + ")"
+                       + (f", 첫 불일치 {lead['version']}: {lead['first_mismatch']}" if lead else ""), rows)
+    good = [V for V in cands if V["version"] in acc]
+    other = [V for V in cands if V["version"] not in acc]
+    names = [V["version"] for V in cands]
+    if good and not other:
+        return _result(P, "pass", ", ".join(f"{V['version']} 일치({count(by[V['version']])})" for V in good), rows, names)
+    if good:
+        return _result(P, "review", f"{', '.join(V['version'] for V in good)} 와 {', '.join(_label(V) for V in other)} 모두 일치: 이 답안으로는 "
+                       "판을 가를 수 없다(derand 문항 결과를 함께 내거나 .rsp 를 낸다)", rows, names)
+    return _result(P, "review", ", ".join(f"{_label(V)} 일치({count(by[V['version']])})" for V in other)
+                   + f": 받아 줄 판({', '.join(acc) or '없음'})이 아니다", rows, names)
+
+
+def _judge_items(P, items, answers, acc):
+    exp = {}
+    for V in P["versions"]:
+        for rec in V["excerpt"] or ():
+            for iid, val in _expected(P, V, rec).items():
+                exp[iid] = (V["version"], val)
+    stats = {V["version"]: {"checked": 0, "ok": 0, "first": None} for V in P["versions"]}
+    rows = [_row(V, acc, stats[V["version"]]) for V in P["versions"]]
+    shape = [it["id"] for it in items if it["id"] in answers
+             and (set(answers[it["id"]]) - set(it["answer"]) - set(it["optional"]) or not set(it["answer"]) <= set(answers[it["id"]]))]
+    if shape:
+        it = next(x for x in items if x["id"] == shape[0])
+        return _result(P, "undecided", f"문항과 맞지 않는 답 {len(shape)}개: {shape[0]}(받는 칸 {', '.join(it['answer'] + it['optional'])})",
+                       rows)
+    missing = [it["id"] for it in items if it["answer"] and it["id"] not in answers]
+    if missing:
+        return _result(P, "undecided", f"답 없는 문항 {len(missing)}개: {missing[0]}" + (" 외" if len(missing) > 1 else ""), rows)
+    for it in items:
+        a = answers.get(it["id"])
+        if not a:
+            continue
+        ver, val = exp[it["id"]]
+        s = stats[ver]
+        s["checked"] += 1
+        bad = next((f for f in it["answer"] + it["optional"] if f in a and a[f] != val[f]), None)
+        if bad is None:
+            s["ok"] += 1
+        elif s["first"] is None:
+            s["first"] = f"{it['id']} {bad}"
+    rows = [_row(V, acc, stats[V["version"]]) for V in P["versions"]]
+    tampered = [it["id"] for it in items if it["id"].endswith(":verify-tampered") and answers[it["id"]].get("ok") is True]
+    if tampered:
+        return _result(P, "fail", f"변조 서명을 받아들임: {tampered[0]}" + (f" 외 {len(tampered) - 1}개" if len(tampered) > 1 else ""), rows)
+    cands = [V for V in P["versions"] if stats[V["version"]]["checked"] and stats[V["version"]]["ok"] == stats[V["version"]]["checked"]]
+    return _decide(P, cands, acc, rows, "items")
+
+
+def canonical_record(P, rec):
+    """.rsp 레코드를 참조판의 칸 꼴로: HAETAE 꼴(siglen·sig)인데 smlen·sm(참조 crypto_sign 의 sig || msg)으로 쓴 것은 sig 로,
+    AIMer 꼴(smlen·sm = msg || sig)인데 siglen·sig 로 쓴 것은 sm 으로 바꾼다. 꼴이 맞지 않으면 그대로 둔다(대조에서 다르게 나온다)."""
+    r = dict(rec)
+    if P["kind"] != "sig" or not {"mlen", "msg"} <= set(r):
+        return r
+    m = 2 * int(r["mlen"])
+    if "sig" in P["fields"] and "sig" not in r and "sm" in r and len(r["sm"]) >= m and r["sm"][len(r["sm"]) - m:] == r["msg"]:
+        sm = r.pop("sm")
+        r.pop("smlen", None)
+        sig = sm[:len(sm) - m]
+        r["sig"], r["siglen"] = sig, str(len(sig) // 2)
+    elif "sm" in P["fields"] and "sm" not in r and "sig" in r:
+        sig = r.pop("sig")
+        r.pop("siglen", None)
+        r["sm"], r["smlen"] = r["msg"] + sig, str(int(r["mlen"]) + len(sig) // 2)
+    return r
+
+
+def match_rsp_digests(P, digests, acc, records=None):
+    """.rsp 레코드 digest 목록을 판마다 같은 자리의 record_digests 와 대조한다. 레코드 수가 같고 모두 같으면 후보. records(정규화한 레코드)를
+    주면 첫 불일치 레코드에서 처음 다른 칸을 발췌와 비교해 적는다."""
+    n = len(digests)
+    stats = {}
+    for V in P["versions"]:
+        rd = V["record_digests"]
+        ok = sum(1 for i, d in enumerate(digests[:len(rd)]) if d == rd[i])
+        first = next((i for i, d in enumerate(digests[:len(rd)]) if d != rd[i]), None)
+        where = None
+        if first is not None:
+            ex = (V["excerpt"] or [])[first] if V["excerpt"] and first < len(V["excerpt"]) else None
+            field = next((f for f in P["fields"] if ex is not None and records is not None and records[first].get(f) != ex[f]), None)
+            where = f"count {first}" + (f" {field}" if field else "")
+        elif n != len(rd):
+            where = f"레코드 {n}건(참조 {len(rd)}건)"
+        stats[V["version"]] = {"checked": n, "ok": ok, "records": f"{ok}/{len(rd)}", "first": where}
+    rows = [_row(V, acc, stats[V["version"]]) for V in P["versions"]]
+    if n == 0:
+        return _result(P, "undecided", ".rsp 에 레코드가 0건이다", rows)
+    cands = [V for V in P["versions"] if n == V["records"] and stats[V["version"]]["ok"] == n]
+    if not cands:
+        prefix = [V for V in P["versions"] if n < V["records"] and stats[V["version"]]["ok"] == n]
+        if prefix:
+            return _result(P, "undecided", f"레코드 {n}건뿐({prefix[0]['records']}건 필요). 있는 {n}건은 "
+                           + ", ".join(V["version"] for V in prefix) + " 와 일치", rows)
+    return _decide(P, cands, acc, rows, "records")
+
+
+def _judge_rsp(P, records, acc):
+    try:
+        canon = [canonical_record(P, r) for r in records]
+        digests = [record_digest(r) for r in canon]
+    except (ValueError, KeyError) as e:
+        return _result(P, "undecided", f".rsp 레코드를 정규화할 수 없다: {e}", [_row(V, acc, {"checked": 0, "ok": 0, "first": None})
+                                                                            for V in P["versions"]])
+    return match_rsp_digests(P, digests, acc, canon)
+
+
+def match_versions(key, parsed, accept):
+    """정답 묶음과 읽은 답안으로 파라미터마다 판정한다(정답 묶음 순서). accept: {파라미터: [받아 줄 판]}.
+    답안 JSON: 정답 묶음으로 다시 만든 문제지의 prompt_sha256 과 같아야 하고(아니면 모두 미판정), 문제지에 없는 문항 id 가 있으면
+    미판정이다. 파라미터마다 필수 문항(decaps, verify)이 다 있어야 하고(없으면 미판정), 변조 서명 문항을 true 로 답하면 실패다.
+    판마다 그 판 문항이 모두 맞으면 후보다. 후보가 받아 줄 판뿐이면 통과, 받아 줄 판과 다른 판이 함께 후보면 검토 필요(판을 가르지
+    못함), 옛 판·알려진 변형만이면 검토 필요, 후보가 없으면 실패(첫 불일치 문항·칸).
+    .rsp: 파라미터 하나, 레코드 digest 를 판마다 record_digests 와 대조해 'n/100' 을 적는다."""
+    if parsed["kind"] == "rsp":
+        return [_judge_rsp(P, parsed["records"], accept.get(P["id"], [])) for P in key["params"]]
+    prompt = emit_prompt(key)
+    blank = {"checked": 0, "ok": 0, "first": None}
+
+    def all_undecided(why):
+        return [_result(P, "undecided", why, [_row(V, accept.get(P["id"], []), blank) for V in P["versions"]]) for P in key["params"]]
+    if parsed["prompt_sha256"] != prompt["prompt_sha256"]:
+        return all_undecided("prompt_sha256 이 이 도구의 KAT 목록으로 만든 문제지와 다르다(pqproof impl prompt 로 다시 받아 답한다)")
+    ids = {it["id"] for it in prompt["items"]}
+    extra = sorted(set(parsed["answers"]) - ids)
+    if extra:
+        return all_undecided(f"문제지에 없는 문항 id {len(extra)}개: {extra[0]}")
+    return [_judge_items(P, [it for it in prompt["items"] if it["param"] == P["id"]], parsed["answers"], accept.get(P["id"], []))
+            for P in key["params"]]
+
+
+def _flip_digest(d):
+    return ("0" if d[0] != "0" else "1") + d[1:]
+
+
+def control_problem(key, accept, kind):
+    """자기 점검: 판정 전에, 받아 줄 판의 정답 답안은 통과하고 한 바이트 바꾼 답안은 실패하는지 본다. 아니면 까닭(전체를 미판정으로
+    둔다), 맞으면 None. kind 'response' 는 발췌로 만든 답안(KEM 은 decaps ss, 서명은 derand sig 한 바이트를 바꾼다), 'rsp' 는 받아 줄
+    판의 record_digests(첫 레코드를 바꾼다)로 본다."""
+    if not key["params"]:
+        return None
+    if kind == "rsp":
+        for P in key["params"]:
+            acc = accept.get(P["id"], [])
+            V = next((V for V in P["versions"] if V["version"] in acc), None)
+            if V is None:
+                return f"{P['id']}: 받아 줄 판이 없다"
+            r = match_rsp_digests(P, list(V["record_digests"]), acc)
+            if (r["status"], r["matched"]) != ("pass", [V["version"]]):
+                return f"{P['id']}: 받아 줄 판 {V['version']} 의 record_digests 가 통과하지 않았다({r['summary']})"
+            bad = list(V["record_digests"])
+            bad[0] = _flip_digest(bad[0])
+            r = match_rsp_digests(P, bad, acc)
+            if r["status"] != "fail":
+                return f"{P['id']}: 한 레코드를 바꾼 답안이 실패하지 않았다({STATUS_KO[r['status']]}: {r['summary']})"
+        return None
+    pick = {}
+    for P in key["params"]:
+        V = next((V for V in P["versions"] if V["version"] in accept.get(P["id"], []) and V["excerpt"]), None)
+        if V is None:
+            return f"{P['id']}: 받아 줄 판에 발췌가 없어 정답 답안을 만들 수 없다"
+        pick[P["id"]] = V["version"]
+    good = example_answers(key, pick)
+
+    def judge(resp):
+        return match_versions(key, {"kind": "response", "problem": None, "params": resp["params"], "prompt_sha256": resp["prompt_sha256"],
+                                    "implementation": None, "answers": resp["answers"]}, accept)
+    for r in judge(good):
+        if (r["status"], r["matched"]) != ("pass", [pick[r["param"]]]):
+            return f"{r['param']}: 받아 줄 판 {pick[r['param']]} 의 정답 답안이 통과하지 않았다({STATUS_KO[r['status']]}: {r['summary']})"
+    bad = json.loads(json.dumps(good))
+    for P in key["params"]:
+        V = next(V for V in P["versions"] if V["version"] == pick[P["id"]])
+        base = _item_base(P, V, V["excerpt"][0])
+        if P["kind"] == "kem":
+            bad["answers"][base + ":decaps"]["ss"] = _flip_hex(bad["answers"][base + ":decaps"]["ss"])
+        else:
+            bad["answers"][base + ":derand"]["sig"] = _flip_hex(bad["answers"][base + ":derand"]["sig"])
+    for r in judge(bad):
+        if r["status"] != "fail":
+            return f"{r['param']}: 한 바이트 바꾼 답안이 실패하지 않았다({STATUS_KO[r['status']]}: {r['summary']})"
+    return None
+
+
+CHECK_TITLE = "KpqC 구현의 KAT 대조(받아 줄 참조판과 일치하는가, 공인 시험 아님)"
+CHECK_EXPECTED = "파라미터마다 받아 줄 판(프로필의 impl_accept, 기본 최신판)의 KAT 와 일치, 변조 서명 거부, 자기 점검 통과"
+
+
+def check_row(results, control=None, problem=None):
+    """검사 행 i-kpqc(rules.judge_impl 이 쓰고 --verify 가 다시 만들어 맞춘다). control: 자기 점검 까닭(있으면 미판정),
+    problem: 답안 전체의 문제(읽지 못함, 모르는 파라미터, 있으면 미판정)."""
+    if control:
+        status, actual = "undecided", f"자기 점검 실패: {control}"
+    elif problem:
+        status, actual = "undecided", problem
+    elif not results:
+        status, actual = "undecided", "판정할 파라미터가 없다"
+    else:
+        status = combine(r["status"] for r in results)
+        actual = " · ".join(f"{r['param']} {STATUS_KO[r['status']]}: {r['summary']}" for r in results)
+    return {"id": CHECK_ID, "title": CHECK_TITLE, "status": status, "expected": CHECK_EXPECTED, "actual": actual}
