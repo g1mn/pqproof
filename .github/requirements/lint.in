@@ -1,4 +1,4 @@
 # Regenerate lint.txt (hashes for every file of each pin):
 #   uv pip compile --generate-hashes --python-version 3.13 --python-platform x86_64-unknown-linux-gnu --exclude-newer <two weeks ago> --no-header -o .github/requirements/lint.txt .github/requirements/lint.in
-ruff==0.17.3
+ruff==0.17.5
 zizmor==1.32.0
