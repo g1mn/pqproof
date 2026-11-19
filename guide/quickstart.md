@@ -49,7 +49,7 @@ VERDICT=PASS  receipt_id=b17355b74d9f…
 The output folder is `proof-out-YYYYMMDD-HHMMSS` (set another with `OUT=`). Open these first:
 
 - `receipt.html`: the whole evidence on one page, for people.
-- `receipt.json`: the same for programs (schema in `schemas/receipt-v3.schema.json`).
+- `receipt.json`: the same for programs (schema in `schemas/receipt-v4.schema.json`).
 - `tables/report.md`: the check table, ready to paste into a document.
 - `README.txt`: what is in the folder and how to re-check it.
 
@@ -69,4 +69,4 @@ It recomputes the evidence hash (`receipt_id`) and every file hash and rebuilds 
 
 Exit codes: 0 pass, 1 fail, 2 usage or input error, 3 undecided, 4 tool error, and 5 for a pass that needs review under `FAIL_ON_REVIEW=1`. `--verify` gives 0 or 1, 2 when the folder or its `receipt.json` is missing, and 4 on a tool error.
 
-To look at one tree without an original, `pqproof check <tree>` judges it as it is now and `pqproof inventory <tree>` lists what it finds with no verdict ([ci.md](ci.md)).
+To look at one tree without an original, `pqproof check <tree>` judges it as it is now and `pqproof inventory <tree>` lists what it finds with no verdict ([ci.md](ci.md)). To check a KpqC implementation against pinned reference KATs, use `pqproof impl` ([impl.md](impl.md)).

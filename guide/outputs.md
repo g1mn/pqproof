@@ -7,7 +7,7 @@ Each run writes a new folder: `OUT=...`, or `./proof-out-YYYYMMDD-HHMMSS` (with 
 | File | For |
 |---|---|
 | `receipt.html` | people: the whole evidence on one self-contained page, dark and light theme |
-| `receipt.json` | programs: the verification evidence ([schema](../schemas/receipt-v3.schema.json), format 3) |
+| `receipt.json` | programs: the verification evidence ([schema](../schemas/receipt-v4.schema.json), format 4 from 0.3.0) |
 | `tables/report.md` | a document: the check table, the blocking locations after a failure, and what is left after the migration |
 | `README.txt` | the folder itself: the verdict, what to open first, the re-check command and what to look at before sharing (from 0.2.0) |
 
@@ -18,6 +18,7 @@ Each run writes a new folder: `OUT=...`, or `./proof-out-YYYYMMDD-HHMMSS` (with 
 - `tables/summary.csv` (the checks), `tables/java.csv` and `tables/java-usage.csv` (classical lines per rule and per location), `tables/tls.csv` (TLS results).
 - `artifacts/`: raw scanner output, the copies of `residue.sh` and `scan/test-paths.ere` that ran, TLS probe transcripts, the weakening result, the list of changed files and a copy of the allowlist.
 - `in/`: zip inputs, unpacked.
+- An implementation check (`pqproof impl judge`, folder `impl-out-YYYYMMDD-HHMMSS`) writes the same `receipt.*`, `deck.json`, `README.txt`, `tables/report.md` and `tables/summary.csv`, plus `tables/impl.csv` (one row per parameter set and version) and `artifacts/impl/` (the answer, the answer key, the question sheet, and the pq-verify report and run record when `--pq-verify` ran). See [impl.md](impl.md).
 
 Re-check with `pqproof --verify <folder>`. It fails on any file that is not listed, and on a changed `README.txt`, so keep notes outside the folder.
 
@@ -33,7 +34,7 @@ Re-check with `pqproof --verify <folder>`. It fails on any file that is not list
 
 ## Machine-readable contract
 
-`schemas/receipt-v3.schema.json` (JSON Schema draft 2020-12) describes evidence format 3 (0.2.0 and later), `schemas/receipt-v2.schema.json` format 2 (0.1.x), and `schemas/unconverted.schema.json` the allowlist. Within one `format_version` these fields keep their name, type and meaning:
+`schemas/receipt-v4.schema.json` (JSON Schema draft 2020-12) describes evidence format 4 (0.3.0 and later; two-tree and one-tree receipts keep the fields of format 3, and an implementation check adds `params.mode` `impl` and the `impl` field), `schemas/receipt-v3.schema.json` format 3 (0.2.x), `schemas/receipt-v2.schema.json` format 2 (0.1.x), and `schemas/unconverted.schema.json` the allowlist. Within one `format_version` these fields keep their name, type and meaning:
 
 - `format_version`, `tool_version`, `ruleset_version`, `ruleset_sha256`, `receipt_id`, `verdict`
 - `checks[].id`, `checks[].status` (the values the schema lists; only `pass` counts as passed)

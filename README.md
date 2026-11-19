@@ -33,6 +33,7 @@ ex=$(python3 -c 'import os, pqproof; print(os.path.join(os.path.dirname(pqproof.
 pqproof "$ex/classic" "$ex/pqc"       # bundled example: RSA and ECDSA moved to ML-KEM-768 and ML-DSA-65, passes
 pqproof <original> <converted>        # your two trees
 pqproof --verify <output folder>      # recompute the evidence hash and every file hash
+pqproof impl judge answers.json       # KpqC implementation: your answers to `pqproof impl prompt` vs pinned reference KATs
 ```
 
 The run writes `proof-out-YYYYMMDD-HHMMSS/`. Open `receipt.html` (for people) or `receipt.json` (for programs); `tables/report.md` is ready to paste into a document. When the run fails, the console ends with where the full lists are and what to do next. A line that has to stay classical goes into an allowlist with its reason, and a person signs it off ([guide/allowlist.md](https://github.com/g1mn/pqproof/blob/main/guide/allowlist.md)).
@@ -69,11 +70,11 @@ Three ways to run it in a pipeline: a migration pull request judged against its 
 
 ## Documentation
 
-[Quick start](https://github.com/g1mn/pqproof/blob/main/guide/quickstart.md) · [Configuration](https://github.com/g1mn/pqproof/blob/main/guide/configuration.md) · [Allowlist](https://github.com/g1mn/pqproof/blob/main/guide/allowlist.md) · [Outputs](https://github.com/g1mn/pqproof/blob/main/guide/outputs.md) · [CI](https://github.com/g1mn/pqproof/blob/main/guide/ci.md) · [Rules and evidence format (DESIGN.md)](https://github.com/g1mn/pqproof/blob/main/DESIGN.md) · [History](https://github.com/g1mn/pqproof/blob/main/HISTORY.md) · [Changelog](https://github.com/g1mn/pqproof/blob/main/CHANGELOG.md) · [Contributing](https://github.com/g1mn/pqproof/blob/main/CONTRIBUTING.md) · [Security](https://github.com/g1mn/pqproof/blob/main/SECURITY.md)
+[Quick start](https://github.com/g1mn/pqproof/blob/main/guide/quickstart.md) · [Configuration](https://github.com/g1mn/pqproof/blob/main/guide/configuration.md) · [Allowlist](https://github.com/g1mn/pqproof/blob/main/guide/allowlist.md) · [Outputs](https://github.com/g1mn/pqproof/blob/main/guide/outputs.md) · [CI](https://github.com/g1mn/pqproof/blob/main/guide/ci.md) · [Implementation check](https://github.com/g1mn/pqproof/blob/main/guide/impl.md) · [Rules and evidence format (DESIGN.md)](https://github.com/g1mn/pqproof/blob/main/DESIGN.md) · [History](https://github.com/g1mn/pqproof/blob/main/HISTORY.md) · [Changelog](https://github.com/g1mn/pqproof/blob/main/CHANGELOG.md) · [Contributing](https://github.com/g1mn/pqproof/blob/main/CONTRIBUTING.md) · [Security](https://github.com/g1mn/pqproof/blob/main/SECURITY.md)
 
 ## Related
 
-[PQ-Proof Agent](https://github.com/g1mn/pq-proof) (`g1mn/pq-proof`, a Vultr Agent Rush entry) is the AI agent that does the migration; this repository is the offline check. [pq-verify](https://pypi.org/project/pq-verify/) tests PQC implementations, and PQ-Proof checks that a codebase finished moving to them, so the two complement each other.
+[PQ-Proof Agent](https://github.com/g1mn/pq-proof) (`g1mn/pq-proof`, a Vultr Agent Rush entry) is the AI agent that does the migration; this repository is the offline check. [pq-verify](https://pypi.org/project/pq-verify/) tests PQC implementations, and PQ-Proof checks that a codebase finished moving to them. From 0.3.0, `pqproof impl` checks KpqC implementations against pinned reference KATs without running them, and `--pq-verify` adds a pq-verify audit of a NIST PQC library to the same evidence ([guide/impl.md](https://github.com/g1mn/pqproof/blob/main/guide/impl.md)).
 
 ## License
 

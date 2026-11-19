@@ -1,0 +1,92 @@
+# KpqC 끝에서 끝까지(선택 CI): 손으로 돌리거나(workflow_dispatch) 릴리스 태그(v*)에서 돈다. 기본 CI(ci.yml)와 달리 KpqC 참조 구현을 받는다.
+#   (1) GitHub 에 있는 KpqC 참조 구현 고정 판(SMAUG-T 1.2.0·1.1.1, HAETAE 1.1.2, NTRU+ 2026-01, AIMer 3.0)과 PQClean 고정 커밋을 SHA-256 으로
+#       맞춰 받아 NIST API 공유 라이브러리로 빌드한다(tests/kpqc_targets.sh). HAETAE 1.2.0 은 공식 쪽 Google Drive 에만 있어 넣지 않았다
+#   (2) 이 체크아웃에서 설치한 pqproof 로 문제지를 내고 examples/impl/kpqc_harness.py 로 답안을 만들어 판정한다(tests/kpqc_e2e.py):
+#       최신판 통과, 옛 판 검토 필요(FAIL_ON_REVIEW=1 이면 종료 5), derand 없는 답안은 판을 못 가려 검토 필요, 일부러 틀린 빌드 실패,
+#       참조 KAT 프로그램이 쓴 .rsp 통과(100/100). 증적마다 pqproof --verify 를 돌린다
+#   (3) pq-verify 2.19.0 을 휠 해시로 고정해 깔고(extras 없음) ML-KEM-768 라이브러리를 감사해 i-nist 를 본다: mlkem-native 고정 커밋 통과,
+#       결함을 심은 판 실패, PQClean ML-KEM-768 clean 실패(FIPS 203 입력 검사를 API 안에서 하지 않는다, pq-verify 2.19.0 실측과 같음)
+# 대상을 빌드하고 실행하는 것은 이 시험 작업과 예제 하네스다. PQ-Proof 런타임은 이 빌드에 기대지 않고 대상을 실행하지 않는다.
+# 액션은 커밋 SHA 로 고정한다(주석은 그 SHA 의 태그). pq-verify 는 .github/requirements/pq-verify.txt 에 해시로 고정한다.
+name: KpqC end-to-end
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kpqc-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  e2e:
+    name: KpqC e2e (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: "3.13"
+
+      - name: Tool versions
+        run: |
+          cc --version | head -1
+          python3 --version
+          if [ "$RUNNER_OS" = macOS ]; then "$(brew --prefix openssl@3)/bin/openssl" version; else openssl version; fi
+
+      - name: OpenSSL headers (Linux; the SMAUG-T and HAETAE KAT DRBG uses libcrypto AES)
+        if: runner.os == 'Linux'
+        run: |
+          if ! printf '#include <openssl/evp.h>\n' | cc -E - >/dev/null 2>&1; then
+            sudo apt-get update -q && sudo apt-get install -y -q libssl-dev
+          fi
+
+      - name: Build pinned KpqC reference implementations and PQClean ML-KEM-768 (SHA-256 checked)
+        run: bash tests/kpqc_targets.sh "$RUNNER_TEMP/kpqc" | tee -a "$GITHUB_ENV"
+
+      - name: pq-verify (hash-pinned, no extras) and two mlkem-native ML-KEM-768 libraries
+        run: |
+          python3 -m venv "$RUNNER_TEMP/pqv"
+          "$RUNNER_TEMP/pqv/bin/python" -m pip install --quiet --no-deps --only-binary=:all: --require-hashes -r .github/requirements/pq-verify.txt
+          "$RUNNER_TEMP/pqv/bin/pq-verify" --version
+          bash tests/pqverify_targets.sh "$RUNNER_TEMP/pqv-targets" | tee -a "$GITHUB_ENV"
+          echo "PQ_VERIFY=$RUNNER_TEMP/pqv/bin/pq-verify" >> "$GITHUB_ENV"
+
+      - name: Install pqproof from this checkout
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install --quiet .
+          "$RUNNER_TEMP/venv/bin/pqproof" --version
+
+      - name: Question sheet, harness and judge on the real builds (expected verdicts, every receipt re-verified)
+        run: |
+          python3 -I tests/kpqc_e2e.py --pqproof "$RUNNER_TEMP/venv/bin/pqproof" --libs "$KPQC_LIBS" --rsp "$KPQC_RSP" \
+            --out "$RUNNER_TEMP/e2e" --nist-good "$PQPROOF_PQV_LIB" --nist-bad "$PQPROOF_PQV_BAD_LIB" \
+            --nist-pqclean "$KPQC_PQCLEAN_LIB" --json kpqc-e2e.json
+
+      - name: Keep the result
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: kpqc-e2e-${{ matrix.os }}
+          path: kpqc-e2e.json
+          if-no-files-found: ignore

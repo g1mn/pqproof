@@ -19,8 +19,9 @@ PQ-Proof judges a migration and writes evidence that others may rely on. These a
 - an evidence folder that someone changed and that `--verify` still accepts, apart from the documented limit that anyone can rewrite every file and hash at once;
 - an input tree or zip that makes PQ-Proof run code from it, write outside the output folder, or read files outside the inputs;
 - a SARIF file or GitHub Action output that reports pass when the run did not pass;
+- with `pqproof impl judge`, answers or a `.rsp` that match no accepted reference version (or accept a changed signature) and still get an `i-kpqc` pass, or an answer file, `.rsp` or copied evidence that makes PQ-Proof run code or that `--verify` accepts after a change;
 - with `pqproof impl judge --pq-verify`, an argument string that gets a refused pq-verify option through (network vectors, output paths, harness commands) or makes PQ-Proof start it through a shell, or a pq-verify report that gives `i-nist` a pass when the audit did not pass.
 
-pq-verify is a separate program that loads and runs the library it audits, and it is not a sandbox. What an audited library does when pq-verify loads it is outside PQ-Proof; audit untrusted libraries in a container or VM.
+pq-verify is a separate program that loads and runs the library it audits, and it is not a sandbox. What an audited library does when pq-verify loads it is outside PQ-Proof; audit untrusted libraries in a container or VM. The example harness `examples/impl/kpqc_harness.py` loads and runs the libraries you give it in the same way. A match in `pqproof impl` is a match with a pinned reference KAT, not a certification ([guide/impl.md](guide/impl.md#limits)).
 
 Known limits listed in [DESIGN.md](DESIGN.md#limits), for example policy values in JSON or YAML and TLS settings outside the given tree, are not vulnerabilities by themselves. A report that shows one of them hiding a real classical key in practice is still welcome.
