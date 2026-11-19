@@ -2,7 +2,7 @@
  "verdict": "pass",
  "verdict_text": "통과(검토 필요 검사 i-kpqc)",
  "verdict_text_en": "pass (needs review: i-kpqc)",
- "receipt": "747800c9ab01",
+ "receipt": "d80241c88b24",
  "receipt_file": "/tmp/work/impl-out/receipt.json",
  "mode": "impl",
  "impl": [

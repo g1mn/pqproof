@@ -1363,8 +1363,8 @@ def pqverify_exe(params):
     found = shutil.which(impl.PQV_NAME)
     if found:
         return os.path.abspath(found), None
-    return None, (f"{impl.PQV_NAME} 를 찾지 못했다(PATH 에 없고 PQ_VERIFY 도 주지 않았다). pip install pq-verify 로 따로 설치하고 "
-                  "PQ_VERIFY 로 가리킨다")
+    return None, (f"{impl.PQV_NAME} 를 찾지 못했다(PATH 에 없고 PQ_VERIFY 도 주지 않았다). 따로 만든 가상 환경에 판과 휠 해시를 고정해 "
+                  "설치하고(guide/impl.md, .github/requirements/pq-verify.txt) PQ_VERIFY 로 가리킨다")
 
 
 def _kill_group(p):
@@ -1593,8 +1593,10 @@ def impl_judge(path, names, params, out=None, quiet=False, pq_verify=None):
                   f"판정 기준: PROFILE={params.profile} · 받아 줄 판 {', '.join(r['impl']['accept']) or '없음'}"
                   + (f" · 문제지 {prompt_rec['items']}문항" if prompt_rec else "")]
     if nist:
+        extra = rc.nist_extra_args(nist)
         lines.append(f"pq-verify: {nist['executable'] or '없음'}" + (f" ({pqv_tool['version'] or '판 모름'})" if pqv_tool else "")
-                     + f" · {spec['audit']} {nist['library']['path']} {spec['param_set']} · 종료 {nist['exit_code']}"
+                     + f" · {spec['audit']} {nist['library']['path']} {spec['param_set']}"
+                     + (f" · 더 준 옵션 {' '.join(impl.shown(a, 200) for a in extra)}" if extra else "") + f" · 종료 {nist['exit_code']}"
                      + (f" · 보고서 {nist['report']}" if nist["report"] else " · 보고서 없음"))
     for c in checks:
         lines.append(f"[{c['id']}] {STATUS_KO[c['status']]}  {c['actual']}")
@@ -1611,6 +1613,9 @@ def impl_judge(path, names, params, out=None, quiet=False, pq_verify=None):
     if code == 0 and params.fail_on_review and any(c["status"] == "review" for c in checks):
         code = EXIT_REVIEW
     note = rc.pending_note(r, en=True)
+    if code == 0 and any(c["id"] == impl.CHECK_ID and c["status"] == "review" for c in checks):
+        lines.append("주의: i-kpqc 가 검토 필요다(받아 줄 판과만 일치한 것이 아니다: 옛 판·알려진 변형과 일치했거나 판을 가르지 못했다). "
+                     "검토 필요는 판정을 바꾸지 않아 종료 코드가 0 이다. CI 에서 멈추려면 FAIL_ON_REVIEW=1 을 준다(종료 5).")
     lines.append(f"VERDICT={verdict.upper()}{f' ({note})' if note else ''}  receipt_id={r['receipt_id']}")
     lines.append(f"검사 {len(checks)}개: " + " · ".join(f"{c['id']} {STATUS_KO[c['status']]}" for c in checks)
                  + f" (통과로 세는 것은 '통과'뿐, 해당 없음은 판정을 바꾸지 않는다) · 도구 {r['tool_version']} · 규칙 묶음 "

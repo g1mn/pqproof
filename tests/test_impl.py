@@ -372,13 +372,28 @@ class Rsp(unittest.TestCase):
         self.assertEqual(impl.record_digest(impl.canonical_record(aim, split)), impl.record_digest(arec))
         self.assertEqual(impl.signed_message_of(rec), rec["sig"] + rec["msg"])
 
+    def test_bom_and_haetae_message_first(self):
+        recs = excerpt("smaug-t/mode3", "1.2.0")
+        bom = impl.parse_input(b"\xef\xbb\xbf" + rsp_text("smaugt_mode3", recs).encode())
+        self.assertEqual((bom["problem"], bom["header"], len(bom["records"])), (None, "smaugt_mode3", len(recs)))
+        hae = MANIFEST["params"]["haetae/mode2"]
+        rec = excerpt("haetae/mode2", "1.2.0")[0]
+        swapped = {k: v for k, v in rec.items() if k not in ("siglen", "sig")}
+        swapped["smlen"], swapped["sm"] = str(int(rec["siglen"]) + int(rec["mlen"])), rec["msg"] + rec["sig"]  # AIMer 처럼 msg || sig
+        self.assertEqual(impl.record_digest(impl.canonical_record(hae, swapped)), impl.record_digest(rec))
+        wrong_len = dict(swapped, smlen=str(int(swapped["smlen"]) + 1))  # 길이 칸이 틀리면 바꾸지 않는다
+        self.assertIn("sm", impl.canonical_record(hae, wrong_len))
+
     def test_header_and_param(self):
         names = MANIFEST["names"]
         rsp = impl.parse_input(rsp_text("SMAUG-T3", excerpt("smaug-t/mode3", "1.2.0")[:1]).encode())
         self.assertEqual(rsp["header"], "SMAUG-T3")
         self.assertEqual(impl.input_params(rsp, names), (["smaug-t/mode3"], None))
         self.assertEqual(impl.input_params(rsp, names, "smaug-t/mode3"), (["smaug-t/mode3"], None))
-        self.assertIn("이름이 아니다", impl.input_params(rsp, names, "smaug-t/mode5")[1])
+        self.assertIn("smaug-t/mode3 의 이름이다", impl.input_params(rsp, names, "smaug-t/mode5")[1])  # 다른 파라미터의 알려진 이름
+        own = impl.parse_input(rsp_text("my own library build", excerpt("smaug-t/mode3", "1.2.0")[:1]).encode())
+        self.assertEqual(impl.input_params(own, names, "smaug-t/mode3"), (["smaug-t/mode3"], None))  # 모르는 이름이면 --param 을 따른다
+        self.assertEqual(own["header"], "my own library build")
         none = impl.parse_input(rsp_text(None, excerpt("smaug-t/mode3", "1.2.0")[:1]).encode())
         self.assertIn("머리 줄이 없다", impl.input_params(none, names)[1])
         odd = impl.parse_input(rsp_text("kyber768", excerpt("smaug-t/mode3", "1.2.0")[:1]).encode())
@@ -388,6 +403,36 @@ class Rsp(unittest.TestCase):
 
 
 class InputLimits(unittest.TestCase):
+    def test_hostile_numbers_depth_and_text(self):
+        # 맥 기본 python 3.9 의 int() 는 긴 숫자에 자릿수 제곱 시간이 걸린다: .rsp 와 답안 JSON 모두 읽기 전에 자릿수로 막는다
+        rsp = impl.parse_input(("# smaugt_mode1\ncount = " + "9" * 400000 + "\n").encode())
+        self.assertIn("상한 18자리", rsp["problem"])
+        self.assertEqual(impl.parse_rsp("count = 000000000000000000000000000033\n")[0]["count"], "33")  # 앞의 0 은 자릿수에 넣지 않는다
+        big = impl.parse_input(b'{"format": "pqproof impl response 1", "answers": ' + b"1" * 400000 + b"}")
+        self.assertIn("상한 40자", big["problem"])
+        deep = impl.parse_input(b'{"format": "pqproof impl response 1", "answers": ' + b"[" * 200000 + b"]" * 200000 + b"}")
+        self.assertIn("깊게", deep["problem"])
+        with self.assertRaises(ValueError):
+            rc.loads_strict(b"[" * 200000 + b"]" * 200000)
+        # 남이 준 글(문항 id·칸·파라미터 이름)은 제어 문자를 적어 바꾸고 잘라서 판정 글에 넣는다
+        key = key_for("smaug-t/mode1")
+        good = impl.example_answers(key, {"smaug-t/mode1": "1.2.0"})
+        nasty = "\x1b[31m|x\n" + "A" * 3000
+        bad_id = dict(good, answers=dict(good["answers"], **{nasty: {"ss": "00"}}))
+        got = judge(key, bad_id)[0]
+        self.assertEqual(got["status"], "undecided")
+        self.assertNotIn("\x1b", got["summary"])
+        self.assertIn("\\x1b", got["summary"])
+        self.assertLess(len(got["summary"]), 300)
+        for doc, want in ((dict(good, params=[nasty]), "모르는 파라미터"), (dict(good, answers={"x": {nasty: "00"}}), "모르는 칸"),
+                          (dict(good, implementation="lib\x1b[2J"), "인쇄할 수 없는")):
+            with self.subTest(want=want):
+                parsed = as_parsed(doc)
+                why = parsed["problem"] or impl.input_params(parsed, MANIFEST["names"])[1]
+                self.assertIn(want, why)
+                self.assertNotIn("\x1b", why)
+        self.assertEqual(impl.shown("a\x1bb\n", 80), "a\\x1bb\\n")
+
     def test_size_limit_and_bad_json(self):
         with mock.patch.object(impl, "MAX_INPUT", 100):
             got = impl.parse_input(b"{" + b" " * 120 + b"}")
@@ -491,19 +536,108 @@ class Evidence(unittest.TestCase):
         rehash(d, "artifacts/impl/key.json", impl.dumps(key))
         self.assertIn("answer key is not consistent", self.fails(d))
 
-    def test_other_kat_list_uses_the_copy(self):
+    def test_broken_kat_list_is_not_a_pass(self):
         with mock.patch.object(impl, "load_manifest", side_effect=impl.ManifestError("gone")):
+            self.assertIn("KAT list cannot be read", self.fails(self.out))
+
+    def test_recorded_other_kat_list_uses_the_copy(self):
+        real = impl.load_manifest()
+        with mock.patch.object(impl, "load_manifest", return_value=dict(real, sha256="f" * 64)):
             res = rc.verify(self.out)
         self.assertEqual([w for ok, w in res if not ok], [])
-        self.assertTrue(any("judged again with the copied answer key" in w for ok, w in res))
+        self.assertTrue(any("judged again with the copy" in w for ok, w in res))
+        d = self.copy("other-kat-forged")  # 기록된 목록이라도 사본의 판 기록이 이 도구의 목록과 다르면 믿지 않는다
+        p = os.path.join(d, "artifacts", "impl", "key.json")
+        key = json.loads(pathlib.Path(p).read_text(encoding="utf-8"))
+        V = key["params"][0]["versions"][0]
+        V["excerpt"][0]["ss"] = impl._flip_hex(V["excerpt"][0]["ss"])
+        V["record_digests"][0] = impl.record_digest(V["excerpt"][0])
+        V["digest"] = impl.rsp_digest(V["record_digests"])
+        self.assertEqual(impl.check_key(key), [])
+        rehash(d, "artifacts/impl/key.json", impl.dumps(key))
+        with mock.patch.object(impl, "load_manifest", return_value=dict(real, sha256="f" * 64)):
+            self.assertIn("disagrees with this tool's KAT list", self.fails(d))
 
-    def test_other_rules_are_not_judged_again(self):
+    def test_other_rules_are_judged_again(self):
         v = rc._version_module()
         real = v.path_sha256
         with mock.patch.object(v, "path_sha256", lambda p: "0" * 64 if str(p).endswith("impl.py") else real(p)):
             res = rc.verify(self.out)
         self.assertEqual([w for ok, w in res if not ok], [])
-        self.assertTrue(any("not judged again with this tool's rules" in w for ok, w in res))
+        self.assertTrue(any("judged again with this tool's rules gives the same statuses" in w for ok, w in res))
+
+    def _failing_copy(self, name):
+        """한 바이트 바꾼 답안으로 실패 증적을 만든다(위조 시험의 바탕)."""
+        key = key_for("smaug-t/mode1")
+        good = impl.example_answers(key, {"smaug-t/mode1": "1.2.0"})
+        iid = "smaug-t/mode1@1.2.0#0:decaps"
+        bad = copy.deepcopy(good)
+        bad["answers"][iid]["ss"] = impl._flip_hex(bad["answers"][iid]["ss"])
+        ans = os.path.join(self.tmp, name + ".json")
+        pathlib.Path(ans).write_text(impl.dumps(bad), encoding="utf-8")
+        out = os.path.join(self.tmp, name)
+        r, code, _ = prove.impl_judge(ans, [], prove.Params({}, mode="impl"), out, quiet=True)
+        self.assertEqual((r["verdict"], code, self.fails(out)), ("fail", 1, ""))
+        goodres = impl.match_versions(key, as_parsed(good), {"smaug-t/mode1": ["1.2.0"]})
+        return out, key, bad, iid, goodres
+
+    @staticmethod
+    def _passify(r, results):
+        r["verdict"] = "pass"
+        r["impl"]["results"] = results
+        r["checks"][0] = impl.check_row(results, None, None)
+
+    def test_forged_pass_with_another_rules_hash_is_caught(self):
+        # 리뷰 T3: 결과를 통과로 고치고 tools[] 의 impl.py 해시를 바꿔 규칙 묶음을 '3+modified' 로 적어도 다시 판정해 잡는다
+        out, _, _, _, goodres = self._failing_copy("t3")
+        v = rc._version_module()
+
+        def change(r):
+            self._passify(r, goodres)
+            for t in r["tools"]:
+                if t["name"] == "pqlite/impl.py":
+                    t["sha256"] = "ab" * 32
+            r["ruleset_version"] = "3+modified"
+            r["ruleset_sha256"] = v.ruleset_from_tools(r["tools"], "3+modified")
+        rewrite(out, change)
+        self.assertIn("differs from the receipt", self.fails(out))
+
+    def test_forged_key_with_unrecorded_kat_list_is_caught(self):
+        # 리뷰 T4: 틀린 답에 맞게 정답 묶음을 고치고 KAT 목록 해시를 바꿔도 사본을 믿지 않는다
+        out, _, bad, iid, _ = self._failing_copy("t4")
+        p = os.path.join(out, "artifacts", "impl", "key.json")
+        key = json.loads(pathlib.Path(p).read_text(encoding="utf-8"))
+        V = key["params"][0]["versions"][0]
+        V["excerpt"][0]["ss"] = bad["answers"][iid]["ss"]
+        V["record_digests"][0] = impl.record_digest(V["excerpt"][0])
+        V["digest"] = impl.rsp_digest(V["record_digests"])
+        rehash(out, "artifacts/impl/key.json", impl.dumps(key))
+        v = rc._version_module()
+
+        def change(r):
+            r["impl"]["kat_manifest_sha256"] = "cd" * 32
+            for t in r["tools"]:
+                if t["name"] == "kat-kpqc":
+                    t["sha256"] = "cd" * 32
+            r["ruleset_version"] = "3+modified"
+            r["ruleset_sha256"] = v.ruleset_from_tools(r["tools"], "3+modified")
+        rewrite(out, change)
+        self.assertIn("neither this tool's nor one recorded", self.fails(out))
+
+    def test_forged_accept_list_is_caught(self):
+        # 받아 줄 판을 옛 판까지 넓히고 프로필 해시를 바꿔도 이 도구의 프로필 내용과 맞춘다
+        d = self.copy("accept")
+        v = rc._version_module()
+
+        def change(r):
+            r["impl"]["accept"] = r["impl"]["accept"] + ["haetae/mode2@1.1.2"]
+            for t in r["tools"]:
+                if t["name"] == "profiles":
+                    t["sha256"] = "ef" * 32
+            r["ruleset_version"] = "3+modified"
+            r["ruleset_sha256"] = v.ruleset_from_tools(r["tools"], "3+modified")
+        rewrite(d, change)
+        self.assertIn("of this tool gives", self.fails(d))
 
     def test_format_three_cannot_hold_impl(self):
         d = self.copy("fv3")

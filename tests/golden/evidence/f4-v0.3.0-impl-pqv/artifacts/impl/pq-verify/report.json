@@ -5,7 +5,7 @@
     "name": "pq-verify",
     "version": "2.19.0"
   },
-  "timestamp": "2026-11-19T12:04:02.168946+00:00",
+  "timestamp": "2026-11-19T13:29:13.607353+00:00",
   "artifact": {
     "bound": true,
     "sha256": "21e5cdbd3da1531fe473cb7f0a4da039c551683c8fc8c6e1c400c923eaa9ac28",
@@ -16,7 +16,7 @@
     "loaded_objects": [
       {
         "path": "/tmp/work/lib/libmlkem768_good.dylib",
-        "inode": 102037427,
+        "inode": 102339153,
         "sha256": "21e5cdbd3da1531fe473cb7f0a4da039c551683c8fc8c6e1c400c923eaa9ac28"
       }
     ]

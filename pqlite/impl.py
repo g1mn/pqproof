@@ -4,7 +4,7 @@
 #   (답안 JSON 또는 PQCgenKAT .rsp)을 참조 KAT 와 대조만 한다(match_versions). 표준 준수나 공인 시험(KCMVP)이 아니다.
 #   - .rsp 읽기와 digest: parse_rsp, record_digest, rsp_digest(참조판 목록을 만드는 tools/make_kat_manifest.py 도 쓴다)
 #   - 참조판 목록 읽기: load_manifest(scan/kat-kpqc.json + scan/kat/ 발췌, 깨졌으면 ManifestError), build_key(판정할 파라미터만 담은
-#     정답 묶음, 증적에 사본으로 남아 --verify 가 다시 판정한다), check_key
+#     정답 묶음, 증적에 사본으로 남아 --verify 가 다시 판정한다), check_key, key_problem(사본을 이 도구의 목록과 판 기록마다 맞춘다)
 #   - 문제지와 답안: emit_prompt, parse_input(답안 JSON 또는 .rsp, 64 MiB 상한), example_answers(어느 판 구현이라면 낼 답안. 자기
 #     점검과 시험이 쓴다)
 #   - 판정: match_versions(판마다 문항이 모두 맞으면 후보, 받아 줄 판이면 통과, 옛 판·알려진 변형이면 검토 필요), control_problem
@@ -25,10 +25,20 @@ import re
 
 # 10진 정수 칸. PQCgenKAT 가 길이와 번호를 10진으로 쓴다(KEM 은 count 만, 서명은 mlen 과 smlen 또는 siglen)
 DEC_FIELDS = frozenset({"count", "mlen", "smlen", "siglen"})
+DEC_DIGITS = 18  # 10진 칸의 자릿수 상한(앞의 0 을 뗀 뒤). 맥 기본 python 3.9 의 int() 는 긴 숫자에 자릿수 제곱 시간이 걸린다
+JSON_NUMBER_CHARS = 40  # JSON 숫자 글의 길이 상한(같은 까닭. 3.11 부터는 int 가 4300자리에서 스스로 멈춘다)
 _KEY_RE = re.compile(r"[a-z][a-z0-9_]*")
 _HEX_RE = re.compile(r"[0-9A-Fa-f]*")
 _DEC_RE = re.compile(r"[0-9]+")
 _DIGEST_RE = re.compile(r"[0-9a-f]{64}")
+
+
+def shown(text, n=80):
+    """남이 준 글(답안의 문항 id·칸 이름·파라미터 이름, .rsp 머리 줄, pq-verify 출력)을 판정 글에 넣는 꼴: 인쇄할 수 없는 글자(제어 문자,
+    줄바꿈, ESC 등)는 \\x1b 처럼 적고 n 자에서 자른다. 콘솔·receipt·report.md·csv 로 터미널 제어 문자가 새지 않게 한다."""
+    s = str(text)
+    body = "".join(c if c.isprintable() else repr(c)[1:-1] for c in s[:n])
+    return body + ("..." if len(s) > n else "")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 저장소 루트, 또는 설치본의 pqproof/_tool
 KAT_FILE = os.path.join(ROOT, "scan", "kat-kpqc.json")
@@ -51,7 +61,10 @@ def _norm_field(key, value, where=""):
     if key in DEC_FIELDS:
         if not _DEC_RE.fullmatch(value):
             raise ValueError(f"{where}{key} 는 10진 정수여야 한다: {value[:40]!r}")
-        return key, str(int(value))
+        digits = value.lstrip("0") or "0"  # int() 를 쓰지 않는다(긴 숫자에 제곱 시간). 앞의 0 을 뗀 글이 곧 정규형이다
+        if len(digits) > DEC_DIGITS:
+            raise ValueError(f"{where}{key} 가 {len(digits):,}자리로 상한 {DEC_DIGITS}자리를 넘는다")
+        return key, digits
     if not _HEX_RE.fullmatch(value):
         raise ValueError(f"{where}{key} 가 16진수가 아니다: {value[:40]!r}")
     if len(value) % 2:
@@ -65,18 +78,21 @@ def parse_rsp(text):
     정규화 규칙(KpqC 참조판 4종 7판의 .rsp 33개를 보고 정했다. KEM 은 count·seed·pk·sk·ct·ss, HAETAE 는
     count·seed·mlen·msg·pk·sk·siglen·sig, AIMer 는 count·seed·mlen·msg·pk·sk·smlen·sm 이고, 모두 LF 줄 끝, 대문자 16진수,
     맨 위에 '# 알고리즘 이름' 한 줄이 있다):
-    - 줄 끝은 LF, CRLF, CR 모두 받는다. 맨 앞 BOM(U+FEFF)은 지운다. ASCII 밖의 글자가 있으면 ValueError.
+    - 줄 끝은 LF, CRLF, CR 모두 받는다. 맨 앞 BOM(U+FEFF, bytes 로 주면 EF BB BF)은 지운다. ASCII 밖의 글자가 있으면 ValueError.
     - 빈 줄과 '#' 로 시작하는 줄(맨 위 '# smaugt_mode1' 같은 이름 줄)은 버린다. 빈 줄은 값이 아니고, 레코드 경계는 count 줄이 정한다.
     - 나머지 줄은 '키 = 값' 꼴이어야 한다(첫 '=' 에서 나눈다). 키는 앞뒤 공백을 지우고 소문자로, 값은 앞뒤 공백을 지운다.
-    - 10진 칸(count, mlen, smlen, siglen)은 10진 정수여야 하고 앞의 0 을 뗀 문자열로 둔다('033' 은 '33').
+    - 10진 칸(count, mlen, smlen, siglen)은 10진 정수여야 하고 앞의 0 을 뗀 문자열로 둔다('033' 은 '33'). 18자리를 넘으면 ValueError.
     - 그 밖의 칸은 16진수여야 하고(빈 값 허용) 대문자로 바꾼다. 16진수가 아닌 글자나 홀수 자릿수는 ValueError.
     - count 줄이 새 레코드를 연다(PQCgenKAT 는 count 를 맨 앞에 쓴다). 첫 count 앞에 다른 칸이 있거나, 한 레코드에 같은 키가
       두 번 나오면 ValueError.
     - 레코드 수, count 가 0 부터 이어지는지, 칸 이름과 길이가 맞는지는 여기서 보지 않는다(부르는 쪽이 본다).
     """
     if isinstance(text, (bytes, bytearray)):
+        text = bytes(text)
+        if text.startswith(b"\xef\xbb\xbf"):
+            text = text[3:]
         try:
-            text = bytes(text).decode("ascii")
+            text = text.decode("ascii")
         except UnicodeDecodeError as e:
             raise ValueError(f".rsp 에 ASCII 밖의 바이트가 있다(위치 {e.start})") from None
     if not isinstance(text, str):
@@ -155,17 +171,25 @@ def _digest(body):
 
 
 def _loads_strict(data, where):
-    """JSON 을 엄격하게 읽는다: UTF-8(BOM 없음), 중복 키·NaN·Infinity 거부. 틀리면 ValueError(까닭에 where 를 붙인다)."""
+    """JSON 을 엄격하게 읽는다: UTF-8(BOM 없음), 중복 키·NaN·Infinity 거부, 숫자 글은 JSON_NUMBER_CHARS 자까지, 너무 깊게 겹친 값
+    (RecursionError)도 거부. 틀리면 예외 대신 ValueError(까닭에 where 를 붙인다). 부르는 쪽은 이것을 미판정 까닭으로 적는다."""
     def pairs(items):
         out = {}
         for k, v in items:
             if k in out:
-                raise ValueError(f"{where}: 키 {k!r} 가 두 번 있다")
+                raise ValueError(f"{where}: 키 {shown(k)!r} 가 두 번 있다")
             out[k] = v
         return out
 
     def constant(name):
         raise ValueError(f"{where}: {name} 는 JSON 숫자가 아니다")
+
+    def number(kind):
+        def parse(text):
+            if len(text) > JSON_NUMBER_CHARS:
+                raise ValueError(f"{where}: 숫자가 {len(text):,}자로 상한 {JSON_NUMBER_CHARS}자를 넘는다")
+            return kind(text)
+        return parse
     if isinstance(data, (bytes, bytearray)):
         if bytes(data[:3]) == b"\xef\xbb\xbf":
             raise ValueError(f"{where}: UTF-8 BOM 으로 시작한다")
@@ -174,9 +198,13 @@ def _loads_strict(data, where):
         except UnicodeDecodeError as e:
             raise ValueError(f"{where}: UTF-8 이 아니다(위치 {e.start})") from None
     try:
-        return json.loads(data, object_pairs_hook=pairs, parse_constant=constant)
+        return json.loads(data, object_pairs_hook=pairs, parse_constant=constant, parse_int=number(int), parse_float=number(float))
     except json.JSONDecodeError as e:
         raise ValueError(f"{where}: JSON 이 아니다({e})") from None
+    except RecursionError:
+        raise ValueError(f"{where}: 값이 너무 깊게 겹쳐 있다(파이썬 재귀 한도)") from None
+    except MemoryError:
+        raise ValueError(f"{where}: 읽다가 메모리가 모자랐다") from None
 
 
 # ---------------------------------------------------------------------------------------------
@@ -489,6 +517,28 @@ def check_key(key):
     return ["정답 묶음에 같은 파라미터가 두 번 있다"] if len(ids) != len(set(ids)) else []
 
 
+def key_problem(manifest, key):
+    """증적의 정답 묶음 사본을 이 도구의 참조판 목록(load_manifest)과 맞춘다(--verify 가, 목록이 그 증적을 쓸 때와 다를 때 쓴다).
+    사본의 판 기록마다 목록에 같은 파라미터·판 이름·rsp_sha256 의 기록이 있고 digest·records·record_digests·sizes·excerpt 가 같아야
+    한다(고정한 .rsp 의 KAT 는 바뀌지 않는다). latest·role·source·aliases 는 목록이 바뀌며 달라질 수 있고 상태를 정하지 않아 보지 않는다.
+    맞으면 None, 아니면 까닭."""
+    for P in key["params"]:
+        M = manifest["params"].get(P["id"])
+        if M is None:
+            return f"{P['id']} 가 이 도구의 KAT 목록에 없다"
+        if (P["alg"], P["kind"], P["fields"]) != (M["alg"], M["kind"], M["fields"]):
+            return f"{P['id']} 의 alg·kind·fields 가 이 도구의 KAT 목록과 다르다"
+        known = {(V["version"], V["rsp_sha256"]): V for V in M["versions"]}
+        for V in P["versions"]:
+            W = known.get((V["version"], V["rsp_sha256"]))
+            if W is None:
+                return f"{P['id']}@{V['version']}(rsp_sha256 {V['rsp_sha256'][:16]}) 이 이 도구의 KAT 목록에 없다"
+            bad = next((k for k in ("digest", "records", "record_digests", "sizes", "excerpt") if V[k] != W[k]), None)
+            if bad:
+                return f"{P['id']}@{V['version']} 의 {bad} 가 이 도구의 KAT 목록과 다르다"
+    return None
+
+
 def key_names(key):
     """정답 묶음에 든 파라미터의 {소문자 이름: 파라미터}(--verify 가 판정 때와 같은 범위로 이름을 푼다)."""
     return _names(key["params"])
@@ -670,7 +720,7 @@ def _parse_response(data):
         return bad(f"답안 format 이 {RESPONSE_FORMAT!r} 가 아니다")
     extra = sorted(set(doc) - RESPONSE_KEYS)
     if extra:
-        return bad(f"답안에 모르는 칸이 있다: {', '.join(extra[:4])}")
+        return bad(f"답안에 모르는 칸이 있다: {', '.join(shown(x) for x in extra[:4])}" + (f" 외 {len(extra) - 4}개" if len(extra) > 4 else ""))
     ps, params, impl, answers = doc.get("prompt_sha256"), doc.get("params"), doc.get("implementation"), doc.get("answers")
     if not isinstance(ps, str) or not _DIGEST_RE.fullmatch(ps):
         return bad("prompt_sha256 이 소문자 16진수 64자가 아니다")
@@ -678,38 +728,43 @@ def _parse_response(data):
         return bad("params 가 겹치지 않는 파라미터 이름 목록이 아니다")
     if impl is not None and (not isinstance(impl, str) or len(impl) > 500):
         return bad("implementation 은 500자 이하 글이거나 null 이어야 한다")
+    if impl is not None and not impl.isprintable():
+        return bad("implementation 에 인쇄할 수 없는 글자(줄바꿈·제어 문자)가 있다")
     if not isinstance(answers, dict):
         return bad("answers 가 객체가 아니다")
     norm = {}
     for iid, a in answers.items():
+        w = shown(iid)
         if not isinstance(a, dict):
-            return bad(f"답 {iid}: 객체가 아니다")
+            return bad(f"답 {w}: 객체가 아니다")
         got = {}
         for k, v in a.items():
             if k == "ok":
                 if not isinstance(v, bool):
-                    return bad(f"답 {iid}: ok 는 true 나 false 여야 한다")
+                    return bad(f"답 {w}: ok 는 true 나 false 여야 한다")
                 got[k] = v
             elif k in HEX_ANSWERS:
                 if not isinstance(v, str) or not _HEX_RE.fullmatch(v.strip()) or len(v.strip()) % 2:
-                    return bad(f"답 {iid}: {k} 가 짝수 자리 16진수가 아니다")
+                    return bad(f"답 {w}: {k} 가 짝수 자리 16진수가 아니다")
                 got[k] = v.strip().upper()
             else:
-                return bad(f"답 {iid}: 모르는 칸 {k!r}")
+                return bad(f"답 {w}: 모르는 칸 {shown(k, 40)!r}")
         norm[iid] = got
     return dict(out, params=params, prompt_sha256=ps, implementation=impl, answers=norm)
 
 
 def _parse_rsp_input(data):
     out = {"kind": "rsp", "problem": None, "header": None, "records": []}
+    data = bytes(data)
+    skip = 3 if data.startswith(b"\xef\xbb\xbf") else 0  # UTF-8 BOM 은 떼고 읽는다(parse_rsp 와 같은 규칙)
     try:
-        text = bytes(data).decode("ascii")
+        text = data[skip:].decode("ascii")
     except UnicodeDecodeError as e:
-        return dict(out, problem=f".rsp 에 ASCII 밖의 바이트가 있다(위치 {e.start})")
-    for line in text.lstrip("﻿").replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        return dict(out, problem=f".rsp 에 ASCII 밖의 바이트가 있다(위치 {e.start + skip})")
+    for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
         s = line.strip()
         if s:
-            out["header"] = (s[1:].strip()[:200] or None) if s.startswith("#") else None
+            out["header"] = (shown(s[1:].strip(), 200) or None) if s.startswith("#") else None
             break
     try:
         out["records"] = parse_rsp(text)
@@ -720,19 +775,22 @@ def _parse_rsp_input(data):
 
 def input_params(parsed, names, hint=None):
     """판정할 파라미터와 입력 문제: ([파라미터], 까닭 또는 None). names: {소문자 이름: 파라미터}(목록 전체 또는 정답 묶음).
-    답안 JSON 은 params 칸을 정식 이름으로 읽고, .rsp 는 hint(--param, 정식 이름) 또는 머리 줄 이름을 쓴다."""
+    답안 JSON 은 params 칸을 정식 이름으로 읽고, .rsp 는 hint(--param, 정식 이름) 또는 머리 줄 이름을 쓴다. hint 를 주면 머리 줄이
+    다른 파라미터의 알려진 이름일 때만 막고, 모르는 이름(자체 빌드 이름 등)이면 hint 를 따른다(머리 줄은 증적 impl.input.header 에 남는다)."""
     if parsed["kind"] == "response":
         known = [p for p in parsed["params"] if names.get(p.lower()) == p]
         unknown = [p for p in parsed["params"] if p not in known]
         if unknown:
-            return known, (f"모르는 파라미터 {', '.join(unknown[:4])}(문제지는 pqproof impl prompt 가 낸 정식 이름을 쓴다)")
+            return known, (f"모르는 파라미터 {', '.join(shown(p, 60) for p in unknown[:4])}"
+                           + (f" 외 {len(unknown) - 4}개" if len(unknown) > 4 else "") + "(문제지는 pqproof impl prompt 가 낸 정식 이름을 쓴다)")
         return known, None
     if parsed["kind"] != "rsp":
         return ([hint] if hint else []), None
     header = parsed.get("header")
     if hint:
-        if header and names.get(header.lower()) != hint:
-            return [hint], f"머리 줄 '# {header}' 이 {hint} 의 이름이 아니다(다른 파라미터의 .rsp 이거나 --param 이 틀렸다)"
+        other = names.get(header.lower()) if header else None
+        if other is not None and other != hint:
+            return [hint], f"머리 줄 '# {header}' 은 {other} 의 이름이다(--param {hint} 와 다르다: 다른 파라미터의 .rsp 이거나 --param 이 틀렸다)"
         return [hint], None
     pid = names.get(header.lower()) if header else None
     if pid is None:
@@ -827,18 +885,25 @@ def _judge_items(P, items, answers, acc):
 
 
 def canonical_record(P, rec):
-    """.rsp 레코드를 참조판의 칸 꼴로: HAETAE 꼴(siglen·sig)인데 smlen·sm(참조 crypto_sign 의 sig || msg)으로 쓴 것은 sig 로,
-    AIMer 꼴(smlen·sm = msg || sig)인데 siglen·sig 로 쓴 것은 sm 으로 바꾼다. 꼴이 맞지 않으면 그대로 둔다(대조에서 다르게 나온다)."""
+    """.rsp 레코드를 참조판의 칸 꼴로: HAETAE 꼴(siglen·sig)인데 smlen·sm 으로 쓴 것은 sig 로(참조 crypto_sign 의 sig || msg 를 먼저,
+    아니면 AIMer 처럼 msg || sig 로 본다), AIMer 꼴(smlen·sm = msg || sig)인데 siglen·sig 로 쓴 것은 sm 으로 바꾼다. 길이 칸(smlen,
+    siglen)이 있으면 실제 길이와 같을 때만 바꾼다. 꼴이 맞지 않으면 그대로 둔다(대조에서 다르게 나온다)."""
     r = dict(rec)
     if P["kind"] != "sig" or not {"mlen", "msg"} <= set(r):
         return r
     m = 2 * int(r["mlen"])
-    if "sig" in P["fields"] and "sig" not in r and "sm" in r and len(r["sm"]) >= m and r["sm"][len(r["sm"]) - m:] == r["msg"]:
-        sm = r.pop("sm")
+    if "sig" in P["fields"] and "sig" not in r and "sm" in r and len(r["sm"]) >= m and r.get("smlen", str(len(r["sm"]) // 2)) == str(len(r["sm"]) // 2):
+        sm = r["sm"]
+        if sm[len(sm) - m:] == r["msg"]:
+            sig = sm[:len(sm) - m]
+        elif sm[:m] == r["msg"]:
+            sig = sm[m:]
+        else:
+            return r
+        r.pop("sm")
         r.pop("smlen", None)
-        sig = sm[:len(sm) - m]
         r["sig"], r["siglen"] = sig, str(len(sig) // 2)
-    elif "sm" in P["fields"] and "sm" not in r and "sig" in r:
+    elif "sm" in P["fields"] and "sm" not in r and "sig" in r and r.get("siglen", str(len(r["sig"]) // 2)) == str(len(r["sig"]) // 2):
         sig = r.pop("sig")
         r.pop("siglen", None)
         r["sm"], r["smlen"] = r["msg"] + sig, str(int(r["mlen"]) + len(sig) // 2)
@@ -903,7 +968,7 @@ def match_versions(key, parsed, accept):
     ids = {it["id"] for it in prompt["items"]}
     extra = sorted(set(parsed["answers"]) - ids)
     if extra:
-        return all_undecided(f"문제지에 없는 문항 id {len(extra)}개: {extra[0]}")
+        return all_undecided(f"문제지에 없는 문항 id {len(extra)}개: {shown(extra[0])}")
     return [_judge_items(P, [it for it in prompt["items"] if it["param"] == P["id"]], parsed["answers"], accept.get(P["id"], []))
             for P in key["params"]]
 
@@ -1113,7 +1178,8 @@ def pqverify_version(stdout):
 
 
 def _str(v, n=200):
-    return v[:n] if isinstance(v, str) else None
+    """보고서의 글 칸(남이 쓴 글): 인쇄할 수 없는 글자를 적어 바꾸고 n 자에서 자른 글, 글이 아니면 None."""
+    return shown(v, n) if isinstance(v, str) else None
 
 
 def _int(v):
@@ -1150,7 +1216,7 @@ def pqverify_summary(audit, run, report, library_sha256=None, not_run=None):
         return s
     if report is None:
         last = next((x.strip() for x in reversed(stdout.splitlines()) if x.strip()), "")
-        s["problem"] = (f"pq-verify 입력 오류(종료 2): {last[:200]}" if s["exit_code"] == 2 else
+        s["problem"] = (f"pq-verify 입력 오류(종료 2): {shown(last, 200)}" if s["exit_code"] == 2 else
                         f"pq-verify 가 보고서를 쓰지 않았다(종료 {s['exit_code']})")
         return s
     if len(report) > PQV_MAX_REPORT:
@@ -1174,11 +1240,11 @@ def pqverify_summary(audit, run, report, library_sha256=None, not_run=None):
     stages = doc.get("stages") if isinstance(doc.get("stages"), dict) else {}
     for name, st in stages.items():
         if not isinstance(st, dict) or _int(st.get("passed")) is None or _int(st.get("total")) is None:
-            s["failed"].append(f"{str(name)[:60]} (칸이 틀림)")
+            s["failed"].append(f"{shown(name, 60)} (칸이 틀림)")
         elif "unavailable" in str(name).lower():  # 'ct:unavailable' 처럼 돌지 못한 검사를 적는 단계: 통과 못 한 단계로 세지 않는다
-            s["unavailable"].append(f"{str(name)[:60]} (돌지 못함)")
+            s["unavailable"].append(f"{shown(name, 60)} (돌지 못함)")
         elif st["passed"] < st["total"]:
-            s["failed"].append(f"{str(name)[:60]} {st['passed']}/{st['total']}")
+            s["failed"].append(f"{shown(name, 60)} {st['passed']}/{st['total']}")
     s["failed"] = s["failed"][:40]
     scope = doc.get("scope")
     if isinstance(scope, dict):
@@ -1190,7 +1256,8 @@ def pqverify_summary(audit, run, report, library_sha256=None, not_run=None):
         s["scope"] = "KEM 필수 단계 9개 모두 돎" if not s["missing"] else f"돌지 않은 KEM 필수 단계: {', '.join(s['missing'])}"
     ct = doc.get("constant_time")
     if isinstance(ct, dict) and ct.get("unavailable"):
-        s["unavailable"].insert(0, f"constant-time: {str(ct['unavailable'])[:160]}")
+        why = ct["unavailable"]
+        s["unavailable"].insert(0, f"constant-time: {shown(why, 160) if isinstance(why, str) else '돌지 못함'}")
     s["unavailable"] = s["unavailable"][:10]
     return s
 
@@ -1203,7 +1270,8 @@ def _target_text(s):
 
 def pqverify_status(s):
     """요약(pqverify_summary) → (상태, 상세 글). 통과: 종료 0, VERIFIED, verified true, 감사 옵션에 맞는 보고서 꼴(schema 주 버전 1),
-    대상 파일에 묶임(artifact.bound, PQ-Proof 가 잰 SHA-256 과 같음), 검사 범위 완전(scope.complete, KEM 은 필수 단계 9개), 모든 검사 통과.
+    대상 파일에 묶임(artifact.bound, PQ-Proof 가 잰 SHA-256 이 있고 그것과 같음: 대상이 일반 파일이 아니라 잴 수 없었으면 통과가 아니다),
+    검사 범위 완전(scope.complete, KEM 은 필수 단계 9개), 모든 검사 통과.
     실패: 종료 1, FINDINGS PRESENT, verified false, 통과 못 한 검사 단계가 있음(DEGRADED 가 아니고 대상 파일에 묶였을 때. 돌지 못한
     검사가 함께 있어도 통과 못 한 단계는 실패다). 그 밖은 미판정(건너뛴 검사는 통과가 아니다)."""
     if s.get("problem"):
@@ -1230,6 +1298,9 @@ def pqverify_status(s):
     unavailable = s.get("unavailable") or []
     if (s["exit_code"] == 0 and s.get("status") == "VERIFIED" and s.get("verified") is True and s.get("scope_complete") is True
             and not s["failed"] and not unavailable and isinstance(total, int) and total > 0 and passed == total):
+        if not s.get("library_sha256"):
+            return "undecided", (f"{head}, VERIFIED 지만 PQ-Proof 가 대상 파일의 SHA-256 을 재지 못했다(일반 파일이 아님): 보고서가 어느 "
+                                 f"파일의 것인지 맞춰 볼 수 없다, {counts}")
         return "pass", f"{head}, VERIFIED, {counts}, 범위 완전({s.get('scope')})"
     if s["exit_code"] == 1 and s.get("status") == "FINDINGS PRESENT" and s.get("verified") is False and s["failed"]:
         names = {f.split(" ")[0] for f in s["failed"]}
@@ -1248,7 +1319,8 @@ def pqverify_status(s):
 
 
 NIST_TITLE = "NIST PQC 구현 감사(pq-verify, 사용자가 켠 바깥 도구)"
-NIST_EXPECTED = ("pq-verify 감사(--require-full-coverage)가 종료 0·VERIFIED·검사 범위 완전이면 통과, 통과 못 한 검사 단계가 있으면 실패, "
+NIST_EXPECTED = ("pq-verify 감사(--require-full-coverage)가 종료 0·VERIFIED·검사 범위 완전이고 PQ-Proof 가 잰 대상 파일에 묶이면 통과, "
+                 "통과 못 한 검사 단계가 있으면 실패(pq-verify 판단을 따른다: API 안에서 FIPS 203 입력 검사를 하지 않아도 실패), "
                  "그 밖(입력 오류, DEGRADED, 범위 불완전, 돌지 못한 검사, 실행 파일 없음, 보고서 깨짐)은 미판정")
 
 

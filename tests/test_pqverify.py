@@ -106,6 +106,19 @@ class Fixtures(unittest.TestCase):
         _, (st, d) = judge_case("a2-full-mlkemnative-kem", library_sha256="0" * 64)
         self.assertEqual(st, "undecided")
         self.assertIn("PQ-Proof 가 잰 대상", d)
+        _, (st, d) = judge_case("a2-full-mlkemnative-kem", library_sha256=None)  # 대상이 폴더·없는 파일이라 재지 못했다
+        self.assertEqual(st, "undecided")
+        self.assertIn("SHA-256 을 재지 못했다", d)
+
+    def test_report_text_is_shown_safely(self):
+        audit, run, report = load_case("a-full-good-kem")
+        doc = json.loads(report)
+        doc["stages"]["ek\x1b[2Jcheck"] = {"passed": 0, "total": 1}
+        doc["constant_time"] = {"unavailable": [[["deep"]]]}
+        s = impl.pqverify_summary(audit, run, json.dumps(doc).encode(), CASES["a-full-good-kem"]["library_sha256"])
+        self.assertTrue(any("\\x1b" in f for f in s["failed"]))
+        self.assertFalse(any("\x1b" in f for f in s["failed"]))
+        self.assertIn("constant-time: 돌지 못함", s["unavailable"])
 
     def test_broken_or_odd_reports_are_undecided(self):
         audit, run, report = load_case("a2-full-mlkemnative-kem")

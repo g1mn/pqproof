@@ -359,10 +359,14 @@ def _no_constant(name):
 
 
 def loads_strict(data):
-    """증적 JSON 바이트를 엄격하게 읽는다: UTF-8(BOM 없음), 중복 키·NaN·Infinity 거부, 값 뒤에 다른 바이트가 오면 거부(json 이 막는다)."""
+    """증적 JSON 바이트를 엄격하게 읽는다: UTF-8(BOM 없음), 중복 키·NaN·Infinity 거부, 값 뒤에 다른 바이트가 오면 거부(json 이 막는다).
+    너무 깊게 겹친 값(RecursionError)도 traceback 대신 ValueError 로 알린다."""
     if data.startswith(b"\xef\xbb\xbf"):
         raise ValueError("starts with a UTF-8 byte order mark")
-    return json.loads(data.decode("utf-8"), object_pairs_hook=_unique_keys, parse_constant=_no_constant)
+    try:
+        return json.loads(data.decode("utf-8"), object_pairs_hook=_unique_keys, parse_constant=_no_constant)
+    except RecursionError:
+        raise ValueError("values are nested too deeply to read") from None
 
 
 def compute_id(receipt):
@@ -816,13 +820,12 @@ def _same_rules(r):
 
 def _nist_record(root, r):
     """pq-verify 감사를 증적의 사본으로 다시 판정한다: 실행 기록(log.json)의 감사 기록과 보고서 사본으로 요약을 다시 뽑아 impl.nist 의 요약·
-    상태·상세와 검사 행 i-nist 가 같은지 본다. 대조 규칙(pqlite/impl.py)이 다르면 다시 판정하지 않고 그렇게 적는다."""
+    상태·상세와 검사 행 i-nist 가 같은지 본다. 대조 규칙(pqlite/impl.py)이 그 증적을 쓴 것과 다르면(다른 규칙 묶음, '+modified') 이
+    도구의 규칙으로 다시 판정해 상태가 같은지만 본다(글은 판마다 다를 수 있다). 다시 판정하지 않고 넘기는 길은 없다."""
     im, n = _impl_module(), r["impl"]["nist"]
     if n is None:
         return []
-    if not _same_rules(r):
-        return [(True, f"written with another pqlite/impl.py (ruleset {r['ruleset_version']}): the pq-verify report is not judged again "
-                       "with this tool's rules")]
+    same_rules = _same_rules(r)
     try:
         log = loads_strict(_read_nofollow(root, n["log"]))
         report = _read_nofollow(root, n["report"]) if n["report"] else None
@@ -837,16 +840,29 @@ def _nist_record(root, r):
     summary = im.pqverify_summary(n["summary"]["audit"], run, report, n["library"]["sha256"], n["not_run"])
     st, detail = im.pqverify_status(summary)
     row = im.nist_check_row(dict(n, summary=summary))
+    if not same_rules:
+        same = st == n["status"] and len(r["checks"]) > 1 and r["checks"][1]["status"] == st
+        return [(same, f"written with another pqlite/impl.py (ruleset {r['ruleset_version']}); the pq-verify report judged again with this "
+                       f"tool's rules gives the same {im.NIST_CHECK_ID} status ({STATUS_KO[st]})" if same else
+                 f"written with another pqlite/impl.py (ruleset {r['ruleset_version']}); the pq-verify report judged again with this tool's "
+                 f"rules gives {im.NIST_CHECK_ID} {st}: {detail[:200]!r}, which differs from the receipt (check it with the pqproof version "
+                 "that wrote it)")]
     same = summary == n["summary"] and (st, detail) == (n["status"], n["detail"]) and len(r["checks"]) > 1 and r["checks"][1] == row
     return [(same, f"the pq-verify report judged again gives the same {im.NIST_CHECK_ID} result ({STATUS_KO[st]})" if same else
              f"the pq-verify report judged again gives {im.NIST_CHECK_ID} {st}: {detail[:200]!r}, which differs from the receipt")]
 
 
 def _kpqc_record(root, r):
-    """KpqC 대조를 다시 판정한다: [(ok, 무엇)]. 정답 묶음 사본(artifacts/impl/key.json)이 스스로 맞는지 늘 본다. 대조 규칙
-    (pqlite/impl.py)이 그 증적을 쓴 것과 같으면 문제지 사본이 그 묶음으로 다시 만든 것과 같은지, 답안 사본을 그 묶음으로 다시 판정한
-    결과·자기 점검·검사 행이 증적과 같은지 보고, KAT 목록까지 같으면 정답 묶음도 다시 만들어 바이트까지 맞춘다. 대조 규칙이 다르면
-    (다른 규칙 묶음의 증적) 다시 판정하지 않고 그렇게 적는다(두 트리 증적도 옛 규칙 묶음의 검사를 다시 돌리지 않는다)."""
+    """KpqC 대조를 다시 판정한다: [(ok, 무엇)]. 다시 판정하지 않고 통과로 넘기는 길은 없다(리뷰: '+modified' 로 규칙 해시만 바꿔 결과를 고친
+    증적이 다시 판정 없이 ok 로 끝나던 구멍).
+    1) 정답 묶음 사본(artifacts/impl/key.json)이 스스로 맞는지 본다.
+    2) 사본을 믿을 근거: 이 도구의 KAT 목록이 그 증적의 것과 같으면 이 도구가 만드는 정답 묶음과 바이트까지 같아야 한다. 다르면 그 증적의
+       KAT 목록·발췌 해시가 scan/ruleset.json 에 기록된 규칙 묶음의 것이어야 하고, 사본의 판 기록마다 이 도구의 목록과 같아야 한다
+       (impl.key_problem). 아니면 사본을 믿지 않고 실패로 적는다.
+    3) 받아 줄 판(impl.accept)은 이 도구의 프로필(scan/profiles.json 의 impl_accept)이 주는 것과 같아야 한다.
+    4) 문제지 사본이 정답 묶음으로 다시 만든 것과 같은지 보고, 답안 사본을 이 도구의 대조 규칙(pqlite/impl.py)으로 다시 판정한다. 그 증적을
+       쓴 규칙과 같으면 결과·자기 점검·검사 행이 글까지 같아야 하고, 다르면(다른 규칙 묶음, '+modified') 파라미터마다 상태·일치한 판과
+       검사 행 상태가 같아야 한다(글은 판마다 다를 수 있다)."""
     im, v = _impl_module(), _version_module()
     x, out = r["impl"], []
     try:
@@ -860,30 +876,40 @@ def _kpqc_record(root, r):
     if [P["id"] for P in key["params"]] != r["params"]["params"]:
         return [(False, f"{x['key']['file']} holds other parameters than params.params")]
     tools = {t.get("name"): t.get("sha256") for t in r["tools"]}
-    if tools.get("pqlite/impl.py") != v.path_sha256(os.path.join(v.ROOT, "pqlite", "impl.py")):
-        return out + [(True, f"written with another pqlite/impl.py (ruleset {r['ruleset_version']}): the answer key is consistent, "
-                             "the answer is not judged again with this tool's rules; check it with the pqproof version that wrote it")]
+    same_rules = tools.get("pqlite/impl.py") == v.path_sha256(os.path.join(v.ROOT, "pqlite", "impl.py"))
     try:
         manifest = im.load_manifest()
-    except im.ManifestError:
-        manifest = None
-    same_kat = (manifest is not None and manifest["sha256"] == x["kat_manifest_sha256"] == tools.get("kat-kpqc")
+    except im.ManifestError as e:
+        return [(False, f"this tool's KAT list cannot be read ({e}), so {x['key']['file']} cannot be checked and the answer is not judged again")]
+    same_kat = (manifest["sha256"] == x["kat_manifest_sha256"] == tools.get("kat-kpqc")
                 and tools.get("kat-excerpts") == v.path_sha256(os.path.join(v.ROOT, "scan", "kat")))
     if same_kat:
         same = im.dumps(im.build_key(manifest, r["params"]["params"])).encode("utf-8") == raw_key
         out.append((same, f"{x['key']['file']} is the answer key this tool's KAT list gives" if same else
                     f"{x['key']['file']} differs from the answer key this tool's KAT list gives"))
-        prof = _profiles_accept(r)
-        if prof is not None:
-            try:
-                want = im.accept_list(im.resolve_accept(manifest["params"], prof, r["params"]["params"]))
-            except ValueError as e:
-                want = [f"error: {e}"]
-            out.append((want == x["accept"], "impl.accept follows the profile" if want == x["accept"] else
-                        f"impl.accept is {x['accept']}, but profile {r['params']['profile']} gives {want}"))
     else:
-        out.append((True, f"{x['key']['file']}: this tool's KAT list differs from the one this receipt used; the answer is judged "
-                          "again with the copied answer key"))
+        recorded = _recorded_kat(r)
+        if recorded is None:
+            return out + [(False, f"{x['key']['file']}: the receipt names a KAT list (kat-kpqc {str(tools.get('kat-kpqc'))[:16]}, kat-excerpts "
+                                  f"{str(tools.get('kat-excerpts'))[:16]}) that is neither this tool's nor one recorded in scan/ruleset.json, "
+                                  "so the answer key copy cannot be trusted and the answer is not judged again")]
+        prob = im.key_problem(manifest, key)
+        if prob:
+            return out + [(False, f"{x['key']['file']}: the answer key copy disagrees with this tool's KAT list ({prob}), so it cannot be "
+                                  "trusted and the answer is not judged again")]
+        out.append((True, f"{x['key']['file']}: the receipt used the KAT list of ruleset {recorded}, not this tool's; every version in the "
+                          "copied answer key matches this tool's list, so the answer is judged again with the copy"))
+    prof = _profiles_accept(r)
+    if prof is None:
+        out.append((False, f"profile {r['params']['profile']} of this tool has no impl_accept, so the accepted versions in impl.accept "
+                           "cannot be confirmed"))
+    else:
+        try:
+            want = im.accept_list(im.resolve_accept(manifest["params"], prof, r["params"]["params"]))
+        except ValueError as e:
+            want = [f"error: {e}"]
+        out.append((want == x["accept"], "impl.accept follows the profile" if want == x["accept"] else
+                    f"impl.accept is {x['accept']}, but profile {r['params']['profile']} of this tool gives {want}"))
     if x["prompt"] is not None:
         prompt = im.emit_prompt(key)
         same = (im.dumps(prompt).encode("utf-8") == _read_nofollow(root, x["prompt"]["file"])
@@ -900,6 +926,19 @@ def _kpqc_record(root, r):
     problem = parsed["problem"] or problem
     control, results = (None, []) if problem else (im.control_problem(key, accept, parsed["kind"]), im.match_versions(key, parsed, accept))
     row = im.check_row(results, control, problem)
+    if not same_rules:
+        def statuses(res, ctrl_ok, prob, check):
+            return [(x_["param"], x_["status"], x_["matched"]) for x_ in res], ctrl_ok, bool(prob), check
+        got = statuses(results, control is None, problem, row["status"])
+        rec = statuses(x["results"], x["control"]["ok"], x["problem"], r["checks"][0]["status"] if r["checks"] else None)
+        same = pids == r["params"]["params"] and got == rec
+        detail = ", ".join(f"{p} {STATUS_KO[st]}" for p, st, _ in got[0]) or row["actual"][:200]
+        out.append((same, f"written with another pqlite/impl.py (ruleset {r['ruleset_version']}); the answer judged again with this tool's "
+                          f"rules gives the same statuses ({im.CHECK_ID} {STATUS_KO[row['status']]})" if same else
+                    f"written with another pqlite/impl.py (ruleset {r['ruleset_version']}); the answer judged again with this tool's rules "
+                    f"gives {im.CHECK_ID} {row['status']} ({detail}), which differs from the receipt (check it with the pqproof version "
+                    "that wrote it)"))
+        return out
     same = (pids == r["params"]["params"] and problem == x["problem"] and results == x["results"]
             and {"ok": control is None, "problem": control} == x["control"] and r["checks"][:1] == [row])
     out.append((same, f"the answer judged again gives the same {im.CHECK_ID} result ({STATUS_KO[row['status']]})" if same else
@@ -907,13 +946,26 @@ def _kpqc_record(root, r):
     return out
 
 
+def _recorded_kat(r):
+    """증적 tools[] 의 KAT 목록(kat-kpqc)·발췌(kat-excerpts) 해시가 scan/ruleset.json 에 기록된 어느 규칙 묶음의 파일 해시와 같으면 그
+    묶음 이름, 아니면 None. 기록된 묶음의 KAT 는 공개한 판이 쓴 것이고, 기록에 없는 해시(직접 고친 목록)는 정답 묶음 사본의 근거가 못 된다."""
+    v = _version_module()
+    tools = {t.get("name"): t.get("sha256") for t in r["tools"]}
+    want = (tools.get("kat-kpqc"), tools.get("kat-excerpts"))
+    if None in want:
+        return None
+    for name, e in v.ruleset_entries()[1].items():
+        files = {f.get("path"): f.get("sha256") for f in (e.get("files") or []) if isinstance(f, dict)}
+        if (files.get("scan/kat-kpqc.json"), files.get("scan/kat")) == want:
+            return name
+    return None
+
+
 def _profiles_accept(r):
-    """증적이 쓴 프로필의 impl_accept(지금 scan/profiles.json 이 그 증적의 것과 같을 때만, 아니면 None)."""
+    """이 도구의 scan/profiles.json 에서 증적이 쓴 프로필의 impl_accept(없으면 None). 해시가 그 증적의 것과 달라도 내용으로 맞춘다
+    (받아 줄 판을 증적에서 고치고 프로필 해시를 바꿔 대조를 건너뛰지 못하게)."""
     v = _version_module()
     path = os.path.join(v.ROOT, "scan", "profiles.json")
-    rec = [t.get("sha256") for t in r["tools"] if t.get("name") == "profiles"]
-    if rec != [v.path_sha256(path)]:
-        return None
     try:
         with open(path, encoding="utf-8") as f:
             return ((json.load(f).get("profiles") or {}).get(r["params"]["profile"]) or {}).get("impl_accept")
@@ -1236,6 +1288,8 @@ def _impl_readme(r, verify_cmd):
         "  A match with pinned reference KAT versions (scan/kat-kpqc.json). PQ-Proof did not build or run the implementation;",
         "  your harness wrote the answers. It is not a conformance test or a certification (not KCMVP).",
         "  참조판 KAT 와 일치하는지 본 것이다. 표준 준수 시험이나 공인 시험(KCMVP)이 아니다.",
+        "  The KAT records in artifacts/impl/ come from the KpqC reference packages (MIT); see scan/kat/NOTICE in PQ-Proof.",
+        "  artifacts/impl/ 의 KAT 레코드는 KpqC 참조 구현 묶음(MIT)에서 왔다. 고지는 PQ-Proof 의 scan/kat/NOTICE 에 있다.",
     ]
     if x.get("nist") is not None:
         lines += [
@@ -1602,16 +1656,26 @@ def impl_rows(r):
     return rows
 
 
+def nist_extra_args(n):
+    """--pq-verify 인자에서 감사 옵션과 그 두 값(경로, 파라미터)을 뺀 나머지(--accumulated 1 처럼 표본 수·범위를 바꾸는 옵션이 보이게)."""
+    args = list(n.get("args") or [])
+    i = next((k for k, a in enumerate(args) if a.startswith("--audit-")), None)
+    return args if i is None else args[:i] + args[i + 3:]
+
+
 def nist_rows(r):
     """pq-verify 감사 표의 (항목, 값)(receipt.html·tables/report.md 가 같이 쓴다). impl.nist 가 없으면 []."""
     n = r["impl"].get("nist")
     if n is None:
         return []
     s = n["summary"]
+    extra = nist_extra_args(n)
     tool = next((t for t in r["tools"] if t.get("name") == "pq-verify"), None)
     rows = [("결과", f"{STATUS_KO[n['status']]}: {n['detail']}"),
             ("pq-verify", (f"{n['executable']} ({(tool or {}).get('version') or '판 모름'})" if n["executable"] else f"없음: {n['not_run']}")),
-            ("감사", f"{s['audit'] or ''} {s['param_set'] or ''}".strip() or "모름"),
+            ("감사", (f"{s['audit'] or ''} {s['param_set'] or ''}".strip() or "모름")
+             + (f" · 더 준 옵션 {' '.join(_impl_module().shown(a, 200) for a in extra)}" if extra else
+                " · 더 준 옵션 없음(표본 수 등은 pq-verify 기본값)")),
             ("대상", f"{n['library']['path']} (sha256 {n['library']['sha256'] or '못 잼'})"),
             ("종료 코드", str(n["exit_code"]) if n["exit_code"] is not None else "없음"),
             ("보고서", f"{s['status'] or '없음'}, verified {s['verified']}, 검사 {s['checks_passed']}/{s['checks_total']}, "

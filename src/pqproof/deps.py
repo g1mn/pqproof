@@ -181,7 +181,8 @@ def pqv_line(rep, env, need=False):
                         "use a container or VM for untrusted code)")
     elif need:
         rep.warnings.append("--pq-verify is given but pq-verify was not found (PQ_VERIFY or PATH): i-nist will be undecided. "
-                            "Install it apart from PQ-Proof (pip install pq-verify in its own virtual environment) and set PQ_VERIFY.")
+                            "Install it apart from PQ-Proof in its own virtual environment, pinned by version and wheel hash "
+                            "(guide/impl.md, .github/requirements/pq-verify.txt), and set PQ_VERIFY.")
     else:
         rep.optional.append("pq-verify: not found (optional, only for pqproof impl judge --pq-verify; set PQ_VERIFY or put it on PATH)")
     return rep

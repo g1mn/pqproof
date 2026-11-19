@@ -85,7 +85,7 @@
    ]
   },
   "3": {
-   "sha256": "d389e962e9847ceec39182992db25ec305196a951980272436b2511b46c6bca1",
+   "sha256": "0f1ffa02779585702fc7503c3a0c715036426d6358c49838bf8c153282941caf",
    "since": "0.3.0",
    "verdict_impact": "no",
    "files": [
@@ -95,7 +95,7 @@
     },
     {
      "path": "pqlite/impl.py",
-     "sha256": "b586adc6723e86ce1232d69eba03f904283910170a59f4c6bbbb44277f76ff53"
+     "sha256": "33314f64cb0da8fbb8d01d778cbf0f61ce38ba1236843f03a8ddf5f1c16aeb60"
     },
     {
      "path": "pqlite/rules.py",

@@ -2,14 +2,14 @@
 
 명령: `bash prove.sh --impl judge answers.json --pq-verify ...` · 판정 **통과(검토 필요 검사 i-kpqc)**
 
-판정 근거: pqproof 0.3.0 · 규칙 묶음 3 (sha256 `d389e962e9847cee`) · 증적 형식 4 · PROFILE=kpqc · 받아 줄 판 smaug-t/modet@1.2.0
+판정 근거: pqproof 0.3.0 · 규칙 묶음 3 (sha256 `0f1ffa0277958570`) · 증적 형식 4 · PROFILE=kpqc · 받아 줄 판 smaug-t/modet@1.2.0
 
 검사 결과
 
 | # | 검사 | 기대 | 실제 |
 |---|---|---|---|
 | V1 | KpqC 구현의 KAT 대조(받아 줄 참조판과 일치하는가, 공인 시험 아님) | 파라미터마다 받아 줄 판(프로필의 impl_accept, 기본 최신판)의 KAT 와 일치, 변조 서명 거부, 자기 점검 통과 | 검토 필요: smaug-t/modet 검토 필요: 옛 판 1.1.1 일치(문항 10/10): 받아 줄 판(1.2.0)이 아니다 |
-| V2 | NIST PQC 구현 감사(pq-verify, 사용자가 켠 바깥 도구) | pq-verify 감사(--require-full-coverage)가 종료 0·VERIFIED·검사 범위 완전이면 통과, 통과 못 한 검사 단계가 있으면 실패, 그 밖(입력 오류, DEGRADED, 범위 불완전, 돌지 못한 검사, 실행 파일 없음, 보고서 깨짐)은 미판정 | 통과: libmlkem768_good.dylib ML-KEM-768: pq-verify 2.19.0, VERIFIED, 검사 1436/1436, 범위 완전(KEM 필수 단계 9개 모두 돎) |
+| V2 | NIST PQC 구현 감사(pq-verify, 사용자가 켠 바깥 도구) | pq-verify 감사(--require-full-coverage)가 종료 0·VERIFIED·검사 범위 완전이고 PQ-Proof 가 잰 대상 파일에 묶이면 통과, 통과 못 한 검사 단계가 있으면 실패(pq-verify 판단을 따른다: API 안에서 FIPS 203 입력 검사를 하지 않아도 실패), 그 밖(입력 오류, DEGRADED, 범위 불완전, 돌지 못한 검사, 실행 파일 없음, 보고서 깨짐)은 미판정 | 통과: libmlkem768_good.dylib ML-KEM-768: pq-verify 2.19.0, VERIFIED, 검사 1436/1436, 범위 완전(KEM 필수 단계 9개 모두 돎) |
 
 파라미터별 참조판 대조
 
@@ -24,7 +24,7 @@ NIST 구현 감사(pq-verify)
 |---|---|
 | 결과 | 통과: libmlkem768_good.dylib ML-KEM-768: pq-verify 2.19.0, VERIFIED, 검사 1436/1436, 범위 완전(KEM 필수 단계 9개 모두 돎) |
 | pq-verify | /opt/pq-verify/bin/pq-verify (2.19.0) |
-| 감사 | --audit-kem ML-KEM-768 |
+| 감사 | --audit-kem ML-KEM-768 · 더 준 옵션 없음(표본 수 등은 pq-verify 기본값) |
 | 대상 | /tmp/work/lib/libmlkem768_good.dylib (sha256 21e5cdbd3da1531fe473cb7f0a4da039c551683c8fc8c6e1c400c923eaa9ac28) |
 | 종료 코드 | 0 |
 | 보고서 | VERIFIED, verified True, 검사 1436/1436, schema pq-verify/kem-audit-result 1.2 |

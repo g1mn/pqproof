@@ -34,6 +34,7 @@ pqproof "$ex/classic" "$ex/pqc"       # bundled example: RSA and ECDSA moved to 
 pqproof <original> <converted>        # your two trees
 pqproof --verify <output folder>      # recompute the evidence hash and every file hash
 pqproof impl judge answers.json       # KpqC implementation: your answers to `pqproof impl prompt` vs pinned reference KATs
+FAIL_ON_REVIEW=1 pqproof impl judge answers.json   # in CI: a match with an old version only (needs review) exits 5, not 0
 ```
 
 The run writes `proof-out-YYYYMMDD-HHMMSS/`. Open `receipt.html` (for people) or `receipt.json` (for programs); `tables/report.md` is ready to paste into a document. When the run fails, the console ends with where the full lists are and what to do next. A line that has to stay classical goes into an allowlist with its reason, and a person signs it off ([guide/allowlist.md](https://github.com/g1mn/pqproof/blob/main/guide/allowlist.md)).
@@ -45,7 +46,7 @@ The run writes `proof-out-YYYYMMDD-HHMMSS/`. Open `receipt.html` (for people) or
 | 2 | usage or input error (no verdict) |
 | 3 | undecided, for example a TLS server with no address to measure; never counted as a pass |
 | 4 | tool error: an unexpected exception inside PQ-Proof (no verdict) |
-| 5 | pass with a check that needs review, only with `FAIL_ON_REVIEW=1` |
+| 5 | pass with a check that needs review, only with `FAIL_ON_REVIEW=1` (use it in CI for `pqproof impl`, where an old KpqC version is "needs review") |
 
 | System | Judge two trees | `--verify`, `sarif` |
 |---|---|---|

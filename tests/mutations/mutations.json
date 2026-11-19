@@ -1595,7 +1595,7 @@
      "i-kpqc": "undecided"
     },
     "contains": {
-     "checks[i-kpqc].actual": "이름이 아니다"
+     "checks[i-kpqc].actual": "smaug-t/mode5 의 이름이다(--param smaug-t/mode1 와 다르다"
     }
    }
   },

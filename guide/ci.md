@@ -48,6 +48,14 @@ Checks that ended not applicable or undecided are listed in `run.properties.notC
 
 All of them read the allowlist from the base commit.
 
+## Implementation check
+
+Run `pqproof impl judge` with `FAIL_ON_REVIEW=1`. A KpqC implementation that matches only an old reference version (SMAUG-T 1.1.1, HAETAE 1.1.2) or a known variant is "needs review", which leaves the verdict at pass, so without it the step exits 0 and prints `VERDICT=PASS (needs review: i-kpqc)`. With it the step exits 5. Keep the `impl-out-*` folder as an artifact; see [guide/impl.md](impl.md).
+
+```bash
+FAIL_ON_REVIEW=1 pqproof impl judge answers.json
+```
+
 ## Offline runners
 
 A runner without internet needs the wheel (from an internal package mirror, or `pip download pqproof` elsewhere), bash, OpenSSL and, for TLS targets, the `tls_probe` binary for its platform with `SHA256SUMS` from the release. PQ-Proof itself makes no network calls.
