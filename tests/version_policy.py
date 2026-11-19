@@ -8,10 +8,12 @@
 #                                                     버전이 그대로면 다음 릴리스가 MINOR 여야 하는지도 알린다
 #                                                     버전을 올렸어도 그 버전이 앞 판과 같은 규칙 묶음으로 나갔고 지금 묶음의
 #                                                     since 가 더 뒤면(다음 릴리스 몫) 버전이 그대로일 때처럼 본다
-#   python3 -I tests/version_policy.py --site-only    사이트(docs/index.html)만: 생성기가 심은 data-build 블록이 지금 판·규칙 묶음·
-#                                                     증적 형식·KAT 목록과 같은가(pages.yml 이 배포 전에 부른다)
+#   python3 -I tests/version_policy.py --site-only    사이트(docs/index.html)만: 생성기가 심은 data-build 블록이 지금 판·이 판이 낸 규칙 묶음·
+#                                                     증적 형식·KAT 목록·출시일과 같은가, 보이는 머리 칩·바닥 줄이 그 블록과 같은가(pages.yml 이 배포 전에 부른다)
 # 사이트 검사(check_site): docs/index.html 이 있으면 위 두 꼴에서도 늘 돈다. 그래서 CI version-policy 작업과 release.yml 이 판을 올렸는데
 #   사이트를 다시 만들지 않은 커밋·태그를 멈춘다(판 올림과 사이트 재빌드는 같은 커밋에, CONTRIBUTING.md 'Releases'). 설치본처럼 docs/ 가 없으면 건너뛴다.
+#   다음 릴리스 몫 규칙 묶음(since 가 지금 판보다 뒤)이 트리에 있으면 사이트는 이 판이 낸 묶음과 비교하고, 다음 판 것일 수 있는 KAT 목록·증적 형식은
+#   알림으로만 남긴다(판을 올리면 다시 엄격하게 본다). 그래서 규칙을 바꾸는 PR 은 사이트 생성기 없이도 CI 를 통과한다.
 # 표준 라이브러리만 쓴다. 저장소는 읽기만 한다(--base 는 git show 로 그 판의 파일을 읽는다).
 # 종료: 0 맞음 · 1 어긋남 · 2 사용법 오류(git 없음, 그 판을 못 읽음)
 """Check the version policy: a release that can move a verdict is never a PATCH release."""
@@ -32,8 +34,13 @@ IMPACT = re.compile(r"(?m)^\*\*Verdict impact \(판정 영향\): (yes|none)\b")
 SHA = re.compile(r"^[0-9a-f]{64}$")
 SITE = os.path.join(ROOT, "docs", "index.html")
 SITE_BLOCK = re.compile(r'<script type="application/json" id="data-build">(.*?)</script>', re.S)
+# 보이는 판 표시: 머리 칩(v판 · 출시일)과 바닥 줄(pqproof 판 · ruleset 묶음 · format 형식 · tests 판). data-build 만 손으로 고친 사이트를 잡는다
+SITE_CHIP = re.compile(r'<a class="ver-chip"[^>]*>(?:\s*<span[^>]*>)?\s*v([^\s<]+) · ([^<]*?)\s*(?:</span>\s*)?</a>')
+SITE_STAMP = re.compile(r'\bpqproof ([^\s<]+) · ruleset ([^\s<]+) · format ([^\s<]+) · tests ([^\s<]+)')
 SITE_SCHEMA = "pqproof-site-build 1"
 REBUILD = "rebuild docs/index.html in the same commit as the version change (CONTRIBUTING.md, Releases)"
+REBUILD_SAME = ("rebuild docs/index.html for this version (the maintainer runs the site generator, CONTRIBUTING.md, Releases); "
+                "a rule change for the next release gets its own ruleset entry whose since is that release (CONTRIBUTING.md, Changing a rule)")
 
 
 def semver(s):
@@ -181,10 +188,12 @@ def check_release(version, base_version, ruleset_now, ruleset_base, gold_now, go
     return bad, notes
 
 
-def site_info(path=SITE):
-    """docs/index.html 에 사이트 생성기가 심은 data-build 블록(dict). 블록이 없거나 깨졌으면 None."""
-    with open(path, encoding="utf-8") as f:
-        m = SITE_BLOCK.search(f.read())
+def site_info(path=SITE, text=None):
+    """docs/index.html 에 사이트 생성기가 심은 data-build 블록(dict). 블록이 없거나 깨졌으면 None. text 를 주면 파일 대신 그 글을 읽는다."""
+    if text is None:
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+    m = SITE_BLOCK.search(text)
     if not m:
         return None
     try:
@@ -204,11 +213,32 @@ def kat_counts(doc):
         vs = sorted({v.get("version") for p in (a.get("params") or {}).values() for v in (p.get("variants") or []) if v.get("latest")})
         latest[aid] = vs[0] if len(vs) == 1 else vs
     return {"algorithms": len(algs), "params": len(params), "versions": len(variants),
-            "excerpts": sum(1 for v in variants if v.get("excerpt")), "latest": latest}
+            "excerpts": sum(1 for v in variants if v.get("excerpt")),
+            "references": sum(1 for v in variants if v.get("role") == "reference"), "latest": latest}
 
 
-def check_site(version, ruleset_current, fmt, reads, info, kat):
-    """사이트가 지금 판으로 만들어졌는지. 어긋난 것의 목록([] 이면 맞다). info 는 site_info() 결과, kat 은 kat_counts() 결과."""
+def site_visible(text):
+    """보이는 판 표시: {'chip': (판, 출시일) 또는 None, 'stamp': (판, 묶음, 형식, 시험 판) 또는 None}."""
+    chip, stamp = SITE_CHIP.search(text), SITE_STAMP.search(text)
+    return {"chip": (chip[1], chip[2].strip()) if chip else None, "stamp": stamp.groups() if stamp else None}
+
+
+def site_expected(version, rules):
+    """사이트가 보여야 할 규칙 묶음과 알림. 이 판이 낸 묶음(shipped_ruleset)이 current 와 다르면 current 는 다음 릴리스 몫이라
+    (규칙 묶음 이름, 알림)을 돌려준다. 그때 트리의 KAT 목록·증적 형식도 다음 판 것일 수 있어 사이트와 비교하지 않는다."""
+    current = rules.get("current")
+    shipped = shipped_ruleset(rules, version)
+    if shipped is None or str(shipped) == str(current):
+        return current, None
+    since = ((rules.get("versions") or {}).get(current) or {}).get("since")
+    return shipped, (f"ruleset {current} ships in {since}, after {version}: the site keeps describing {version} (ruleset {shipped}), "
+                     "and its KAT list and evidence format are compared again when the version moves")
+
+
+def check_site(version, ruleset_current, fmt, reads, info, kat, release_date=None, visible=None):
+    """사이트가 지금 판으로 만들어졌는지. 어긋난 것의 목록([] 이면 맞다). info 는 site_info() 결과, kat 은 kat_counts() 결과.
+    ruleset_current 는 이 판이 낸 규칙 묶음(site_expected). kat·fmt·reads 가 None 이면 그 비교를 건너뛴다(다음 릴리스 몫 묶음이 있을 때).
+    release_date 는 CHANGELOG 의 그 판 날짜(None 이면 건너뜀, '' 이면 날짜 없음), visible 은 site_visible() 결과(None 이면 건너뜀)."""
     if info is None:
         return [f"docs/index.html has no readable data-build block: {REBUILD}"]
     if info.get("schema") != SITE_SCHEMA:
@@ -218,28 +248,56 @@ def check_site(version, ruleset_current, fmt, reads, info, kat):
                       ("example_version", "the example output"), ("release_top", "the top release entry (section I)")):
         if info.get(key) != version:
             bad.append(f"docs/index.html shows {info.get(key)} for {what}, the package is {version}: {REBUILD}")
+    # 판은 그대로인데 내용만 다르면 판 올림 안내가 아니라 이 판으로 다시 만들라는 안내
+    fix = REBUILD if info.get("tool_version") != version else REBUILD_SAME
     if str(info.get("ruleset")) != str(ruleset_current):
-        bad.append(f"docs/index.html was built for ruleset {info.get('ruleset')}, the current ruleset is {ruleset_current}: {REBUILD}")
-    if info.get("format_version") != fmt:
-        bad.append(f"docs/index.html was built for evidence format {info.get('format_version')}, the tool writes {fmt}: {REBUILD}")
-    if list(info.get("format_reads") or []) != list(reads):
-        bad.append(f"docs/index.html says --verify reads formats {info.get('format_reads')}, the tool reads {list(reads)}: {REBUILD}")
-    site_kat = info.get("kat") or {}
-    for key in ("algorithms", "params", "versions", "excerpts", "latest"):
-        if site_kat.get(key) != kat.get(key):
-            bad.append(f"docs/index.html KAT list {key} is {site_kat.get(key)}, scan/kat-kpqc.json gives {kat.get(key)}: {REBUILD}")
+        bad.append(f"docs/index.html was built for ruleset {info.get('ruleset')}, but {version} ships ruleset {ruleset_current}: {fix}")
+    if fmt is not None and info.get("format_version") != fmt:
+        bad.append(f"docs/index.html was built for evidence format {info.get('format_version')}, the tool writes {fmt}: {fix}")
+    if reads is not None and list(info.get("format_reads") or []) != list(reads):
+        bad.append(f"docs/index.html says --verify reads formats {info.get('format_reads')}, the tool reads {list(reads)}: {fix}")
+    if kat is not None:
+        site_kat = info.get("kat") or {}
+        for key in ("algorithms", "params", "versions", "excerpts", "references", "latest"):
+            if site_kat.get(key) != kat.get(key):
+                bad.append(f"docs/index.html KAT list {key} is {site_kat.get(key)}, scan/kat-kpqc.json gives {kat.get(key)}: {fix}")
+    if release_date is not None:
+        if not release_date:
+            bad.append(f"CHANGELOG.md has no date for [{version}], so the site's version chip has none: date the section in the version change")
+        elif info.get("release_date") != release_date:
+            bad.append(f"docs/index.html shows release date {info.get('release_date')}, CHANGELOG.md gives {release_date} for {version}: {fix}")
+    if visible is not None:
+        chip, stamp = visible.get("chip"), visible.get("stamp")
+        if chip is None:
+            bad.append(f"docs/index.html has no visible version chip (v<version> · <date>): {fix}")
+        elif chip != (info.get("tool_version"), info.get("release_date") or ""):
+            bad.append(f"docs/index.html version chip reads v{chip[0]} · {chip[1]}, its data-build block says "
+                       f"{info.get('tool_version')} · {info.get('release_date')}: {fix}")
+        want = (info.get("tool_version"), str(info.get("ruleset")), str(info.get("format_version")), info.get("tests_version"))
+        if stamp is None:
+            bad.append(f"docs/index.html has no visible build line (pqproof <version> · ruleset · format · tests): {fix}")
+        elif tuple(stamp) != tuple(str(x) for x in want):
+            bad.append(f"docs/index.html build line reads pqproof {stamp[0]} · ruleset {stamp[1]} · format {stamp[2]} · tests {stamp[3]}, "
+                       f"its data-build block says {' · '.join(str(x) for x in want)}: {fix}")
     if info.get("stale") is not False:
         bad.append(f"docs/index.html was built with --allow-stale (a local preview, not for publishing): {REBUILD}")
     return bad
 
 
-def site_problems():
-    """지금 트리의 docs/index.html 검사(check_site 를 지금 값으로). docs/ 가 없으면(설치본) None."""
+def site_problems(notes=None):
+    """지금 트리의 docs/index.html 검사(check_site 를 지금 값으로). docs/ 가 없으면(설치본) None. notes(list)를 주면 알림을 더한다."""
     if not os.path.isfile(SITE):
         return None
-    kat = kat_counts(json.loads(read("scan/kat-kpqc.json")))
-    current = json.loads(read("scan/ruleset.json")).get("current")
-    return check_site(V.tool_version(), current, V.FORMAT_VERSION, V.FORMAT_READS, site_info(), kat)
+    version = V.tool_version()
+    expect, pending = site_expected(version, json.loads(read("scan/ruleset.json")))
+    if pending and notes is not None:
+        notes.append(pending)
+    kat = None if pending else kat_counts(json.loads(read("scan/kat-kpqc.json")))
+    fmt, reads = (None, None) if pending else (V.FORMAT_VERSION, V.FORMAT_READS)
+    date = (changelog_sections(read("CHANGELOG.md")).get(version) or (None, ""))[0]
+    with open(SITE, encoding="utf-8") as f:
+        text = f.read()
+    return check_site(version, expect, fmt, reads, site_info(text=text), kat, release_date=(date or "").strip(), visible=site_visible(text))
 
 
 def git_show(ref, path):
@@ -267,8 +325,9 @@ def main(argv=None):
     ap.add_argument("--site-only", action="store_true", help="check only that docs/index.html was built for this version")
     a = ap.parse_args(argv)
     version = V.tool_version()
+    site_notes = []
     try:
-        site = site_problems()
+        site = site_problems(site_notes)
     except (OSError, ValueError) as e:
         print(f"version policy: cannot read the site or the KAT list: {e}", file=sys.stderr)
         return 2
@@ -277,6 +336,8 @@ def main(argv=None):
             print("version policy: no docs/index.html to check", file=sys.stderr)
             return 2
         print(f"version policy: site docs/index.html against pqproof {version}")
+        for n in site_notes:
+            print(f"  note: {n}")
         for b in site:
             print(f"  FAIL {b}")
         print("version policy: " + ("ok" if not site else f"{len(site)} problem(s)"))
@@ -288,7 +349,7 @@ def main(argv=None):
         print(f"version policy: cannot read {e}", file=sys.stderr)
         return 2
     bad = check_tree(version, changelog, raw_rules)
-    notes = []
+    notes = list(site_notes)
     if a.base:
         try:
             init = git_show(a.base, "src/pqproof/__init__.py")
@@ -299,8 +360,9 @@ def main(argv=None):
         except (OSError, ValueError, TypeError, KeyError) as e:
             print(f"version policy: cannot read {a.base}: {e}", file=sys.stderr)
             return 2
-        more, notes = check_release(version, base_version, ruleset_doc(json.dumps(raw_rules)), r_base, g_now, g_base, changelog)
+        more, rel_notes = check_release(version, base_version, ruleset_doc(json.dumps(raw_rules)), r_base, g_now, g_base, changelog)
         bad += more
+        notes += rel_notes
     if site is None:
         notes.append("no docs/index.html here (an installed copy?): the site check is skipped")
     else:

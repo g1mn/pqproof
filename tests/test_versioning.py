@@ -427,6 +427,11 @@ class SiteCheck(unittest.TestCase):
 
     def test_kat_counts(self):
         self.assertEqual((self.kat["algorithms"], self.kat["params"]), (4, 16))
+        # 참조판과 알려진 변형(공개된 참조판과 맞지 않는 KAT)을 나눠 센다: 사이트가 35판 전부를 참조판이라 부르지 않게
+        roles = [v.get("role") for a in json.loads((PROOF / "scan" / "kat-kpqc.json").read_text(encoding="utf-8"))["algorithms"].values()
+                 for p in a["params"].values() for v in p["variants"]]
+        self.assertEqual(self.kat["references"], roles.count("reference"))
+        self.assertLess(self.kat["references"], self.kat["versions"])
         self.assertEqual(self.kat["versions"], sum(len(p["variants"]) for a in json.loads((PROOF / "scan" / "kat-kpqc.json").read_text(encoding="utf-8"))["algorithms"].values() for p in a["params"].values()))
         self.assertTrue(all(isinstance(v, str) for v in self.kat["latest"].values()), self.kat["latest"])
 
@@ -448,13 +453,65 @@ class SiteCheck(unittest.TestCase):
         for key, value, want in cases:
             with self.subTest(key=key, value=value):
                 self.assertIn(want, "\n".join(self.check(dict(self.good, **{key: value}))))
-        for key in ("algorithms", "params", "versions", "excerpts"):
+        for key in ("algorithms", "params", "versions", "excerpts", "references"):
             with self.subTest(kat=key):
                 kat = dict(self.good["kat"], **{key: self.good["kat"][key] + 1})
                 self.assertIn(f"KAT list {key}", "\n".join(self.check(dict(self.good, kat=kat))))
         latest = dict(self.good["kat"]["latest"], **{"smaug-t": "1.1.1"})
         self.assertIn("KAT list latest", "\n".join(self.check(dict(self.good, kat=dict(self.good["kat"], latest=latest)))))
         self.assertIn("no readable data-build block", "\n".join(self.check(None)))
+
+    def test_same_version_mismatch_does_not_ask_for_a_version_change(self):
+        # 판은 그대로인데 규칙 묶음만 다르면 '판 올림과 같은 커밋' 안내가 아니라 이 판으로 다시 만들라는 안내
+        bad = "\n".join(self.check(dict(self.good, ruleset="1")))
+        self.assertIn(f"but {self.ver} ships ruleset {self.rs}", bad)
+        self.assertIn("rebuild docs/index.html for this version", bad)
+        self.assertNotIn("same commit as the version change", bad)
+
+    def test_a_ruleset_for_the_next_release_keeps_the_site(self):
+        # 다음 릴리스 몫 묶음(since 가 지금 판보다 뒤)이 트리에 있으면 사이트는 이 판이 낸 묶음과 비교하고, KAT 목록·증적 형식은 판 올림 때 본다
+        rules = copy.deepcopy(RULESET)
+        nxt = "next-test"
+        rules["versions"][nxt] = dict(rules["versions"][str(self.rs)], sha256="f" * 64, since="99.0.0")
+        rules["current"] = nxt
+        expect, note = VP.site_expected(self.ver, rules)
+        self.assertEqual(str(expect), str(self.rs))
+        self.assertIn("ships in 99.0.0", note)
+        more_kat = dict(self.kat, versions=self.kat["versions"] + 1)
+        self.assertEqual(VP.check_site(self.ver, expect, None, None, self.good, None), [])
+        self.assertIn("KAT list versions", "\n".join(VP.check_site(self.ver, expect, V.FORMAT_VERSION, V.FORMAT_READS, self.good, more_kat)))
+        # 판을 올리면(그 묶음을 낸 판) 다시 엄격하다: 사이트를 새 묶음으로 다시 만들어야 한다
+        expect, note = VP.site_expected("99.0.0", rules)
+        self.assertEqual((expect, note), (nxt, None))
+        self.assertTrue(VP.check_site("99.0.0", expect, V.FORMAT_VERSION, V.FORMAT_READS, self.good, self.kat))
+        # 지금 트리에는 다음 릴리스 몫 묶음이 없다
+        self.assertEqual(VP.site_expected(self.ver, RULESET), (RULESET["current"], None))
+
+    def test_release_date_and_visible_marks(self):
+        chip = (self.ver, "2026-11-20")
+        stamp = (self.ver, str(self.rs), str(V.FORMAT_VERSION), self.ver)
+        ok = {"chip": chip, "stamp": stamp}
+        self.assertEqual(self.check_full(self.good, "2026-11-20", ok), [])
+        cases = [("2026-11-21", ok, "CHANGELOG.md gives 2026-11-21"), ("", ok, "has no date"),
+                 ("2026-11-20", dict(ok, chip=("0.0.1", "2026-11-20")), "version chip reads v0.0.1"),
+                 ("2026-11-20", dict(ok, chip=None), "no visible version chip"),
+                 ("2026-11-20", dict(ok, stamp=(self.ver, "1", str(V.FORMAT_VERSION), self.ver)), "build line reads"),
+                 ("2026-11-20", dict(ok, stamp=None), "no visible build line")]
+        for date, vis, want in cases:
+            with self.subTest(want=want):
+                self.assertIn(want, "\n".join(self.check_full(self.good, date, vis)))
+        # data-build 만 다음 판으로 고친 사이트(보이는 칩·바닥 줄은 옛 판): 통과하지 않는다
+        forged = dict(self.good, tool_version="9.9.9", tests_version="9.9.9", example_version="9.9.9", release_top="9.9.9")
+        self.assertIn("version chip reads", "\n".join(VP.check_site("9.9.9", self.rs, V.FORMAT_VERSION, V.FORMAT_READS, forged, self.kat, "2026-11-20", ok)))
+
+    def check_full(self, info, date, visible):
+        return VP.check_site(self.ver, self.rs, V.FORMAT_VERSION, V.FORMAT_READS, info, self.kat, release_date=date, visible=visible)
+
+    def test_site_visible_reads_the_chip_and_the_build_line(self):
+        html = ('<a class="ver-chip" href="#sec-version" title="v"><span class="nw">v0.3.0 · 2026-11-20</span></a>'
+                '<span class="mono">build 2026-11-20 03:54 KST · pqproof 0.3.0 · ruleset 3 · format 4 · tests 0.3.0 2026-11-20 · kat 35</span>')
+        self.assertEqual(VP.site_visible(html), {"chip": ("0.3.0", "2026-11-20"), "stamp": ("0.3.0", "3", "4", "0.3.0")})
+        self.assertEqual(VP.site_visible("<p>none</p>"), {"chip": None, "stamp": None})
 
     def test_site_info_reads_the_block(self):
         tmp = tempfile.mkdtemp(prefix="pqproof-site-")

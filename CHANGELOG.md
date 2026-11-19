@@ -17,7 +17,7 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 ### Changed
 
 - The README is short now; usage, verdict rules, public test results, the implementation check, limits and releases are on the site, [g1mn.github.io/pqproof](https://g1mn.github.io/pqproof/), which is rebuilt for 0.3.0 (test numbers, example output, KpqC versions and sources, FAQ).
-- `tests/version_policy.py` also checks that `docs/index.html` was built for the current version, ruleset, evidence format and KAT list (the `data-build` block the site generator writes). CI, the release workflow and the Pages deploy (`--site-only`) stop when it was not, so a version bump and the site rebuild go in the same commit (CONTRIBUTING.md, Releases).
+- `tests/version_policy.py` also checks that `docs/index.html` was built for the current version, the ruleset that version ships, the evidence format, the KAT list and the release date (the `data-build` block the site generator writes), and that the version chip and build line people see agree with that block. CI, the release workflow and the Pages deploy (`--site-only`) stop when it was not, so a version bump and the site rebuild go in the same commit (CONTRIBUTING.md, Releases). A ruleset for the next release does not need a rebuild until the version moves.
 
 ## [0.3.0] - 2026-11-20
 

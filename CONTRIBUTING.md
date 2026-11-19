@@ -45,6 +45,8 @@ A rule ID or a value can live in more than one file. For a new or changed rule:
 5. In `CHANGELOG.md` under `[Unreleased]`, write "Verdict impact: yes" with the table from step 3. A verdict change ships in a MINOR release while the version is 0.x (`tests/version_policy.py` enforces it).
 6. Update the tables in DESIGN.md.
 
+You do not need the site generator for a rule change. While the new ruleset's `since` is a later release than `__version__`, `tests/version_policy.py` compares the site with the ruleset the current version shipped and only notes the KAT list and evidence format; the maintainer rebuilds the site when the version moves (Releases).
+
 ## Adding a language
 
 Detection lives in three places: name patterns in `scan/residue.sh` (the classical-line count), CBOM rows in `scan/cbom-scan.sh`, and the structural scanner `pqlite/scan.py` (Java, Go). Start with `residue.sh` patterns and their behaviour rows, then check the test-path rule (`scan/test-paths.ere`) for the language's test file names, and the comment detection, which goes by language: `residue.sh` reads comments per file extension (Python docstrings and trailing `#`, `#` in shell, YAML, TOML, Terraform and `sshd_config`, C-family block comments), `cbom-scan.sh` reads a leading `#`, `--` or `;` as a comment only in the languages that use it (a C `#include` is code), and `pqlite/rules.py` checks Go, JavaScript, Python and Java rows with the tokenizer of `pqlite/verify.py`. Add a small before and after pair to the tests. Each of these is a ruleset change.
