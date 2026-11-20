@@ -947,7 +947,7 @@ kpqc_harness: 20 answers for 20 items -&gt; answers-111.json
       </section>
     </main>
   </div>
-  <footer class="foot"><span><span class="ko">MIT · <a href="https://github.com/g1mn/pqproof">g1mn/pqproof</a> · KISA 매뉴얼 인용은 공공누리 제4유형 · 글꼴 Noto Sans KR·JetBrains Mono는 SIL OFL 1.1 · 이 페이지는 외부 자원을 불러오지 않습니다</span><span class="en">MIT · <a href="https://github.com/g1mn/pqproof">g1mn/pqproof</a> · KISA manual quotes: KOGL Type 4 · fonts Noto Sans KR and JetBrains Mono: SIL OFL 1.1 · this page loads no external resources</span></span><span class="mono">build 2026-11-20 10:53 KST · pqproof 0.3.0 · ruleset 3 · format 4 · tests 0.3.0 2026-11-20 · kisa 21 · kat 35 · fig 67871463657d/67ed55f75445</span>
+  <footer class="foot"><span><span class="ko">MIT · <a href="https://github.com/g1mn/pqproof">g1mn/pqproof</a> · KISA 매뉴얼 인용은 공공누리 제4유형 · 글꼴 Noto Sans KR·JetBrains Mono는 SIL OFL 1.1 · 이 페이지는 외부 자원을 불러오지 않습니다</span><span class="en">MIT · <a href="https://github.com/g1mn/pqproof">g1mn/pqproof</a> · KISA manual quotes: KOGL Type 4 · fonts Noto Sans KR and JetBrains Mono: SIL OFL 1.1 · this page loads no external resources</span></span><span class="mono">build 2026-11-20 18:17 KST · pqproof 0.3.0 · ruleset 3 · format 4 · tests 0.3.0 2026-11-20 · kisa 21 · kat 35 · fig 67871463657d/67ed55f75445</span>
     <div class="faq-item" style="flex:1 1 100%;margin:4px 0 0"><button type="button" class="faq-q" aria-expanded="false" aria-controls="lic-ofl"><span><span class="ko">글꼴 라이선스(SIL Open Font License 1.1) 원문</span><span class="en">Font license (SIL Open Font License 1.1), full text</span></span><span aria-hidden="true">+</span></button><div class="faq-a" id="lic-ofl"><span class="ko">본문 글꼴 Noto Sans KR(쓰는 글자만 남긴 부분 집합)의 저작권 줄과 라이선스입니다. 구성도 안의 JetBrains Mono 저작권 줄은 그림 파일 안에 있습니다.</span><span class="en">Copyright line and license of the body font, Noto Sans KR (subset to the characters used). The JetBrains Mono notice for the diagram is inside the figure.</span><pre class="codeblock lic-text" style="margin-top:8px">Copyright 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
@@ -1147,7 +1147,9 @@ OTHER DEALINGS IN THE FONT SOFTWARE.</pre></div></div></footer>
     fig.setAttribute('title', l === 'ko' ? 'PQ-Proof 동작 흐름' : 'How PQ-Proof works');
     sizeFig(); fig.srcdoc = f.html;
   }
-  fig.addEventListener('load', function () { syncFig(); applyPreset(); sizeFig(); });
+  // archify 3.x starts still unless the reader chose Live; the site hides that button, so turn motion on after load (not under reduced motion).
+  function startMotion() { try { var w = fig.contentWindow, G = w && w.Archify && w.Archify.motionGovernor; if (G && G.capable && typeof G.setMode === 'function' && !(w.matchMedia && w.matchMedia('(prefers-reduced-motion: reduce)').matches)) G.setMode('live'); } catch (e) {} }
+  fig.addEventListener('load', function () { syncFig(); applyPreset(); sizeFig(); startMotion(); });
   window.addEventListener('resize', sizeFig);
   function renderBadges() { var p = PRESETS[preset] || PRESETS.all; $('viewBadge').innerHTML = bi(esc(p.ko), esc(p.en)); }
   D.querySelectorAll('.preset-btn').forEach(function (btn) {
