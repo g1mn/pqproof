@@ -20,6 +20,7 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 - ClusterFuzzLite (`.clusterfuzzlite/`, `.github/workflows/cflite.yml`) fuzzes the two parsers that read files from other people: the `impl judge` answer file (`tests/fuzz/answer_fuzzer.py`: never raises, reports a problem instead) and `receipt.json` under `--verify` (`tests/fuzz/evidence_json_fuzzer.py`: raises only ValueError). Pull requests that touch them get a short run, and a weekly run fuzzes longer.
 - Fuzz tests for `tls_probe` (`probe/fuzz_test.go`: the `-groups` list parser and the filter for names printed from peers). CI runs their seeds with `go test`; the release binaries are unchanged, since `go build` leaves test files out.
 - Releases attach the build provenance as a Sigstore bundle (`pqproof-<tag>-provenance.intoto.jsonl`), so it can be checked with `gh attestation verify --bundle`. The bundles of 0.2.0 to 0.5.0 were added to those releases from the attestations they already had.
+- `tools/mapping_draft.py` for the day a standard (such as the KISA guide) is published: it prints the PDF text with page markers and turns the chosen items into reviewable stubs, with the existing items on the same topic as suggestions. A draft fails `tests/test_mappings.py` until a person fills it in; `mappings/README.md` has the steps.
 
 ### Changed
 

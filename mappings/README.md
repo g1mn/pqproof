@@ -27,9 +27,12 @@ The site shows them as tables. `tests/test_mappings.py` checks every file.
 
 For the KISA guide, once it is published:
 
-1. Set `published` to `true`, fill `source` (title, edition, URL) and add one item per guide item, quoting only the published text.
-2. Run `python3 -I tests/test_mappings.py`.
-3. Gaps that PQ-Proof can close become issues; a release that closes them says so in `CHANGELOG.md`.
+1. Record the source in `source`: title, edition, publisher, date, URL. Keep the SHA-256 of the file you read.
+2. `python3 -I tools/mapping_draft.py extract guide.pdf > guide.txt` prints the text with page markers. Pick the items a migration check can speak to and write them to a TSV with the columns `id`, `page`, `section`, `quote` (short and verbatim), `about_ko`, `about_en`.
+3. `python3 -I tools/mapping_draft.py draft items.tsv --into mappings/kisa-pqc-guide.json > draft.json` turns each row into an item with the status `todo` and lists existing items on the same topic, with their status and evidence, under `_suggest`. A draft never passes the tests.
+4. For each item, decide the status, write `note_*` and `remaining_*` in both languages, cite the evidence (files and the names in them) and delete `_suggest`. Then set `published` to `true` and update `checked`.
+5. Run `python3 -I tests/test_mappings.py` and `bash prove.sh --unit`.
+6. Gaps that PQ-Proof can close become issues; a release that closes them says so in `CHANGELOG.md`, with its verdict impact.
 
 Do not add items before the document is out. A new document gets a new file with its own `id`.
 
