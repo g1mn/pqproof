@@ -39,13 +39,18 @@ def ids(kind):
     return [r["id"] for r in rulesrc.residue_rules() if r["kind"] == kind]
 
 
+# 실패 메시지: 같은 규칙이 여러 파일에 사본으로 있다(셸·파이썬·SARIF). 주석 대신 이 시험이 무엇을 함께 고칠지 알려 준다
+def sync(what, where):
+    return f"{what} must match in {where}; change them in the same commit and follow CONTRIBUTING.md, Changing a rule"
+
+
 class ResidueAndProve(unittest.TestCase):
     def test_families_are_the_first_nine_gen_rules(self):
         # residue.sh 머리 주석: 앞의 아홉 줄(G-RSA ~ G-DH-DSA)이 prove.sh 가 세는 '공개키 9계열'이다
-        self.assertEqual(ids("GEN")[:9], rules.FAMILIES)
+        self.assertEqual(ids("GEN")[:9], rules.FAMILIES, sync("the nine public-key families", "the first nine GEN rules of scan/residue.sh and pqlite/rules.py FAMILIES"))
 
     def test_expect_rule_ids(self):
-        self.assertEqual(ids("EXPECT"), list(rules.EXPECT_IDS))
+        self.assertEqual(ids("EXPECT"), list(rules.EXPECT_IDS), sync("EXPECT rule names", "scan/residue.sh and pqlite/rules.py EXPECT_IDS (and scan/profiles.json)"))
         # 프로필(scan/profiles.json)이 고르는 규칙은 모두 residue.sh 에 있고, kem·sig 묶음(자산 칸)이 맞다
         group = {r["id"]: r for r in rulesrc.residue_rules() if r["kind"] == "EXPECT"}
         for name, prof in rules.PROFILES.items():
@@ -64,11 +69,12 @@ class ResidueAndProve(unittest.TestCase):
         samples = ["ML-KEM-768", "mlkem768", "ML_KEM_1024", "ml-dsa-65", "MLDSA87", "SMAUG-T3", "NTRU+576", "ntruplus", "HAETAE3",
                    "AIMer128f", "disclaimer", "ML-KEM-512", "MLDSA44", "SLH-DSA-SHA2-192s", "slh_dsa_shake_256f",
                    "SLHDSA-SHA2-256s", "SLH-DSA-SHA2-128s", "SPHINCS+-SHA2-192s-simple", "SLH-DSA"]
-        self.assertEqual(set(res), set(rules.EXPECT_RE))
+        self.assertEqual(set(res), set(rules.EXPECT_RE), sync("EXPECT rules", "scan/residue.sh and pqlite/rules.py EXPECT_RE"))
         for rid in res:
             for s in samples:
                 with self.subTest(rule=rid, name=s):
-                    self.assertEqual(bool(re.search(res[rid], s)), bool(re.search(rules.EXPECT_RE[rid], s)))
+                    self.assertEqual(bool(re.search(res[rid], s)), bool(re.search(rules.EXPECT_RE[rid], s)),
+                                     sync(f"what {rid} matches", "scan/residue.sh and pqlite/rules.py EXPECT_RE"))
 
     def test_composite_names(self):
         # 복합 서명 이름표: residue.sh RES_COMPOSITE(ML-DSA-65·87 만), pqlite/scan.py COMPOSITE_NAME, cbom-scan.sh COMPRE 가 같은 이름을 잡는다
@@ -80,8 +86,9 @@ class ResidueAndProve(unittest.TestCase):
         for row in rows:
             with self.subTest(name=row):
                 want = bool(scanmod.COMPOSITE_NAME.search(row))
-                self.assertEqual(bool(re.search(ere, row)), want)
-                self.assertEqual(bool(re.search(cbom, row.lower())), want)
+                where = "scan/residue.sh RES_COMPOSITE, scan/cbom-scan.sh COMPRE and pqlite/scan.py COMPOSITE_NAME"
+                self.assertEqual(bool(re.search(ere, row)), want, sync("composite signature names", where))
+                self.assertEqual(bool(re.search(cbom, row.lower())), want, sync("composite signature names", where))
         self.assertTrue(scanmod.COMPOSITE_NAME.search("MLDSA44-RSA2048-PSS-SHA256"))  # 44 는 scan.py 가 잡아 보안레벨 3 미만으로 막는다
         self.assertFalse(re.search(ere, "MLDSA44-RSA2048-PSS-SHA256"))  # residue 는 44 를 허용하지 않는다
 
@@ -94,16 +101,17 @@ class ResidueAndProve(unittest.TestCase):
         ere = rulesrc.residue_export("RES_ALLOW_WRITEOPS")
         self.assertTrue(ere and ere.startswith(rulesrc.residue_export("RES_WRITEOPS") + "|"))
         as_py = re.compile(ere.replace("[[:space:]]", r"\s"))
-        import test_rules  # noqa: E402  같은 표(WRITES·NOT_WRITES)를 쓴다
+        import test_rules
         rows = test_rules.AllowRules.WRITES + test_rules.AllowRules.NOT_WRITES + [
             "xSign(k)", "doEncryptOAEP(x)", "mygenerate_private_key", "myjwt.encode(x)", "x509CreateCertificate(a)"]
         for line in rows:
             with self.subTest(line=line):
-                self.assertEqual(bool(as_py.search(line)), bool(rules.ALLOW_WRITEOPS.search(line)))
+                self.assertEqual(bool(as_py.search(line)), bool(rules.ALLOW_WRITEOPS.search(line)),
+                                 sync("write operations of the name rule", "scan/residue.sh RES_ALLOW_WRITEOPS and pqlite/rules.py ALLOW_WRITEOPS"))
 
     def test_write_operations(self):
         res = rulesrc.residue_export("RES_WRITEOPS")
-        self.assertEqual(res, rules.WRITEOPS.pattern)
+        self.assertEqual(res, rules.WRITEOPS.pattern, sync("write operations", "scan/residue.sh RES_WRITEOPS and pqlite/rules.py WRITEOPS"))
         self.assertTrue(rules.ALLOW_WRITEOPS.pattern.startswith(res + "|"), "ALLOW_WRITEOPS must extend WRITEOPS")
         lwrite = [r["re"] for r in rulesrc.residue_rules() if r["kind"] == "LWRITE"]
         self.assertEqual(len(lwrite), 1)
@@ -114,13 +122,13 @@ class ResidueAndProve(unittest.TestCase):
         pairs = re.findall(r"\[(\w)(\w)\]", res)
         self.assertEqual("".join(f"[{a}{b}]" for a, b in pairs), res, "RES_ALLOWLINE is no longer one [Xx] class per letter")
         self.assertTrue(all(a.upper() == a and b == a.lower() for a, b in pairs))
-        self.assertEqual("".join(b for _, b in pairs), rules.ALLOWLINE.pattern)
+        self.assertEqual("".join(b for _, b in pairs), rules.ALLOWLINE.pattern, sync("the legacy word", "scan/residue.sh RES_ALLOWLINE and pqlite/rules.py ALLOWLINE"))
         self.assertTrue(rules.ALLOWLINE.flags & re.I)
 
     def test_legacy_file_name(self):
         awk = rulesrc.residue_legacy_file()
         self.assertTrue(awk and awk.startswith("^"))
-        self.assertEqual(rules.LEGACY_FILE.pattern, "(?:^|/)" + awk[1:])
+        self.assertEqual(rules.LEGACY_FILE.pattern, "(?:^|/)" + awk[1:], sync("the Legacy*.java file rule", "scan/residue.sh and pqlite/rules.py LEGACY_FILE"))
 
     def test_same_line_ml_kem_forms_agree(self):
         # 같은 줄 ML-KEM 인정 꼴: 규칙 묶음 2부터 residue.sh(G-X25519·G-CURVE)와 pqlite/rules.py 가 같다(대소문자·밑줄 무관).
@@ -160,11 +168,12 @@ class RulesInOnePlace(unittest.TestCase):
 class SarifRules(unittest.TestCase):
     def test_counted_gen_rules(self):
         # c-classic 이 세는 GEN 규칙: 공개키 9계열과 보안레벨 3 미만 PQC. G-AES128 은 표에만 나온다
-        self.assertEqual(sarif.COUNTED_GEN, set(rules.FAMILIES) | {"G-WEAK-PQC"})
-        self.assertEqual(sarif.COUNTED_GEN, set(ids("GEN")) - {"G-AES128"})
+        where = "src/pqproof/sarif.py COUNTED_GEN, pqlite/rules.py FAMILIES and the GEN rules of scan/residue.sh"
+        self.assertEqual(sarif.COUNTED_GEN, set(rules.FAMILIES) | {"G-WEAK-PQC"}, sync("the rules SARIF counts", where))
+        self.assertEqual(sarif.COUNTED_GEN, set(ids("GEN")) - {"G-AES128"}, sync("the rules SARIF counts", where))
 
     def test_every_counted_rule_has_an_english_name(self):
-        self.assertEqual(set(sarif.FAMILY_EN), sarif.COUNTED_GEN | set(ids("LWRITE")))
+        self.assertEqual(set(sarif.FAMILY_EN), sarif.COUNTED_GEN | set(ids("LWRITE")), sync("English rule names", "src/pqproof/sarif.py FAMILY_EN and COUNTED_GEN"))
 
 
 class OpenSSLChoice(unittest.TestCase):
@@ -192,7 +201,8 @@ class OpenSSLChoice(unittest.TestCase):
         shutil.rmtree(cls.tmp, ignore_errors=True)  # setUpClass 가 만든 자기 폴더만
 
     def test_same_candidates(self):
-        self.assertEqual(prove.OPENSSL_CANDIDATES, deps.OPENSSL_CANDIDATES)
+        self.assertEqual(prove.OPENSSL_CANDIDATES, deps.OPENSSL_CANDIDATES,
+                         "prove.py OPENSSL_CANDIDATES and src/pqproof/deps.py OPENSSL_CANDIDATES are the same list in the same order: change both")
 
     def choose(self, candidates, given=None, path=None):
         env = {k: v for k, v in os.environ.items() if k != "OPENSSL"}
@@ -251,7 +261,7 @@ class SkipDirs(unittest.TestCase):
 
     def test_tree_list(self):
         got = sorted(r for r, _, _ in rc.tree_files(self.root) if r.endswith("K.java"))
-        self.assertEqual(got, self.WANT)
+        self.assertEqual(got, self.WANT, "the skipped-folder rule is written three times: pqlite/skipdirs.py and the skip_dirs functions of scan/residue.sh and scan/cbom-scan.sh; change all three together")
         skipped = skipdirs.walk(self.root, skipdirs.load())[1]
         self.assertEqual(skipped, [(".svn", "any"), (".venv", "any"), ("app/.tox", "output"), ("build", "output"), ("dist", "output"),
                                    ("node_modules", "any"), ("pkg/.terraform", "output"), ("src/main/webapp/node_modules", "output"),
@@ -273,18 +283,18 @@ class SkipDirs(unittest.TestCase):
     def test_residue_sees_the_same_files(self):
         parsed = rules.parse_residue(prove.run_residue(prove.GENERIC_RESIDUE, self.root)[1])
         got = sorted(x["path"] for x in parsed["rules"]["G-RSA"]["lines"])
-        self.assertEqual(got, self.WANT)
+        self.assertEqual(got, self.WANT, "the skipped-folder rule is written three times: pqlite/skipdirs.py and the skip_dirs functions of scan/residue.sh and scan/cbom-scan.sh; change all three together")
 
     def test_cbom_scan_sees_the_same_files(self):
         out = os.path.join(self.tmp, "cbom")
         ok, _, rows = prove.run_cbom_scan(prove.CBOM_SCAN, self.root, out, prove.default_openssl())
         self.assertTrue(ok, prove.slurp(os.path.join(out, "run.log"))[-1500:])
         got = sorted({r["위치"].rsplit(":", 1)[0] for r in rows if r["위치"].endswith("K.java:1")})
-        self.assertEqual(got, self.WANT)
+        self.assertEqual(got, self.WANT, "the skipped-folder rule is written three times: pqlite/skipdirs.py and the skip_dirs functions of scan/residue.sh and scan/cbom-scan.sh; change all three together")
 
     def test_scan_py_walks_the_same_files(self):
         got = sorted(r for r, _ in scanmod._files(self.root) if r.endswith("K.java"))
-        self.assertEqual(got, self.WANT)
+        self.assertEqual(got, self.WANT, "the skipped-folder rule is written three times: pqlite/skipdirs.py and the skip_dirs functions of scan/residue.sh and scan/cbom-scan.sh; change all three together")
 
     def test_one_list_left(self):
         # 옛 목록이 남아 있지 않다: 넷 모두 scan/skip-dirs 를 읽는다(형식 1·2 를 다시 재는 receipt.LEGACY_TREE_SKIP_DIRS 만 남는다)

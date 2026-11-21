@@ -6,7 +6,7 @@ import sys
 import unittest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
-from pqlite.verify import JAVA, kind_of, review, views, weakening  # noqa: E402
+from pqlite.verify import JAVA, kind_of, review, views, weakening
 
 BASE = "package x;\nclass A {\n  void f() {}\n}\n"
 

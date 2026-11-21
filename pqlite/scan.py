@@ -1,15 +1,5 @@
 # from g1mn/pq-proof 7b7803f (MIT)
-# 수정: Row에 threat 칸(shor·pqc·weak-pqc·info·unknown), Java BC/JCA 규칙(scan_java: getInstance 호출,
-#       ML-KEM·ML-DSA·Kyber·Dilithium 이름, BC 공급자 등록, setNamedGroups), jdk.tls.namedGroups 설정 읽기,
-#       DISTRO_OPENSSL에 Ubuntu jammy·noble, Java 시험 폴더 건너뛰기, 위 요약 주석.
-#       변이 시험에서 보탬: 대입 추적(지역 변수 가림·Map.of 표·다른 파일 Class.NAME), BC 경량 API·JCA 키 스펙·키 형·
-#       곡선 표·JWT/JOSE 상수·OID 상수 행, 못 가른 이름도 '확인' 행.
-#       시험·예제 경로는 scan/test-paths.ere 한 곳(cbom-scan.sh·residue.sh·prove.py 와 같은 목록)으로 가른다(TEST_PATH, is_test).
-#       같은 파일 둘째 줄의 본 소스 표시(/src/main/) 뒤쪽은 시험으로 보지 않는다(MAIN_PATH, com/example 회귀 수정).
-#       건너뛰는 폴더는 scan/skip-dirs 한 곳(pqlite/skipdirs.py)에서 읽는다. vendor·build·target 은 트리 맨 위나 빌드 파일 옆일
-#       때만 건너뛰고 src/main 아래는 본다(교차 리뷰 X02·X03·X09).
-#       규칙 묶음 2에서 보탬: KpqC(HAETAE·AIMer·SMAUG-T·NTRU+) 이름을 PQC 로(X28), 복합 서명(ML-DSA+고전) 이름은 threat 'composite'(X26),
-#       Nimbus ECKeyGenerator·RSAKeyGenerator·OctetKeyPairGenerator·Curve.P_256 등(X20), 문자열 잇기("R" + "SA")를 한 이름으로(X57).
+# 이 위에 Java·JCA·BC 규칙, 대입 추적, KpqC·복합 서명 이름 등을 더했다(변경 이력은 CHANGELOG.md).
 """암호 사용처 목록(CBOM) 행을 만든다(PQ-Proof scan.py에 Java BC/JCA를 보탬).
 
 오프라인판 추가분:
@@ -96,7 +86,7 @@ def is_test(path):
 
 PATH_SAFE = re.compile(r"[A-Za-z0-9._/-]{1,200}")
 PATH_UNSAFE = re.compile(r"[^A-Za-z0-9._/-]")
-SKIP_RULES = skipdirs.load()  # 건너뛰는 폴더: scan/skip-dirs 한 곳(트리 해시·cbom-scan.sh·residue.sh 와 같은 규칙, 교차 리뷰 X09)
+SKIP_RULES = skipdirs.load()  # 건너뛰는 폴더: scan/skip-dirs 한 곳(교차 리뷰 X09)
 HYBRID = "X25519MLKEM768"
 NIST_KEX = "quantum-vulnerable: deprecated after 2030, disallowed after 2035 (NIST IR 8547, Table 4)"
 NIST_SIG = "quantum-vulnerable: deprecated after 2030, disallowed after 2035 (NIST IR 8547, Table 2)"
@@ -110,7 +100,7 @@ SHOR, PQC, WEAK_PQC, INFO, UNKNOWN = "shor", "pqc", "weak-pqc", "info", "unknown
 COMPOSITE = "composite"  # ML-DSA 와 고전 서명을 한 키로 묶은 복합 서명(교차 리뷰 X26): 막지 않고 검토 필요로 센다
 NIST_KPQC = "post-quantum, Korean KpqC standard (not NIST-approved)"
 NIST_COMPOSITE = "composite ML-DSA with a classical signature (IETF LAMPS draft)"
-# 복합 서명 이름. scan/residue.sh RES_COMPOSITE·scan/cbom-scan.sh COMPRE 와 같은 뜻(tests/test_rule_sync.py 가 대조한다)
+# 복합 서명 이름
 COMPOSITE_NAME = re.compile(r"(?i)ml[-_]?dsa[-_]?(44|65|87)[-_](?:rsa|ecdsa|ed25519|ed448)")
 
 # Go's names for TLS groups, and the names OpenSSL (nginx ssl_ecdh_curve) uses for the same groups.

@@ -57,8 +57,53 @@ class Patterns(unittest.TestCase):
         self.assertEqual((n1, n2, once), (2, 0, twice))
 
     def test_prove_and_sarif_share_the_rules(self):
-        self.assertEqual(prove.REDACT, sarif.REDACT)
-        self.assertEqual(prove.MASK, sarif.MASK)
+        msg = "prove.py REDACT/MASK and src/pqproof/sarif.py REDACT/MASK hide the same values in tables and SARIF: change both"
+        self.assertEqual(prove.REDACT, sarif.REDACT, msg)
+        self.assertEqual(prove.MASK, sarif.MASK, msg)
+
+
+# 같은 줄을 prove.py REDACT 와 cbom-scan.sh MASKAWK(스캐너 원본 출력 artifacts/ 의 발췌 가림)에 넣었을 때 비밀 값이 사라지는가
+MASK_CASES = [
+    ("keytool -genkeypair -keyalg RSA -storepass s3cr3tpass1 -keystore a.p12", "s3cr3tpass1"),
+    ("keytool -importkeystore -srcstorepass oldpw1234 -deststorepass newpw5678", "oldpw1234"),
+    ("openssl genrsa -aes256 -passout pass:hunter2hunter2 -out k.pem 2048", "hunter2hunter2"),
+    ('char[] password = "changeit".toCharArray();', "changeit"),
+    ('{"client_secret": "abc123xyz", "alg": "RS256"}', "abc123xyz"),
+    ("Authorization: Bearer abcdefghijklmnop", "abcdefghijklmnop"),
+    (f"export TOKEN={GH}", GH),
+    ("api_key: 'k-123456'", "k-123456"),
+    ("secret_key = 'sk-test-1234567890'", "sk-test-1234567890"),
+    (f"aws configure set aws_access_key_id {AWS}", AWS),
+    (f"url = 'https://x/?q={GH}'", GH),
+]
+
+
+@unittest.skipUnless(shutil.which("awk"), "awk 없음")
+class ScannerMaskAgrees(unittest.TestCase):
+    """cbom-scan.sh 의 MASKAWK 는 prove.py REDACT 보다 좁다. 다른 곳은 KNOWN_MASK_GAPS 에 고정한다(스캐너 원본 출력에 값이 남는다).
+    cbom-scan.sh 는 규칙 파일이라 고치면 규칙 묶음 변경이고, 그때 맞춘 줄을 KNOWN_MASK_GAPS 에서 지운다(이 시험이 알려 준다)."""
+    KNOWN_MASK_GAPS = {
+        "secret_key = 'sk-test-1234567890'",            # secret[_-]?key 이름이 MASKAWK 에 없다
+        f"aws configure set aws_access_key_id {AWS}",   # 알려진 토큰 접두사(AKIA 등)를 MASKAWK 는 보지 않는다
+        f"url = 'https://x/?q={GH}'",                   # 이름 없이 나온 토큰(ghp_ 등)도 같다
+    }
+
+    def test_scanner_hides_what_prove_hides(self):
+        import re
+        import subprocess
+        text = (PROOF / "scan" / "cbom-scan.sh").read_text(encoding="utf-8")
+        prog = re.search(r"(?ms)^MASKAWK='(.*?)'$", text)[1]
+        lines = [line for line, _ in MASK_CASES]
+        out = subprocess.run(["awk", prog], input="\n".join(lines) + "\n", capture_output=True, text=True, check=True).stdout.splitlines()
+        self.assertEqual(len(out), len(lines))
+        gaps = set()
+        for (line, secret), masked in zip(MASK_CASES, out):
+            self.assertNotIn(secret, prove.redact(line)[0], f"prove.py REDACT misses {line!r}")
+            if secret in masked:
+                gaps.add(line)
+        self.assertEqual(gaps, self.KNOWN_MASK_GAPS,
+                         "scan/cbom-scan.sh MASKAWK and prove.py REDACT hide different values. Change MASKAWK (a ruleset change, "
+                         "CONTRIBUTING.md) or, if you closed a gap, remove that line from KNOWN_MASK_GAPS")
 
 
 @unittest.skipUnless(shutil.which("bash") and prove.default_openssl(), "bash 또는 openssl 없음")

@@ -18,7 +18,7 @@
 # 시험 경로는 scan/test-paths.ere 한 곳에 두고 cbom-scan.sh 와 같이 쓴다(TEST_PATHS=<파일>로 바꿀 수 있다). 그 경로의 코드 줄은
 #   TEST 로 따로 세고 줄마다 적는다(판정에 안 넣지만 숨기지 않는다).
 #   목록 첫 줄은 시험 경로 규칙, 둘째 줄은 본 소스 표시(/src/main/)다. 표시가 있는 경로는 그 앞부분만 첫 줄에 맞춰 본다.
-# 건너뜀: 폴더는 scan/skip-dirs 한 곳(SKIP_DIRS=<파일>로 바꿀 수 있다, cbom-scan.sh·pqlite/skipdirs.py 와 같은 규칙). .git·node_modules
+# 건너뜀: 폴더는 scan/skip-dirs 한 곳(SKIP_DIRS=<파일>로 바꿀 수 있다). .git·node_modules
 #   같은 이름은 어느 깊이든, vendor·build·target·dist 는 트리 맨 위나 빌드 파일 옆일 때만이고 src/main 아래는 본다(교차 리뷰 X02·X03·X09).
 #   키·DB·비밀 모양 파일(.pem .key .p12 .jks .der .crt .sqlite3 .env)은 내용은 읽지 않고 이름 개수만.
 # 파일 목록은 임시 파일로 awk 에 넘긴다(파일 수천 개 저장소에서 인자 한도를 넘지 않게, 교차 리뷰 X08).
@@ -36,8 +36,7 @@ RES_MAINRE=$(grep -v -e '^#' -e '^[[:space:]]*$' "$TESTRE_FILE" 2>/dev/null | se
 [ -r "$SKIP_FILE" ] || { echo "건너뛰는 폴더 목록 없음: $SKIP_FILE (SKIP_DIRS=<파일>로 준다)" >&2; exit 2; }
 TMPD=$(mktemp -d "${TMPDIR:-/tmp}/residue.XXXXXX") || exit 2
 trap 'rm -f "$TMPD"/* 2>/dev/null; rmdir "$TMPD" 2>/dev/null' EXIT
-# --- 건너뛰는 폴더(scan/skip-dirs). residue.sh 와 cbom-scan.sh 에 같은 글로 있고 pqlite/skipdirs.py 와 같은 규칙이다
-# (tests/test_rule_sync.py 가 세 곳을 대조한다). any 이름은 어느 깊이든 건너뛰되 경로에 main 표시가 있으면 같은 폴더에 buildfile 이
+# --- 건너뛰는 폴더(scan/skip-dirs). any 이름은 어느 깊이든 건너뛰되 경로에 main 표시가 있으면 같은 폴더에 buildfile 이
 # 있을 때만 건너뛴다. output 이름은 트리 맨 위이거나 같은 폴더에 buildfile 이 있을 때만, 경로에 main 표시가 없을 때만 건너뛴다.
 # 건너뛴 폴더 안은 보지 않는다.
 skip_load() { # SKIP_FILE → SK_ANYX·SK_OUTX(find 식), SK_ANYL(이름 목록), SK_BFS(빌드 파일), SK_MAIN, SK_MAINP(find -path 꼴)
@@ -117,12 +116,11 @@ RULES
 export RES_RULES RES_ROOT="$ROOT" RES_TESTRE RES_MAINRE
 export RES_ALLOWLINE='[Ll][Ee][Gg][Aa][Cc][Yy]'
 # 복합 서명 이름(ML-DSA 와 고전 서명을 한 키로 묶은 IETF LAMPS·BouncyCastle 이름, 교차 리뷰 X26). 공개키 9계열에서 LEFT 로 세지 않고
-# ALLOW 로 두면 prove.sh 가 '복합 서명'으로 따로 세어 검토 필요로 올린다(pqlite/rules.py COMPOSITE 와 같은 뜻). ML-DSA-44 를 묶은 것은
+# ALLOW 로 두면 prove.sh 가 '복합 서명'으로 따로 세어 검토 필요로 올린다. ML-DSA-44 를 묶은 것은
 # 보안레벨 3 미만이라 허용하지 않고(LEFT), G-WEAK-PQC 도 그대로 센다
 export RES_COMPOSITE='[Mm][Ll][-_]?[Dd][Ss][Aa][-_]?(65|87)[-_](RSA|rsa|ECDSA|ecdsa|Ed25519|ed25519|Ed448|ed448)'
 export RES_WRITEOPS='ENCRYPT_MODE|WRAP_MODE|initSign|KeyPairGenerator|generateKeyPair'
 # 이름 규칙의 쓰기 연산: RES_WRITEOPS 에 Python·Go·Node 의 새 서명·새 암호화·새 키 생성과 토큰·인증서 서명 API 를 보탠다
-# (pqlite/rules.py ALLOW_WRITEOPS 와 같은 뜻의 ERE)
 export RES_ALLOW_WRITEOPS='ENCRYPT_MODE|WRAP_MODE|initSign|KeyPairGenerator|generateKeyPair|\.sign[[:space:]]*\(|(^|[^A-Za-z0-9_])Sign(PKCS1v15|PSS|ASN1)?[[:space:]]*\(|\.encrypt[[:space:]]*\(|(^|[^A-Za-z0-9_])Encrypt(OAEP|PKCS1v15)[[:space:]]*\(|generate_private_key|(^|[^A-Za-z0-9_])GenerateKey[[:space:]]*\(|\.generate[[:space:]]*\(|createSign[[:space:]]*\(|publicEncrypt[[:space:]]*\(|generateKeyPair(Sync)?[[:space:]]*\(|(^|[^A-Za-z0-9_])jwt\.encode[[:space:]]*\(|\.SignedString[[:space:]]*\(|\.signWith[[:space:]]*\(|(^|[^A-Za-z0-9_])CreateCertificate[[:space:]]*\('
 
 skip_load || exit 2

@@ -86,7 +86,7 @@ class EvidenceError(Exception):
     pass
 
 
-# SARIF snippet 에 실린 비밀 값을 가린다(교차 리뷰 X33). prove.py REDACT 와 같아야 한다(tests/test_redact.py).
+# SARIF snippet 에 실린 비밀 값을 가린다(교차 리뷰 X33).
 # 지문(partialFingerprints)도 가린 글로 만든다: 비밀 값의 해시가 code scanning 으로 나가지 않게
 REDACT = (
     r"(?i)(-(?:src|dest)?(?:storepass|keypass)\s+)(\"[^\"]*\"|'[^']*'|[^\s\"'`]+)",

@@ -1110,7 +1110,7 @@ def check_row(results, control=None, problem=None, answered=True):
 # 보고서 읽기 pqverify_summary, 판정 pqverify_status, 검사 행 nist_check_row). --verify 가 증적의 보고서 사본으로 다시 판정한다.
 # 받은 보고서는 남이 만든 데이터다. JSON 으로 읽고 칸의 꼴을 확인할 뿐 그 안의 무엇도 실행하지 않는다.
 NIST_CHECK_ID = "i-nist"
-PQV_NAME = "pq-verify"  # PATH 에서 찾는 실행 파일 이름(PQ_VERIFY 로 바꾼다). src/pqproof/deps.py 와 같아야 한다
+PQV_NAME = "pq-verify"  # PATH 에서 찾는 실행 파일 이름(PQ_VERIFY 로 바꾼다)
 PQV_TESTED = "2.19.0"  # 실제 출력 고정물(tests/fixtures/pqverify/)로 시험한 판. 다른 판도 읽지만 보고서 꼴(schema 주 버전)이 같아야 한다
 PQV_SCHEMA_MAJOR = "1"
 PQV_MAX_REPORT = 16 << 20  # 보고서 상한(바이트). 넘으면 읽지 않고 미판정

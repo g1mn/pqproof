@@ -233,8 +233,9 @@ class Args(unittest.TestCase):
     def test_deps_finds_the_same_executable(self):
         sys.path.insert(0, str(PROOF / "src"))
         from pqproof import deps
-        self.assertEqual(deps.PQV_NAME, impl.PQV_NAME)
-        self.assertEqual((deps.PQV_ENV_DROP_PREFIX, set(deps.PQV_ENV_DROP)), (impl._ENV_DROP_PREFIX, set(impl._ENV_DROP)))
+        self.assertEqual(deps.PQV_NAME, impl.PQV_NAME, "src/pqproof/deps.py PQV_NAME and pqlite/impl.py PQV_NAME: doctor and the audit must look for the same program")
+        self.assertEqual((deps.PQV_ENV_DROP_PREFIX, set(deps.PQV_ENV_DROP)), (impl._ENV_DROP_PREFIX, set(impl._ENV_DROP)),
+                         "src/pqproof/deps.py PQV_ENV_DROP* and pqlite/impl.py _ENV_DROP*: doctor and the audit must drop the same environment variables")
         with tempfile.TemporaryDirectory() as d:
             fake = os.path.join(d, "pq-verify")
             pathlib.Path(fake).write_text("#!/bin/sh\n[ -z \"$PQV_X$LD_X\" ] || exit 7\necho 'pq-verify 2.19.0'\n", encoding="utf-8")

@@ -1,8 +1,4 @@
-# rules.py: 판정 규칙(교차 리뷰 X10). prove.py 안에 있던 판정 상수와 판정 함수를 값 그대로 옮겼다. 이 파일은 규칙 묶음
-# 해시(pqlite/version.py RULESET_FILES)에 든다. 그래서 여기 값 하나만 바뀌어도 ruleset_sha256 이 바뀌고, 새 규칙 묶음 이름과
-# CHANGELOG 의 '판정 영향' 칸이 필요하다(tests/test_versioning.py, tests/version_policy.py).
-# prove.py 에는 입력 읽기, 실행 순서, 표·증적 쓰기만 남는다. prove.py 에 판정용 정규식 상수가 새로 생기면
-# tests/test_rule_sync.py 가 실패한다(여기로 옮긴다).
+# rules.py: 판정 규칙(교차 리뷰 X10). prove.py 안에 있던 판정 상수와 판정 함수를 값 그대로 옮겼다.
 # 판정식 derive_verdict(실패 > 미판정 > 통과)는 증적 형식의 정의라 pqlite/receipt.py 에 둔다(--verify 가 같은 식으로 맞춰 본다).
 """Verdict rules of PQ-Proof: classical families, allow rules, hybrid window, residue reading and the checks."""
 import json
@@ -20,7 +16,7 @@ from .receipt import STATUS_KO
 
 # 공개키 9계열(residue.sh GEN 규칙 앞의 아홉 줄, c-classic 이 센다)과 EXPECT 규칙 이름
 FAMILIES = ["G-RSA", "G-EC", "G-CURVE", "G-OAEP-PKCS1", "G-CLASSIC-SIG", "G-JWT-ALG", "G-EDDSA", "G-X25519", "G-DH-DSA"]
-EXPECT_IDS = ("E-MLKEM768", "E-MLKEM1024", "E-MLDSA65", "E-MLDSA87", "E-SLHDSA", "E-KPQC-KEM", "E-KPQC-SIG")  # residue.sh EXPECT 규칙
+EXPECT_IDS = ("E-MLKEM768", "E-MLKEM1024", "E-MLDSA65", "E-MLDSA87", "E-SLHDSA", "E-KPQC-KEM", "E-KPQC-SIG")
 # 알고리즘 프로필(교차 리뷰 X11·X28): c-expect 가 EXPECT=kem·sig 마다 세는 EXPECT 규칙, b-tls 가 홀로 제시하는 하이브리드 그룹,
 # EXPECT=cert 가 받는 인증서 키. scan/profiles.json 한 곳에 두고 규칙 묶음 해시에 든다. PROFILE=<이름>, 기본 nist-cat3
 PROFILES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scan", "profiles.json")
@@ -228,8 +224,7 @@ def code_part(text):
 
 
 LEGACY_REASONS = ("Legacy*.java(옛 데이터 읽기·검증 전용)", "같은 줄 legacy(옛 데이터 읽기·검증)")
-# 복합 서명(ML-DSA 와 고전 서명을 한 키로 묶은 IETF LAMPS·BouncyCastle 이름, 교차 리뷰 X26). 두 스캐너가 같은 이름표(scan.COMPOSITE_NAME,
-# residue.sh RES_COMPOSITE, cbom-scan.sh COMPRE)로 읽고, 막지도 허용하지도 않고 '검토 필요'로 따로 센다. ML-DSA-44 를 묶은 것은 막는다
+# 복합 서명(ML-DSA 와 고전 서명을 한 키로 묶은 IETF LAMPS·BouncyCastle 이름, 교차 리뷰 X26). 막지도 허용하지도 않고 '검토 필요'로 따로 센다. ML-DSA-44 를 묶은 것은 막는다
 COMPOSITE = scanmod.COMPOSITE_NAME
 COMPOSITE_REASON = "복합 서명(ML-DSA+고전 서명, 허용 여부는 사람이 확인)"
 CBOM_COMPOSITE = "복합 서명(PQC+고전)"  # cbom-scan.sh verdict() 가 다는 위협
@@ -708,7 +703,7 @@ def expect_count(jf, ids):
     return n, shown + (f" = {n}" if len(got) > 1 else "")
 
 
-# EXPECT 규칙 이름 → 같은 뜻의 파이썬 정규식(EXPECT_FROM=api 가 CBOM 행 알고리즘에 맞춘다. residue.sh EXPECT 와 tests/test_rule_sync.py 가 대조)
+# EXPECT 규칙 이름 → 파이썬 정규식(EXPECT_FROM=api 가 CBOM 행 알고리즘에 맞춘다)
 EXPECT_RE = {"E-MLKEM768": r"(?i)ml[-_]?kem[-_]?768", "E-MLKEM1024": r"(?i)ml[-_]?kem[-_]?1024",
              "E-MLDSA65": r"(?i)ml[-_]?dsa[-_]?65", "E-MLDSA87": r"(?i)ml[-_]?dsa[-_]?87",
              "E-SLHDSA": r"(?i)slh[-_]?dsa[-_]?(sha2|shake)[-_]?(192|256)",
@@ -744,7 +739,6 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
     """(checks, verdict, pending, unused, live, name_only). derive_verdict 는 pqlite/receipt.py 의 것(증적 형식의 판정식)을 받는다.
     inputs_extra: prove.prepare_input 의 입력 정보 {"orig"|"fixed": {links, skipped_output}}(고친 판만 본다).
     name_only: 이름 규칙(Legacy*.java·코드의 legacy)으로만 허용하고 허용 목록 항목이 없는 위치(CBOM, SCOPE=all 이면 residue 도)."""
-    # 검사
     checks = []
 
     def check(cid, title, status, expected, actual):

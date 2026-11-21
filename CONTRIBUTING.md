@@ -45,7 +45,7 @@ Code comments and tool output are in Korean; documentation is in English, with a
 
 ## Changing a rule
 
-The ruleset is the files in `RULESET_FILES` of `pqlite/version.py`: `scan/cbom-scan.sh`, `scan/residue.sh`, `scan/test-paths.ere`, `scan/skip-dirs`, `scan/profiles.json`, `pqlite/scan.py`, `pqlite/verify.py`, `pqlite/allowlist.py`, `pqlite/rules.py`, `pqlite/skipdirs.py`, `pqlite/tlsprobe.py`, `pqlite/impl.py`, `scan/kat-kpqc.json` and the excerpts in `scan/kat/` (fourteen files from ruleset 3). A folder to skip goes in `scan/skip-dirs`, nowhere else. A verdict constant or pattern belongs in `pqlite/rules.py`, not in `prove.py`; a test fails when `prove.py` gets a new pattern constant. Changing any byte of them, a comment included, changes the ruleset hash, and a run with a changed file is named `<current>+modified` until the change has its own ruleset name. So a lint fix in these files (CI runs shellcheck on `scan/cbom-scan.sh` and `scan/residue.sh`) goes in with a ruleset change.
+The ruleset is the files in `RULESET_FILES` of `pqlite/version.py`: `scan/cbom-scan.sh`, `scan/residue.sh`, `scan/test-paths.ere`, `scan/skip-dirs`, `scan/profiles.json`, `pqlite/scan.py`, `pqlite/verify.py`, `pqlite/allowlist.py`, `pqlite/rules.py`, `pqlite/skipdirs.py`, `pqlite/tlsprobe.py`, `pqlite/impl.py`, `scan/kat-kpqc.json` and the excerpts in `scan/kat/` (fourteen files from ruleset 3). A folder to skip goes in `scan/skip-dirs`, nowhere else. A verdict constant or pattern belongs in `pqlite/rules.py`, not in `prove.py`; a test fails when `prove.py` gets a new pattern constant. From ruleset 5, comments do not count toward the ruleset hash: Python comments, full-line comments and blank lines outside quotes and heredocs in the shell scanners, and `#` lines in `scan/test-paths.ere` and `scan/skip-dirs`. Trailing comments in shell files and every other byte still count. After a comment-only edit, run `python3 -I -B pqlite/version.py --alias`, which records the new hash as an alias of the current ruleset and refuses when more than comments changed. Any other change names a run `<current>+modified` until the change has its own ruleset name, so a code lint fix in these files (CI runs shellcheck on `scan/cbom-scan.sh` and `scan/residue.sh`) goes in with a ruleset change.
 
 A rule ID or a value can live in more than one file. For a new or changed rule:
 
@@ -80,3 +80,5 @@ A field added, removed, renamed or changed in meaning raises `format_version` in
 ## Pull requests
 
 Say in the description whether a verdict can move (the template asks). Keep commits small, with tests. Documentation: usage goes in `guide/`, rules and formats in `DESIGN.md`.
+
+When the same review comment comes up twice, turn it into a test or a lint rule whose failure message says what to change, instead of a code comment that asks people to remember. Keep comments for reasons and for standard references (FIPS, RFC, KpqC sections).

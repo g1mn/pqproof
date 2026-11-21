@@ -18,7 +18,7 @@ from unittest import mock
 
 PROOF = pathlib.Path(__file__).resolve().parent.parent
 try:
-    import pqproof  # noqa: F401  설치본
+    import pqproof
 except ImportError:
     sys.path.insert(0, str(PROOF / "src"))  # 저장소 체크아웃
 import pqproof  # noqa: E402

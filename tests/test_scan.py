@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
-from pqlite.scan import HYBRID, dockerfile_images, scan  # noqa: E402
+from pqlite.scan import HYBRID, dockerfile_images, scan
 
 SNAPSHOT = pathlib.Path(__file__).resolve().parent / "fixtures" / "orders-edge"
 

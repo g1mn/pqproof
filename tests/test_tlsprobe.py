@@ -7,7 +7,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
-from pqlite import tlsprobe as T  # noqa: E402
+from pqlite import tlsprobe as T
 
 HYBRID_OUT = """probe: tls_probe 0.4.0 (go1.27.3)
 target: 127.0.0.1:8443

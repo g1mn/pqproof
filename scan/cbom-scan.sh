@@ -25,8 +25,7 @@ MAINRE=$(grep -v -e '^#' -e '^[[:space:]]*$' "$TESTRE_FILE" 2>/dev/null | sed -n
 [ -n "$TESTRE" ] || { echo "시험 경로 목록 없음: $TESTRE_FILE (TEST_PATHS=<파일>로 준다)" >&2; exit 2; }
 SKIP_FILE=${SKIP_DIRS:-$HERE/skip-dirs}
 [ -r "$SKIP_FILE" ] || { echo "건너뛰는 폴더 목록 없음: $SKIP_FILE (SKIP_DIRS=<파일>로 준다)" >&2; exit 2; }
-# --- 건너뛰는 폴더(scan/skip-dirs). residue.sh 와 cbom-scan.sh 에 같은 글로 있고 pqlite/skipdirs.py 와 같은 규칙이다
-# (tests/test_rule_sync.py 가 세 곳을 대조한다). any 이름은 어느 깊이든 건너뛰되 경로에 main 표시가 있으면 같은 폴더에 buildfile 이
+# --- 건너뛰는 폴더(scan/skip-dirs). any 이름은 어느 깊이든 건너뛰되 경로에 main 표시가 있으면 같은 폴더에 buildfile 이
 # 있을 때만 건너뛴다. output 이름은 트리 맨 위이거나 같은 폴더에 buildfile 이 있을 때만, 경로에 main 표시가 없을 때만 건너뛴다.
 # 건너뛴 폴더 안은 보지 않는다.
 skip_load() { # SKIP_FILE → SK_ANYX·SK_OUTX(find 식), SK_ANYL(이름 목록), SK_BFS(빌드 파일), SK_MAIN, SK_MAINP(find -path 꼴)
@@ -116,7 +115,7 @@ lc() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 trim() { local s=$1; s=${s#"${s%%[![:space:]]*}"}; s=${s%"${s##*[![:space:]]}"}; printf '%s' "$s"; }
 note() { local o="" x; for x in "$@"; do [ -n "$x" ] && o="${o:+$o · }$x"; done; printf '%s' "$o"; }
 # 근거 줄 발췌. 키·토큰일 수 있는 긴 base64 덩어리는 가린다(증거 파일이 보고서에 그대로 붙으므로)
-# 비밀번호·토큰처럼 보이는 값(-storepass 뒤, pass:, password=·token= 대입, Bearer)도 *** 로 가린다(prove.py REDACT 와 같은 뜻, 교차 리뷰 X33)
+# 비밀번호·토큰처럼 보이는 값(-storepass 뒤, pass:, password=·token= 대입, Bearer)도 *** 로 가린다(교차 리뷰 X33)
 MASKAWK='function msk(re,   o, p) {
   o = ""
   while (match(L, re)) {
@@ -167,7 +166,7 @@ autouse() { case "$(lc "$1")" in
 
 # 위협·우선순위·권장 판정 → TH PR RP WN. P1=키교환·암호화(HNDL 직접 노출) P2=서명·인증서·고전 취약 P3=그로버 약화
 WEAKPQ='ml[-_]?kem[-_]?512|ml[-_]?dsa[-_]?44|kyber[-_]?512|dilithium[-_]?2([^0-9]|$)|slh[-_]?dsa[-_]?(sha2|shake)[-_]?128'   # NIST 보안레벨 3 미만 PQC(교차 리뷰 X07, SLH-DSA 128 은 규칙 묶음 4)
-# 복합 서명(ML-DSA 와 고전 서명을 한 키로 묶은 IETF LAMPS·BC 이름). residue.sh RES_COMPOSITE·pqlite/rules.py COMPOSITE 와 같은 뜻(교차 리뷰 X26)
+# 복합 서명(ML-DSA 와 고전 서명을 한 키로 묶은 IETF LAMPS·BC 이름, 교차 리뷰 X26)
 COMPRE='ml[-_]?dsa[-_]?(44|65|87)[-_](rsa|ecdsa|ed25519|ed448)'
 COMPTH="복합 서명(PQC+고전)"; COMPRP="복합 서명은 허용 여부를 정책으로 정하고 사람이 확인(목표는 ML-DSA-65 단독)"
 verdict() {

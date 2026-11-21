@@ -1,32 +1,6 @@
 # from g1mn/pq-proof 7b7803f (MIT)
-# 수정: 허용 목록·실행 데이터 제외 칸(allowlist·excluded)과 deck.json(render_deck, verify가 다시 만들어 비교).
-# 수정: 허용 항목 사람 확인 칸(reviewed_by·reviewed_at, allowlist.unreviewed, params.require_review, 검사 r-allow)과 판정 옆
-#       '허용 n건 사람 확인 전' 표시. 이 칸이 없는 옛 증적은 예전 그대로 그린다(옛 receipt.html·deck.json이 그대로 맞게).
-#       verify는 항목의 사람 확인 칸을 증적 폴더의 허용 목록 사본에서 다시 풀어 맞춰 본다(allowlist.resolve_reviews).
-# 수정(결함 D1·D2 뒤): 허용 항목마다 덮은 줄 수(lines_fixed, 원본 lines_orig·orig), 안 쓰인 항목 수(unused,
-#       unused_orig_lines), 허용 범위 쓰기 경로 수(write_review)를 적고 consistency 가 대조한다. 판정 옆 표시에 쓰기 경로·안 쓰인
-#       항목 수를 더한다. 시험 경로 목록 사본(test_paths), CBOM·residue 의 시험 줄 수(tests)도 적는다. 이 칸이 없는 옛 증적은
-#       예전 그대로 그린다.
-# 수정(독립 검토 뒤): 고친 판에서 무효·제외·트리 밖인데 원본 고전 줄을 덮는 항목도 안 쓰인 항목으로 센다(_counts_unused,
-#       allowlist.counts_unused 와 같은 식). 새 형식 증적(test_paths 또는 lines_fixed 있음)에서 unused·unused_orig_lines·
-#       write_review 칸이 빠지면 실패로 본다(칸을 지워 옛 증적처럼 보이게 하는 위조). verify 는 evidence-fragment.json 과
-#       tables/report.md 의 판정이 receipt 판정과 같은지도 본다(새 형식만).
-# 수정(0.1.0, 버전 관리): 증적 형식 2. format_version·tool_version·ruleset_version·ruleset_sha256 칸을 더하고 verify 가 규칙 묶음
-#       해시를 tools[] 해시로 다시 계산해 맞춘다. format_version 이 없는 증적은 형식 1(0.1.0 이전 공개본)로 읽는다: 첫 공개본의 옛 NOTE 를
-#       받고 receipt.html 은 그 판의 낱말(영수증)로 다시 그려 비교한다(tests/golden/evidence 고정물). 형식 2부터 판정 옆 표시에
-#       '검증 호출 제거 n건 검토 필요'(r-review)를 더한다. 형식 1 증적은 예전 표시 그대로 그린다.
-# 수정(0.1.1): receipt.json 을 엄격하게 읽는다(loads_strict: BOM·중복 키·NaN·Infinity 거부) 그리고 파일 바이트가 도구 직렬화(dumps)와
-#       같은지 본다. 정규화는 키를 UTF-16 코드 단위 순서로 정렬하고(RFC 8785 3.2.3) 절댓값 2^53 을 넘는 정수는 거부한다.
-#       verify 에서 폴더나 receipt.json 이 없으면 main 이 2(입력 오류)로 끝낸다. 열기는 O_NOFOLLOW·dir_fd 가 없는 플랫폼(Windows)에서
-#       경로 조각마다 lstat 으로 링크를 거른 뒤 연다.
-# 수정(0.3.0): 증적 형식 4. 구현 검증(pqproof impl, params.mode impl) 증적은 두 트리 칸(inputs·cbom·java·tls 등) 대신 최상위 impl 칸
-#       (답안 사본·정답 묶음 사본·문제지 사본, 받아 줄 판, 자기 점검, 파라미터별 결과)과 검사 i-kpqc 하나를 가진다(SCHEMA_IMPL).
-#       verify 는 정답 묶음 사본으로 답안 사본을 다시 판정해 결과·검사 행이 같은지 보고(impl_record), 지금 도구의 KAT 목록이 그 증적과
-#       같으면 정답 묶음·문제지를 다시 만들어 바이트까지 맞춘다. 두 트리·한 트리 증적은 형식 3과 같은 꼴이다. 형식 1~3을 계속 읽는다.
-#       pq-verify 다리(검사 i-nist): impl.nist 에 pq-verify 실행(argv·종료 코드)과 보고서 요약·상태를 적고, 보고서(artifacts/impl/pq-verify/
-#       report.json)와 실행 기록(log.json)을 산출물로 둔다. consistency 는 요약으로 상태를 다시 정하고, verify 는 보고서·실행 기록 사본으로
-#       요약부터 다시 뽑아 맞춘다. 답안 없이 pq-verify 만 돌린 증적은 impl.input·key 가 null 이고 i-kpqc 가 해당 없음이다.
-# 수정: 축소판. RFC 8785 정규화(_number·_jcs·canonical)·compute_id·validate·obj·strict·iso·_Artifacts·_read_nofollow·
+# 가져온 것과 새로 쓴 것(변경 이력은 CHANGELOG.md):
+#       RFC 8785 정규화(_number·_jcs·canonical)·compute_id·validate·obj·strict·iso·_Artifacts·_read_nofollow·
 #       _hash_refs·_listed_files·verify 뼈대·STYLE·SCRIPT(테마 토글)는 가져오고, microVM 증적용 build·_sandbox·_network·
 #       _proofs·_steps·POLICY·consistency·SCHEMA·render_html은 이 오프라인판용으로 새로 썼다. loop._open_nofollow도 옮겨 왔다.
 """한 번 돌린 prove.sh의 검증 증적: receipt.json, receipt.html, 그리고 그것이 이름 붙인 파일들.
@@ -1068,17 +1042,17 @@ def version_problems(r):
             out.append(f"format_version {fv} needs {key}")
         elif fv < since and key in r:
             out.append(f"{key} is a field of format {since}, but format_version is {fv}")
-    got = v.ruleset_from_tools(r["tools"], r["ruleset_version"])  # 그 묶음의 파일 목록으로(묶음 1은 여섯, 2부터 여덟)
+    got = v.ruleset_from_tools(r["tools"], r["ruleset_version"])  # 그 묶음의 파일 목록으로(묶음마다 다르다: scan/ruleset.json)
     if r["ruleset_sha256"] != got:
         out.append(f"ruleset_sha256 is {r['ruleset_sha256']}, but the rule files listed in tools[] hash to {got}")
-    current, history = v.ruleset_history()
+    hashes = v.ruleset_hashes()  # 이름마다 기록 해시와 별칭(주석만 고친 판, 규칙 묶음 5부터)
     name = r["ruleset_version"]
-    if name in history and history[name] != r["ruleset_sha256"]:
-        out.append(f"ruleset_version {name} is {history[name]} in scan/ruleset.json, but the receipt says {r['ruleset_sha256']}")
-    elif name not in history and not name.endswith("+modified"):
-        out.append(f"ruleset_version {name} is not in this tool's ruleset history (it knows {', '.join(sorted(history)) or 'none'}); "
+    if name in hashes and r["ruleset_sha256"] not in hashes[name]:
+        out.append(f"ruleset_version {name} is {' or '.join(sorted(hashes[name]))} in scan/ruleset.json, but the receipt says {r['ruleset_sha256']}")
+    elif name not in hashes and not name.endswith("+modified"):
+        out.append(f"ruleset_version {name} is not in this tool's ruleset history (it knows {', '.join(sorted(hashes)) or 'none'}); "
                    "check this receipt with the pqproof version that wrote it, or a newer one")
-    elif name.endswith("+modified") and r["ruleset_sha256"] in history.values():
+    elif name.endswith("+modified") and any(r["ruleset_sha256"] in h for h in hashes.values()):
         out.append(f"ruleset_version {name} says modified, but ruleset_sha256 is a recorded ruleset")
     return out
 

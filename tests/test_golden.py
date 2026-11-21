@@ -27,7 +27,8 @@ class LegacyEvidence(unittest.TestCase):
             with self.subTest(fixture=fx["name"]):
                 d = GOLD / fx["name"]
                 bad = [w for ok, w in R.verify(str(d)) if not ok]
-                self.assertEqual(bad, [])
+                self.assertEqual(bad, [], "older evidence no longer verifies. If the tree walk (pqlite/skipdirs.py) or a field changed, raise the "
+                                          "evidence format and keep reading the old one (CONTRIBUTING.md, Evidence format)")
                 r = json.loads((d / "receipt.json").read_text(encoding="utf-8"))
                 self.assertEqual(R.format_version(r), fx["format_version"])
                 self.assertEqual((r["receipt_id"], r["verdict"]), (fx["receipt_id"], fx["verdict"]))

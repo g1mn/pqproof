@@ -1,8 +1,7 @@
 # skipdirs.py: 건너뛰는 폴더 규칙(scan/skip-dirs)을 읽고 트리를 걷는다(교차 리뷰 X02·X03·X09). 표준 라이브러리만 쓰고 pqlite 의 다른
 # 모듈을 들여오지 않는다(pqlite/receipt.py 가 스크립트로 돌 때 이 파일을 경로로 읽는다).
-# 이 걷기 방식이 증적 형식 3의 트리 목록과 tree_sha256 을 정한다. 걷기 방식을 바꾸면 증적 형식을 올린다. 목록(scan/skip-dirs)은
+# 이 걷기 방식이 증적 형식 3의 트리 목록과 tree_sha256 을 정한다. 목록(scan/skip-dirs)은
 # 규칙 묶음에 들고 실행마다 증적에 사본이 남는다(--verify 는 그 사본으로 in/ 트리 해시를 다시 잰다).
-# scan/residue.sh 와 scan/cbom-scan.sh 의 skip_dirs 함수가 같은 규칙을 셸로 쓴다(tests/test_rule_sync.py 가 세 곳의 결과를 맞춰 본다).
 """Skip-folder rules (scan/skip-dirs) and the tree walk that the tree hash, the scanners and the input check share."""
 import os
 

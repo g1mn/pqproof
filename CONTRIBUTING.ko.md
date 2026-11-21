@@ -45,7 +45,7 @@ ruff check . && shellcheck -S warning prove.sh build-probe.sh scan/residue.sh sc
 
 ## 규칙 바꾸기
 
-규칙 묶음은 `pqlite/version.py`의 `RULESET_FILES`에 든 파일입니다: `scan/cbom-scan.sh`, `scan/residue.sh`, `scan/test-paths.ere`, `scan/skip-dirs`, `scan/profiles.json`, `pqlite/scan.py`, `pqlite/verify.py`, `pqlite/allowlist.py`, `pqlite/rules.py`, `pqlite/skipdirs.py`, `pqlite/tlsprobe.py`, `pqlite/impl.py`, `scan/kat-kpqc.json`, 그리고 `scan/kat/`의 발췌입니다(규칙 묶음 3부터 14개). 건너뛸 폴더는 `scan/skip-dirs`에만 적습니다. 판정 상수나 패턴은 `prove.py`가 아니라 `pqlite/rules.py`에 둡니다. `prove.py`에 새 패턴 상수가 생기면 시험이 실패합니다. 이 파일들은 주석 한 글자만 바뀌어도 규칙 묶음 해시가 바뀌고, 바뀐 파일로 돈 실행은 그 변경이 자기 규칙 묶음 이름을 얻기 전까지 `<current>+modified`로 적힙니다. 그래서 이 파일들의 린트 수정(CI가 `scan/cbom-scan.sh`와 `scan/residue.sh`에 shellcheck를 돌림)도 규칙 묶음 변경과 함께 들어가야 합니다.
+규칙 묶음은 `pqlite/version.py`의 `RULESET_FILES`에 든 파일입니다: `scan/cbom-scan.sh`, `scan/residue.sh`, `scan/test-paths.ere`, `scan/skip-dirs`, `scan/profiles.json`, `pqlite/scan.py`, `pqlite/verify.py`, `pqlite/allowlist.py`, `pqlite/rules.py`, `pqlite/skipdirs.py`, `pqlite/tlsprobe.py`, `pqlite/impl.py`, `scan/kat-kpqc.json`, 그리고 `scan/kat/`의 발췌입니다(규칙 묶음 3부터 14개). 건너뛸 폴더는 `scan/skip-dirs`에만 적습니다. 판정 상수나 패턴은 `prove.py`가 아니라 `pqlite/rules.py`에 둡니다. `prove.py`에 새 패턴 상수가 생기면 시험이 실패합니다. 규칙 묶음 5부터 주석은 규칙 묶음 해시에 들지 않습니다: 파이썬 주석, 셸 스캐너에서 따옴표와 heredoc 밖에 있는 주석 줄과 빈 줄, `scan/test-paths.ere`와 `scan/skip-dirs`의 `#` 줄이 그렇습니다. 셸 파일의 줄 끝 주석과 그 밖의 모든 바이트는 여전히 해시에 듭니다. 주석만 고쳤다면 `python3 -I -B pqlite/version.py --alias`를 돌리세요. 새 해시를 현재 규칙 묶음의 별칭으로 적고, 주석 말고도 바뀐 것이 있으면 거부합니다. 그 밖의 변경으로 돈 실행은 그 변경이 자기 규칙 묶음 이름을 얻기 전까지 `<current>+modified`로 적히므로, 이 파일들의 코드 린트 수정(CI가 `scan/cbom-scan.sh`와 `scan/residue.sh`에 shellcheck를 돌림)도 규칙 묶음 변경과 함께 들어가야 합니다.
 
 규칙 ID나 값은 여러 파일에 있을 수 있습니다. 규칙을 새로 만들거나 바꿀 때는 이렇게 합니다.
 
@@ -80,3 +80,5 @@ ruff check . && shellcheck -S warning prove.sh build-probe.sh scan/residue.sh sc
 ## 풀 리퀘스트
 
 판정이 바뀔 수 있는지 설명에 적어 주세요(템플릿이 묻습니다). 커밋은 작게, 시험과 함께 올려 주세요. 문서는 사용법이면 `guide/`에, 규칙과 형식이면 `DESIGN.md`에 둡니다.
+
+같은 리뷰 지적이 두 번 나오면, 기억해 달라는 주석을 다는 대신 무엇을 고칠지 실패 메시지로 알려 주는 시험이나 린트 규칙으로 바꿉니다. 주석은 이유와 표준 근거(FIPS, RFC, KpqC 절)에 씁니다.

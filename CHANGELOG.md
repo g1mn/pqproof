@@ -14,8 +14,22 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 **Verdict impact (판정 영향): none.**
 
+## [0.4.1] - 2026-11-21
+
+Tool 0.4.1, ruleset 5, evidence format 4 (unchanged).
+
+**Verdict impact (판정 영향): none.** Ruleset 5 has the same rules as ruleset 4; only comments changed. The 41 golden tree cases keep every verdict, check status and count (only the ruleset name in the golden file moved), and evidence from rulesets 1 to 4 still verifies the way it did.
+
+### Changed
+
+- Comments no longer rename a ruleset. From ruleset 5, `scan/ruleset.json` keeps the hash of the rule files without comments (`comment_free`), and an edit that changes only comments is recorded as an alias of the same ruleset with `python3 -I -B pqlite/version.py --alias`, which refuses when more than comments changed. Python comments are left out, and so are full-line comments and blank lines outside quotes and heredocs in the shell scanners; trailing comments in shell files still count. `--verify` still recomputes `ruleset_sha256` from the file hashes in `tools` and accepts the recorded hash or an alias. Tests check that the text without comments parses to the same Python AST, and that every shell line left out sits at the top level (`bash -n`).
+- Comments: history notes that repeat the changelog, stale numbers and lines that restate the code are gone. Notes such as "this must match that file" moved into the tests that enforce them, whose failure messages now say what to change together. Comments that give a reason or a standard reference stay.
+- Lint: ruff also checks `E402`, `E731` and `BLE001` (so every `noqa` marks a real exception), `ERA001` (no commented-out code) and `RUF100` (no unused `noqa`).
+- CONTRIBUTING: when the same review comment comes up twice, it becomes a test or a lint rule.
+
 ### Added
 
+- A test that puts the same lines through `scan/cbom-scan.sh` (MASKAWK) and `prove.py` (REDACT). The comment in `cbom-scan.sh` said they hide the same values; they do not. The scanner's raw output in `artifacts/` still shows a value after `secret_key`, an AWS access key ID and a bare GitHub token, while the tables and SARIF hide them. These three are pinned as known gaps until the scanner changes in a later ruleset.
 - Korean copies of the README and the contributing guide, `README.ko.md` and `CONTRIBUTING.ko.md`, linked from the top of the English files. `tests/test_docs.py` checks that each copy keeps the same headings, commands, code spans, table rows and links as the English file, so a change to one side alone fails. The README site links open the site in the matching language (`?lang=en`, `?lang=ko`), and the site's Korean view links to the Korean contributing guide.
 - The source distribution also ships `ROADMAP.md` and `mappings/`, which `tests/test_mappings.py` reads.
 

@@ -2,6 +2,7 @@
 판정 고정 기록(golden)이 지금 규칙 묶음과 맞는지, 판정 옆 '검증 호출 제거' 표시가 형식 2에만 붙는지,
 버전 정책(tests/version_policy.py: 판정이 바뀌는 릴리스는 PATCH 가 아니다, CHANGELOG 항목마다 판정 영향 줄)."""
 import copy
+import io
 import json
 import os
 import pathlib
@@ -10,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tokenize
 import unittest
 
 PROOF = pathlib.Path(__file__).resolve().parent.parent
@@ -93,11 +95,95 @@ class RulesetPin(unittest.TestCase):
         current, history = V.ruleset_history()
         self.assertIn(current, history)
         got = V.current_ruleset_sha256()
-        self.assertEqual(got, history[current],
-                         f"A rule file changed ({', '.join(p for p, _ in V.RULESET_FILES)}). "
-                         "Add a new ruleset name with this hash to scan/ruleset.json, "
-                         f"make it current, rewrite tests/golden/verdicts.json if verdicts moved, and add a CHANGELOG entry: {got}")
-        self.assertEqual(len(set(history.values())), len(history), "two ruleset names share a hash")
+        entry = V.ruleset_entries()[1][current]
+        free = (entry.get("comment_free") or {}).get("sha256")
+        if free and free == V.current_comment_free()["sha256"]:
+            hint = "Only comments changed: run python3 -I -B pqlite/version.py --alias, which records this hash as an alias of ruleset " + current
+        else:
+            hint = ("A rule changed. Add a new ruleset name with this hash (python3 -I -B pqlite/version.py --ruleset-json) to scan/ruleset.json, "
+                    "make it current, rewrite tests/golden/verdicts.json if verdicts moved, and add a CHANGELOG entry (CONTRIBUTING.md, Changing a rule)")
+        self.assertIn(got, V.ruleset_hashes()[current], f"{hint}: {got}")
+        every = [h for hs in V.ruleset_hashes().values() for h in hs]
+        self.assertEqual(len(set(every)), len(every), "two ruleset names (or aliases) share a hash")
+
+    def test_the_current_ruleset_records_its_comment_free_hash(self):
+        # 규칙 묶음 5부터: 주석을 뺀 해시가 있어야 주석만 고친 판을 별칭으로 받을 수 있다
+        current, entries = V.ruleset_entries()
+        if int(current.split("+")[0]) < 5:
+            self.skipTest("ruleset before 5")
+        self.assertEqual(entries[current]["comment_free"], V.current_comment_free(),
+                         "scan/ruleset.json comment_free of the current ruleset differs from the rule files without comments: "
+                         "a rule changed, so add a new ruleset name (CONTRIBUTING.md, Changing a rule)")
+
+
+class CommentFreeHash(unittest.TestCase):
+    """규칙 묶음 해시에서 주석을 뺀다(규칙 묶음 5부터). 빼는 것이 정말 주석뿐인지 본다: 파이썬은 AST 가 같고, 셸은 뺀 줄이 맨 위 수준이다."""
+
+    def test_python_rule_files_keep_their_code(self):
+        import ast
+        for p, _ in V.RULESET_FILES:
+            if p.endswith(".py"):
+                with self.subTest(file=p):
+                    src = (PROOF / p).read_text(encoding="utf-8")
+                    free = V.comment_free_text(str(PROOF / p)).decode("utf-8")
+                    self.assertEqual(ast.dump(ast.parse(free)), ast.dump(ast.parse(src)), "comment removal changed the code")
+                    left = [t for t in tokenize.generate_tokens(io.StringIO(free).readline) if t.type == tokenize.COMMENT]
+                    self.assertEqual(left, [], "a comment is still in the hashed text")
+
+    @unittest.skipUnless(shutil.which("bash"), "bash 없음")
+    def test_shell_lines_left_out_are_top_level(self):
+        # 뺀 줄을 '}' 로 바꾸면 bash -n 이 실패해야 한다: 맨 위 수준(명령 자리)이라는 뜻이다. 따옴표·heredoc 안이면 그냥 글이라 통과한다
+        for p, _ in V.RULESET_FILES:
+            if not p.endswith(".sh"):
+                continue
+            text = (PROOF / p).read_text(encoding="utf-8")
+            lines = text.split("\n")
+            with tempfile.TemporaryDirectory() as d:
+                probe = os.path.join(d, "x.sh")
+                for row in V.shell_comment_lines(text):
+                    with self.subTest(file=p, line=row):
+                        self.assertTrue(not lines[row - 1].strip() or lines[row - 1].lstrip().startswith("#"))
+                        changed = lines[:row - 1] + ["}"] + lines[row:]
+                        with open(probe, "w", encoding="utf-8") as f:
+                            f.write("\n".join(changed))
+                        r = subprocess.run(["bash", "-n", probe], capture_output=True)
+                        self.assertNotEqual(r.returncode, 0, f"{p}:{row} is not at the top level, so it must stay in the hash")
+
+    def test_small_cases(self):
+        with tempfile.TemporaryDirectory() as d:
+            def free(name, text):
+                f = os.path.join(d, name)
+                with open(f, "w", encoding="utf-8") as fh:
+                    fh.write(text)
+                return V.comment_free_text(f).decode("utf-8")
+            self.assertEqual(free("a.py", 'x = "#1"  # note\n\n# only\ny = """a\n\n# b"""\n'), 'x = "#1"\ny = """a\n\n# b"""')
+            sh = "#!/bin/bash\n# top\nA='x\n# in quotes\n'\ncat <<'EOF'\n# in heredoc\nEOF\nf() {\n  # in function\n  echo $# ${x#y}  # trailing stays\n}\n"
+            self.assertEqual(free("b.sh", sh), "#!/bin/bash\nA='x\n# in quotes\n'\ncat <<'EOF'\n# in heredoc\nEOF\nf() {\n  echo $# ${x#y}  # trailing stays\n}")
+            self.assertEqual(free("c.ere", "# note\n\n/(test)/\n/src/main/\n"), "/(test)/\n/src/main/")
+            self.assertEqual(free("d.json", '{"a": 1}\n'), '{"a": 1}\n')
+
+    def test_alias_only_for_comment_changes(self):
+        with tempfile.TemporaryDirectory() as d:
+            for p, _ in V.RULESET_FILES:
+                src, dst = PROOF / p, os.path.join(d, *p.split("/"))
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                (shutil.copytree if src.is_dir() else shutil.copyfile)(src, dst)
+            rs = os.path.join(d, "ruleset.json")
+            with open(rs, "w", encoding="utf-8") as f:
+                json.dump({"current": "9", "versions": {"9": {"sha256": V.current_ruleset_sha256(d), "since": "9.0.0", "verdict_impact": "no",
+                                                              "files": V.current_ruleset_files(d), "comment_free": V.current_comment_free(d)}}}, f)
+            rules_py = os.path.join(d, "pqlite", "rules.py")
+            with open(rules_py, "a", encoding="utf-8") as f:
+                f.write("# a new comment\n")
+            code, msg = V.add_alias(d, rs)
+            self.assertEqual(code, 0, msg)
+            self.assertEqual(V.ruleset_label(V.current_ruleset_sha256(d), rs), "9")
+            with open(rules_py, "a", encoding="utf-8") as f:
+                f.write("NEW_CONSTANT = 1\n")
+            code, msg = V.add_alias(d, rs)
+            self.assertEqual(code, 1)
+            self.assertIn("pqlite/rules.py", msg)
+            self.assertEqual(V.ruleset_label(V.current_ruleset_sha256(d), rs), "9+modified")
 
     def test_golden_verdicts_follow_the_current_ruleset(self):
         gold = json.loads((PROOF / "tests" / "golden" / "verdicts.json").read_text(encoding="utf-8"))["runs"]
@@ -286,7 +372,8 @@ class VersionPolicy(unittest.TestCase):
             sha = RULESET["versions"]["1"]["sha256"]  # 옛 꼴은 묶음 1 시절에만 썼다
             pathlib.Path(path).write_text(json.dumps({"current": "1", "versions": {"1": sha}}), encoding="utf-8")
             self.assertEqual(V.ruleset_history(path), ("1", {"1": sha}))
-            self.assertEqual(V.ruleset_entries(path)[1]["1"], {"sha256": sha, "since": None, "verdict_impact": None, "files": None})
+            self.assertEqual(V.ruleset_entries(path)[1]["1"], {"sha256": sha, "since": None, "verdict_impact": None, "files": None,
+                                                             "aliases": [], "comment_free": None})
             self.assertEqual(V.ruleset_label(sha, path), "1")
             self.assertEqual(VP.ruleset_doc(json.dumps({"current": "1", "versions": {"1": sha}}))["versions"]["1"], {"sha256": sha})
         finally:

@@ -95,8 +95,19 @@ def check_ruleset(doc):
         elif V.ruleset_digest({f["path"]: f.get("sha256") for f in files}, paths) != e.get("sha256"):
             got = V.ruleset_digest({f["path"]: f.get("sha256") for f in files}, paths)
             bad.append(f"{where}: the hashes in files give {got}, not sha256")
-    if len({e.get("sha256") for e in versions.values() if isinstance(e, dict)}) != len(versions):
-        bad.append("scan/ruleset.json: two ruleset names share a hash")
+        # 별칭(주석만 고친 판, 규칙 묶음 5부터): files 로 다시 계산한 해시가 sha256 과 같아야 한다
+        for a in e.get("aliases") or []:
+            af = a.get("files") if isinstance(a, dict) else None
+            ap = sorted(str(f.get("path")) for f in af if isinstance(f, dict)) if isinstance(af, list) else None
+            if not ap or V.ruleset_digest({f["path"]: f.get("sha256") for f in af}, ap) != a.get("sha256"):
+                bad.append(f"{where}: an alias must list files whose hashes give its sha256")
+        cf = e.get("comment_free")
+        if cf is not None and (not isinstance(cf.get("files"), list) or
+                               V.ruleset_digest({f["path"]: f.get("sha256") for f in cf["files"]}, [f["path"] for f in cf["files"]]) != cf.get("sha256")):
+            bad.append(f"{where}: comment_free.files must give comment_free.sha256")
+    every = [h for e in versions.values() if isinstance(e, dict) for h in [e.get("sha256")] + [a.get("sha256") for a in e.get("aliases") or []]]
+    if len(set(every)) != len(every):
+        bad.append("scan/ruleset.json: two ruleset names (or aliases) share a hash")
     return bad
 
 

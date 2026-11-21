@@ -106,7 +106,9 @@ target-version = "py39"
 extend-exclude = ["scan/fixtures", "tests/fixtures", "tests/golden/evidence", "docs"]
 
 [tool.ruff.lint]
-select = ["F", "E9", "B"]
+# E402·E731·BLE001: noqa 로 표시한 늦은 import·람다·넓은 except 만 허용한다. ERA001: 주석으로 남긴 코드를 막는다.
+# RUF100: 쓰지 않는 noqa 를 막는다(주석으로 남긴 의도는 검사가 지킨다).
+select = ["F", "E9", "B", "E402", "E731", "BLE001", "ERA001", "RUF100"]
 
 [tool.ruff.lint.per-file-ignores]
 "pqlite/allowlist.py" = ["F401"]

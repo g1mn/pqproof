@@ -12,7 +12,6 @@ import zipfile
 
 SHELL_TOOLS = ("grep", "awk", "sed", "find", "sort", "head", "tail", "tr", "cut", "uniq", "wc", "mktemp", "date")
 KEYSTORE = re.compile(r"\.(?:jks|jceks|p12|pfx|keystore|bks)$", re.I)
-# prove.py OPENSSL_CANDIDATES 와 같아야 한다(tests/test_rule_sync.py)
 OPENSSL_CANDIDATES = ("/opt/homebrew/opt/openssl@3.5/bin/openssl", "/opt/homebrew/opt/openssl@3/bin/openssl", "/opt/homebrew/bin/openssl",
                       "/usr/local/opt/openssl@3/bin/openssl", "/usr/local/bin/openssl")
 
@@ -75,8 +74,8 @@ def probe_binary(bin_dir):
     return path if os.path.isfile(path) and os.access(path, os.X_OK) else None
 
 
-PQV_NAME = "pq-verify"  # pqlite/impl.py PQV_NAME 과 같아야 한다(tests/test_pqverify.py)
-# pq-verify 를 부를 때 뺄 환경 변수(pqlite/impl.py _ENV_DROP_PREFIX·_ENV_DROP 과 같아야 한다)
+PQV_NAME = "pq-verify"
+# pq-verify 를 부를 때 뺄 환경 변수
 PQV_ENV_DROP_PREFIX = ("PQV_", "LD_", "DYLD_")
 PQV_ENV_DROP = ("PYTHONPATH", "PYTHONHOME", "PYTHONSTARTUP", "PYTHONINSPECT")
 

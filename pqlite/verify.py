@@ -1,6 +1,5 @@
 # from g1mn/pq-proof 7b7803f (MIT)
-# 수정: JAVA 종류(.java .kt .kts .groovy .scala)와 Java·Spring·JDK 규칙(deny), review() 검토 등급 규칙,
-#       Spring 설정 읽기(_props: .properties·YAML 펼침·-D·setProperty·환경 변수 이름), 위 요약 주석.
+# 이 위에 Java·Spring·JDK 규칙과 검토 등급(review)을 더했다(변경 이력은 CHANGELOG.md).
 """TLS 약화 수정 검사(PQ-Proof verify.py에 Java·Spring을 보탬).
 
 바뀐 파일마다 수정 전후를 그 파일의 파서처럼 읽어(주석 제거, 문자열 처리) 규칙별 개수를 비교한다.

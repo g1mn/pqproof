@@ -5,7 +5,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
-from pqlite import scan as S  # noqa: E402
+from pqlite import scan as S
 
 
 def rows_of(files):
