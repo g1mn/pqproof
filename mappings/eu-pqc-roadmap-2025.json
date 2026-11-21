@@ -1,0 +1,225 @@
+{
+ "schema": "pqproof-mapping 1",
+ "id": "eu-pqc-roadmap-2025",
+ "published": true,
+ "checked": "2026-11-21",
+ "applies_from": "0.5.0",
+ "title_en": "PQ-Proof against the EU coordinated implementation roadmap for the transition to PQC",
+ "title_ko": "EU 양자내성암호 전환 공동 이행 로드맵과 PQ-Proof 대응표",
+ "source": {
+  "title": "A Coordinated Implementation Roadmap for the Transition to Post-Quantum Cryptography",
+  "publisher": "NIS Cooperation Group (European Commission)",
+  "edition": "Part 1, version 1.1, 11 June 2025",
+  "url": "https://digital-strategy.ec.europa.eu/en/library/coordinated-implementation-roadmap-transition-post-quantum-cryptography"
+ },
+ "wording_en": "How PQ-Proof addresses each item. It does not say that a product meets the document, and the publisher has not reviewed or endorsed it.",
+ "wording_ko": "항목마다 PQ-Proof가 어떻게 대응하는지 보인다. 제품이 이 문서를 충족한다는 뜻이 아니며, 발행처가 검토하거나 승인한 표가 아니다.",
+ "items": [
+  {
+   "id": "R1",
+   "ref": {
+    "section": "4.1",
+    "page": 6
+   },
+   "quote": "For high-risk use cases, quantum-vulnerable public-key mechanisms shall not be used stand-alone after the end of 2030, analogously after the end of 2035 for medium-risk use cases.",
+   "about_en": "Quantum-vulnerable public-key mechanisms are not used on their own after 2030 (high risk) and 2035 (medium risk).",
+   "about_ko": "양자 취약 공개키 방식을 2030년(고위험)·2035년(중위험) 뒤에는 단독으로 쓰지 않는다.",
+   "status": "partial",
+   "note_en": "c-classic counts classical public-key lines left without a recorded reason and a-cbom blocks classical CBOM rows, while a hybrid TLS group passes b-tls.",
+   "note_ko": "c-classic이 사유 없이 남은 기존 공개키 줄을 세고 a-cbom이 기존 공개키 CBOM 행을 막는다. 하이브리드 TLS 그룹은 b-tls를 통과한다.",
+   "evidence": [
+    {
+     "file": "pqlite/rules.py",
+     "symbols": [
+      "FAMILIES = "
+     ]
+    },
+    {
+     "file": "scan/residue.sh",
+     "symbols": [
+      "GEN@@G-RSA@@"
+     ]
+    },
+    {
+     "file": "pqlite/tlsprobe.py",
+     "symbols": [
+      "def target_verdict"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "Risk classes and dates are not encoded."
+   ],
+   "remaining_ko": [
+    "위험 등급과 날짜는 규칙에 없다."
+   ]
+  },
+  {
+   "id": "R2",
+   "ref": {
+    "section": "4.1",
+    "page": 6
+   },
+   "quote": "In particular, whenever a quantum-vulnerable public-key cryptographic mechanism, such as RSA or any discrete logarithm based mechanism, is currently used, replacing it by a standardized hybrid combination which includes PQC should be considered.",
+   "about_en": "Where RSA or a discrete-logarithm mechanism is used, consider a standardised hybrid that includes PQC.",
+   "about_ko": "RSA나 이산로그 기반 방식을 쓰는 곳은 PQC를 포함한 표준 하이브리드로 바꾸는 것을 검토한다.",
+   "status": "partial",
+   "note_en": "RSA, DH, DSA, EC and the other classical families are found in both trees; b-tls checks the standard hybrid group X25519MLKEM768, and composite signatures are counted apart and need review.",
+   "note_ko": "RSA·DH·DSA·EC 등 기존 공개키 계열을 두 트리에서 찾고, b-tls가 표준 하이브리드 그룹 X25519MLKEM768을 확인한다. 복합 서명은 따로 세어 검토 필요로 올린다.",
+   "evidence": [
+    {
+     "file": "pqlite/rules.py",
+     "symbols": [
+      "FAMILIES = "
+     ]
+    },
+    {
+     "file": "scan/residue.sh",
+     "symbols": [
+      "GEN@@G-RSA@@"
+     ]
+    },
+    {
+     "file": "scan/residue.sh",
+     "symbols": [
+      "RES_COMPOSITE"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "Hybrid outside TLS (application-level KEM combiners) is not checked."
+   ],
+   "remaining_ko": [
+    "TLS 밖의 하이브리드(응용 계층 KEM 결합)는 보지 않는다."
+   ]
+  },
+  {
+   "id": "R3",
+   "ref": {
+    "section": "6.2",
+    "page": 11
+   },
+   "quote": "A first essential step and “no-regret” move for every entity is to create and maintain current inventories of assets that perform cryptographic operations and of assets that have cryptographic operations performed on them as part of asset management.",
+   "about_en": "Create and keep current an inventory of assets that perform or receive cryptographic operations.",
+   "about_ko": "암호 연산을 하거나 받는 자산의 목록을 만들고 최신으로 유지한다.",
+   "status": "partial",
+   "note_en": "It builds a static inventory (CBOM rows) of the code, configuration and key files in both trees and blocks classical rows left in the converted tree.",
+   "note_ko": "두 트리의 코드·설정·키 파일에서 정적 암호 자산 목록(CBOM 행)을 만들고, 고친 판에 남은 기존 공개키 행을 막는다.",
+   "evidence": [
+    {
+     "file": "scan/cbom-scan.sh",
+     "symbols": [
+      "scan_generic()",
+      "keytext_alg()"
+     ]
+    },
+    {
+     "file": "pqlite/scan.py",
+     "symbols": [
+      "def _classify"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "Running systems, network traffic and hardware are not inventoried."
+   ],
+   "remaining_ko": [
+    "실행 중인 시스템·네트워크 트래픽·하드웨어는 목록에 넣지 않는다."
+   ]
+  },
+  {
+   "id": "R4",
+   "ref": {
+    "section": "6.2",
+    "page": 11
+   },
+   "quote": "Generating and maintaining cryptographic inventories can be aided by tools (discovery and asset management tools). Using a standardised format for a cryptographic inventory, like CBOM (Cryptographic Bill of Materials, an extension of the SBOM standard), is recommended.",
+   "about_en": "Discovery tools help build inventories, and a standard format such as CBOM is recommended.",
+   "about_ko": "발견 도구가 목록 작성을 돕고, CBOM 같은 표준 형식을 권한다.",
+   "status": "partial",
+   "note_en": "PQ-Proof is a discovery tool for code, configuration and key files and writes CBOM rows for both trees. The rows are its own table format.",
+   "note_ko": "PQ-Proof는 코드·설정·키 파일을 훑는 발견 도구이고 두 트리의 CBOM 행을 쓴다. 행은 자체 표 형식이다.",
+   "evidence": [
+    {
+     "file": "scan/cbom-scan.sh",
+     "symbols": [
+      "scan_generic()",
+      "keytext_alg()"
+     ]
+    },
+    {
+     "file": "pqlite/scan.py",
+     "symbols": [
+      "def _classify"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "No export to the CycloneDX CBOM format yet (ROADMAP.md)."
+   ],
+   "remaining_ko": [
+    "CycloneDX CBOM 형식으로 내보내기는 아직 없다(ROADMAP.md)."
+   ]
+  },
+  {
+   "id": "R5",
+   "ref": {
+    "section": "3.2",
+    "page": 5
+   },
+   "quote": "The design of cryptographic protocols and systems in a modular way that enables replacing the cryptographic components. This concept must not be confused with a requirement to negotiate the cipher suite during protocol execution",
+   "about_en": "Crypto-agility: a modular design that lets cryptographic components be replaced.",
+   "about_ko": "암호 민첩성: 암호 구성 요소를 바꿀 수 있는 모듈식 설계.",
+   "status": "gap",
+   "note_en": "PQ-Proof judges the end state of one migration. It does not measure how easily algorithms can be swapped later.",
+   "note_ko": "PQ-Proof는 한 번의 전환이 끝난 상태를 판정한다. 나중에 알고리즘을 얼마나 쉽게 바꿀 수 있는지는 재지 않는다.",
+   "evidence": [],
+   "remaining_en": [
+    "No agility measure yet. A candidate is reporting algorithm names fixed in code against names read from configuration (ROADMAP.md)."
+   ],
+   "remaining_ko": [
+    "민첩성 측정은 아직 없다. 후보는 코드에 박힌 알고리즘 이름과 설정에서 읽는 이름을 나눠 보이는 것이다(ROADMAP.md)."
+   ]
+  },
+  {
+   "id": "R6",
+   "ref": {
+    "section": "6.3",
+    "page": 13
+   },
+   "quote": "One important example in this context is to provide a quantum-safe upgrade path, i.e. even if a product is not fully transitioned to PQC, the software and firmware upgrade routines should use quantum-safe signatures.",
+   "about_en": "Software and firmware update routines use quantum-safe signatures even before the product is fully migrated.",
+   "about_ko": "제품 전환이 끝나기 전이라도 소프트웨어·펌웨어 업데이트에는 양자내성 서명을 쓴다.",
+   "status": "partial",
+   "note_en": "Classical signature code is flagged wherever it is, including an update path, and ML-DSA and SLH-DSA count as expected signatures (EXPECT=sig).",
+   "note_ko": "기존 서명 코드는 업데이트 경로를 포함해 어디에 있든 잡고, ML-DSA·SLH-DSA를 기대 서명으로 센다(EXPECT=sig).",
+   "evidence": [
+    {
+     "file": "pqlite/rules.py",
+     "symbols": [
+      "FAMILIES = "
+     ]
+    },
+    {
+     "file": "scan/residue.sh",
+     "symbols": [
+      "GEN@@G-RSA@@"
+     ]
+    },
+    {
+     "file": "scan/residue.sh",
+     "symbols": [
+      "E-MLDSA65",
+      "E-SLHDSA"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "The update path is not singled out, and firmware outside the tree is not seen."
+   ],
+   "remaining_ko": [
+    "업데이트 경로를 따로 가리지 않고, 트리 밖 펌웨어는 보지 않는다."
+   ]
+  }
+ ]
+}

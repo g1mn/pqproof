@@ -12,7 +12,7 @@ No dates. This is what comes next and why. Issues labelled `good first issue` ar
 
 KISA's plan to publish a PQC migration guide in 2026 was [reported in January 2026](https://byline.network/2026/01/28-578/). It is not out yet, so nothing here assumes what it will say. When it is published:
 
-1. `mappings/kisa-pqc-guide.json` gets one item per guide item, quoting the published text, each marked covered, partial or gap.
+1. `mappings/kisa-pqc-guide.json` gets one item per guide item, quoting the published text, each marked covered, partial or gap. `tools/mapping_draft.py` turns the published PDF into reviewable stubs; `mappings/README.md` has the steps.
 2. A release closes the gaps PQ-Proof can close and the site shows the table.
 
 ## Next
@@ -20,7 +20,9 @@ KISA's plan to publish a PQC migration guide in 2026 was [reported in January 20
 - KpqC reference KATs: add new versions to `scan/kat-kpqc.json` when a KS standard or a new reference release comes out.
 - A PQC-only profile that does not count a hybrid result as finished (NIST IR 8547, section 3.2).
 - An agility signal: algorithm names fixed in code against names read from configuration (NIST IR 8547, section 1.1).
-- More mappings, for example NIST SP 800-227.
+- Export the inventory in the CycloneDX CBOM format (EU PQC roadmap, section 6.2).
+- LMS and XMSS (NIST SP 800-208) as expected firmware signatures under the cnsa2 profile (CNSA 2.0 FAQ).
+- More mappings as public documents come out, the KISA guide first.
 - FIPS 206 (FN-DSA) and FIPS 207 (HQC) once NIST publishes them.
 
 ## Not planned

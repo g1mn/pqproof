@@ -1,0 +1,203 @@
+{
+ "schema": "pqproof-mapping 1",
+ "id": "nist-sp800-227",
+ "published": true,
+ "checked": "2026-11-21",
+ "applies_from": "0.5.0",
+ "title_en": "PQ-Proof against NIST SP 800-227 (Recommendations for Key-Encapsulation Mechanisms)",
+ "title_ko": "NIST SP 800-227(키 캡슐화 메커니즘 권고)과 PQ-Proof 대응표",
+ "source": {
+  "title": "NIST SP 800-227, Recommendations for Key-Encapsulation Mechanisms",
+  "publisher": "National Institute of Standards and Technology",
+  "edition": "Final, September 2025",
+  "url": "https://csrc.nist.gov/pubs/sp/800/227/final"
+ },
+ "wording_en": "How PQ-Proof addresses each item. It does not say that a product meets the document, and the publisher has not reviewed or endorsed it.",
+ "wording_ko": "항목마다 PQ-Proof가 어떻게 대응하는지 보인다. 제품이 이 문서를 충족한다는 뜻이 아니며, 발행처가 검토하거나 승인한 표가 아니다.",
+ "items": [
+  {
+   "id": "P1",
+   "ref": {
+    "section": "3.1",
+    "page": 11
+   },
+   "quote": "Implementations shall comply with a specific NIST FIPS or SP that specifies the algorithms of the relevant KEM. For example, a conforming implementation of ML-KEM shall comply with FIPS 203 [3].",
+   "about_en": "A KEM implementation conforms to the FIPS that specifies it (FIPS 203 for ML-KEM).",
+   "about_ko": "KEM 구현은 그 KEM을 정한 FIPS를 따른다(ML-KEM은 FIPS 203).",
+   "status": "partial",
+   "note_en": "PQ-Proof does not test NIST implementations itself. pqproof impl judge --pq-verify runs pq-verify, an audit tool for NIST PQC libraries, and puts its result in the same evidence; a missing engine or incomplete coverage leaves the check undecided.",
+   "note_ko": "PQ-Proof가 NIST 구현을 직접 시험하지는 않는다. pqproof impl judge --pq-verify가 NIST PQC 라이브러리 감사 도구 pq-verify를 돌려 그 결과를 같은 증적에 넣고, 도구가 없거나 범위가 불완전하면 미판정으로 둔다.",
+   "evidence": [
+    {
+     "file": "pqlite/impl.py",
+     "symbols": [
+      "def pqverify_summary"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "Conformance testing is pq-verify's, and the result is only as complete as its coverage."
+   ],
+   "remaining_ko": [
+    "적합성 시험은 pq-verify가 하고, 결과는 그 도구의 범위만큼만 말한다."
+   ]
+  },
+  {
+   "id": "P2",
+   "ref": {
+    "section": "3.1",
+    "page": 11
+   },
+   "quote": "KEM implementations shall use approved cryptographic elements with security strengths that meet or exeed the required strength for each KEM parameter set. The security strength of the selected parameter set should be at least the desired security strength of the application.",
+   "about_en": "The KEM parameter set is at least as strong as the application needs.",
+   "about_ko": "KEM 파라미터 세트는 응용에 필요한 강도 이상이어야 한다.",
+   "status": "partial",
+   "note_en": "PROFILE sets the required security category (nist-cat3: category 3 and above, cnsa2: category 5). Parameter sets below category 3, such as ML-KEM-512, are blocked, and those below the profile's category do not count as expected.",
+   "note_ko": "PROFILE이 필요한 보안 등급을 정한다(nist-cat3은 등급 3 이상, cnsa2는 등급 5). 등급 3 미만 파라미터 세트(ML-KEM-512 등)는 막고, 프로필 등급보다 낮은 것은 기대 알고리즘으로 세지 않는다.",
+   "evidence": [
+    {
+     "file": "scan/profiles.json",
+     "symbols": [
+      "\"nist-cat3\"",
+      "\"cnsa2\""
+     ]
+    },
+    {
+     "file": "scan/residue.sh",
+     "symbols": [
+      "GEN@@G-WEAK-PQC@@"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "The strength of the primitives around the KEM (hash, KDF, symmetric cipher) is not checked."
+   ],
+   "remaining_ko": [
+    "KEM 주변 요소(해시, KDF, 대칭 암호)의 강도는 보지 않는다."
+   ]
+  },
+  {
+   "id": "P3",
+   "ref": {
+    "section": "3.1",
+    "page": 11
+   },
+   "quote": "In addition, random bits shall be generated using approved techniques, as described in the latest revisions of SP 800-90A, SP 800-90B, and SP 800-90C [6–8]. For using randomness in key generation, see SP 800-133 [18].",
+   "about_en": "Random bits come from approved generators (SP 800-90A, B and C).",
+   "about_ko": "난수는 승인된 생성기(SP 800-90A·B·C)에서 얻는다.",
+   "status": "gap",
+   "note_en": "PQ-Proof has no rule for random number sources.",
+   "note_ko": "PQ-Proof에는 난수 출처를 보는 규칙이 없다.",
+   "evidence": [],
+   "remaining_en": [
+    "Random number sources are not checked."
+   ],
+   "remaining_ko": [
+    "난수 출처는 보지 않는다."
+   ]
+  },
+  {
+   "id": "P4",
+   "ref": {
+    "section": "3.3",
+    "page": 14
+   },
+   "quote": "Cryptographic modules for KEMs should be designed with appropriate countermeasures against side-channel attacks. This includes protecting against timing attacks with constant-time implementations and protecting memory from leakage.",
+   "about_en": "KEM modules have side-channel countermeasures such as constant-time code.",
+   "about_ko": "KEM 모듈은 상수 시간 코드 같은 부채널 대책을 갖춘다.",
+   "status": "gap",
+   "note_en": "PQ-Proof reads code and does not run it, so timing and memory leakage are out of its reach.",
+   "note_ko": "PQ-Proof는 코드를 읽기만 하고 실행하지 않아 시간·메모리 누출은 볼 수 없다.",
+   "evidence": [],
+   "remaining_en": [
+    "Side channels are not checked."
+   ],
+   "remaining_ko": [
+    "부채널은 보지 않는다."
+   ]
+  },
+  {
+   "id": "P5",
+   "ref": {
+    "section": "4.6",
+    "page": 26
+   },
+   "quote": "For example, the migration to post-quantum key-establishment techniques might initially include multi-algorithm solutions that combine one new post-quantum algorithm with one tried-and-tested but quantum-vulnerable (or traditional) algorithm.",
+   "about_en": "Migration may start with hybrids that pair a post-quantum and a traditional algorithm.",
+   "about_ko": "전환은 양자내성 알고리즘과 기존 알고리즘을 묶은 하이브리드로 시작할 수 있다.",
+   "status": "partial",
+   "note_en": "b-tls asks each TLS target to negotiate the hybrid group X25519MLKEM768 alone, and composite signatures are counted apart and need review.",
+   "note_ko": "b-tls는 TLS 대상마다 하이브리드 그룹 X25519MLKEM768만으로 협상하는지 보고, 복합 서명은 따로 세어 검토 필요로 올린다.",
+   "evidence": [
+    {
+     "file": "pqlite/tlsprobe.py",
+     "symbols": [
+      "def target_verdict"
+     ]
+    },
+    {
+     "file": "scan/residue.sh",
+     "symbols": [
+      "RES_COMPOSITE"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "Hybrid outside TLS (application-level KEM combiners) is not checked."
+   ],
+   "remaining_ko": [
+    "TLS 밖의 하이브리드(응용 계층 KEM 결합)는 보지 않는다."
+   ]
+  },
+  {
+   "id": "P6",
+   "ref": {
+    "section": "4.6.1",
+    "page": 28
+   },
+   "quote": "Still, most multi-algorithm schemes will likely include a step in which a series of shared secrets are combined via a key combiner algorithm of a form similar to KeyCombine above. In those cases, an approved key combiner discussed in Sec. 4.6.2 shall be used.",
+   "about_en": "A multi-algorithm scheme combines its shared secrets with an approved key combiner.",
+   "about_ko": "여러 알고리즘을 묶을 때는 승인된 키 결합기로 공유 비밀을 합친다.",
+   "status": "gap",
+   "note_en": "PQ-Proof does not inspect how shared secrets are combined. In TLS it checks only that the standard hybrid group X25519MLKEM768 is negotiated; that group's specification fixes the combination.",
+   "note_ko": "PQ-Proof는 공유 비밀을 어떻게 합치는지 보지 않는다. TLS에서는 표준 하이브리드 그룹 X25519MLKEM768로 협상하는지만 보고, 결합 방식은 그 그룹의 규격이 정한다.",
+   "evidence": [],
+   "remaining_en": [
+    "Application-level key combiners are not checked."
+   ],
+   "remaining_ko": [
+    "응용 계층 키 결합기는 보지 않는다."
+   ]
+  },
+  {
+   "id": "P7",
+   "ref": {
+    "section": "5.1.3",
+    "page": 35
+   },
+   "quote": "ML-KEM.ParamSets. There are three parameter sets described in Sec. 8 of FIPS 203: ML-KEM-512, ML-KEM-768, and ML-KEM-1024.",
+   "about_en": "ML-KEM has three parameter sets: ML-KEM-512, 768 and 1024.",
+   "about_ko": "ML-KEM의 파라미터 세트는 ML-KEM-512·768·1024 셋이다.",
+   "status": "covered",
+   "note_en": "All three are recognised. Under nist-cat3, ML-KEM-768 and 1024 count as expected and ML-KEM-512 is blocked as below category 3; cnsa2 counts ML-KEM-1024 only.",
+   "note_ko": "셋 모두 알아본다. nist-cat3에서는 ML-KEM-768·1024를 기대 알고리즘으로 세고 ML-KEM-512는 등급 3 미만으로 막는다. cnsa2는 ML-KEM-1024만 센다.",
+   "evidence": [
+    {
+     "file": "scan/residue.sh",
+     "symbols": [
+      "E-MLKEM768",
+      "E-MLKEM1024"
+     ]
+    },
+    {
+     "file": "pqlite/scan.py",
+     "symbols": [
+      "NIST_WEAK_PQ"
+     ]
+    }
+   ],
+   "remaining_en": [],
+   "remaining_ko": []
+  }
+ ]
+}

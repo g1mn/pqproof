@@ -1,0 +1,222 @@
+{
+ "schema": "pqproof-mapping 1",
+ "id": "uk-ncsc-pqc-timelines",
+ "published": true,
+ "checked": "2026-11-21",
+ "applies_from": "0.5.0",
+ "title_en": "PQ-Proof against the UK NCSC timelines for migration to post-quantum cryptography",
+ "title_ko": "영국 NCSC 양자내성암호 전환 일정 지침과 PQ-Proof 대응표",
+ "source": {
+  "title": "Timelines for migration to post-quantum cryptography",
+  "publisher": "National Cyber Security Centre (UK)",
+  "edition": "Version 1.0, 20 March 2025",
+  "url": "https://www.ncsc.gov.uk/guidance/pqc-migration-timelines"
+ },
+ "wording_en": "How PQ-Proof addresses each item. It does not say that a product meets the document, and the publisher has not reviewed or endorsed it.",
+ "wording_ko": "항목마다 PQ-Proof가 어떻게 대응하는지 보인다. 제품이 이 문서를 충족한다는 뜻이 아니며, 발행처가 검토하거나 승인한 표가 아니다.",
+ "items": [
+  {
+   "id": "C1",
+   "ref": {
+    "section": "Executive summary, by 2028"
+   },
+   "quote": "Carry out a full discovery exercise (assessing your estate to understand which services and infrastructure that depend on cryptography need to be upgraded to PQC)",
+   "about_en": "By 2028, find which services and infrastructure depend on cryptography that needs PQC.",
+   "about_ko": "2028년까지 PQC로 바꿔야 할 암호에 기대는 서비스와 인프라를 찾는다.",
+   "status": "partial",
+   "note_en": "It builds a static inventory (CBOM rows) of the code, configuration and key files in both trees and blocks classical rows left in the converted tree.",
+   "note_ko": "두 트리의 코드·설정·키 파일에서 정적 암호 자산 목록(CBOM 행)을 만들고, 고친 판에 남은 기존 공개키 행을 막는다.",
+   "evidence": [
+    {
+     "file": "scan/cbom-scan.sh",
+     "symbols": [
+      "scan_generic()",
+      "keytext_alg()"
+     ]
+    },
+    {
+     "file": "pqlite/scan.py",
+     "symbols": [
+      "def _classify"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "Running systems, network traffic and hardware are not inventoried."
+   ],
+   "remaining_ko": [
+    "실행 중인 시스템·네트워크 트래픽·하드웨어는 목록에 넣지 않는다."
+   ]
+  },
+  {
+   "id": "C2",
+   "ref": {
+    "section": "Planning your PQC migration: discovery and assessment"
+   },
+   "quote": "For some of your services, particularly those running on IT or OT which you manage directly, you may need to gain a more thorough understanding of their cryptographic components, so that you can map exactly the cryptography, protocols and hardware on which they depend.",
+   "about_en": "Map the exact cryptography, protocols and hardware a managed service depends on.",
+   "about_ko": "직접 관리하는 서비스가 기대는 암호·프로토콜·하드웨어를 정확히 파악한다.",
+   "status": "partial",
+   "note_en": "CBOM rows name the algorithm, file and line in code, configuration and key files, and b-tls records the TLS group each live target negotiates.",
+   "note_ko": "CBOM 행이 코드·설정·키 파일의 알고리즘과 파일·줄을 적고, b-tls가 실측 대상마다 협상한 TLS 그룹을 남긴다.",
+   "evidence": [
+    {
+     "file": "scan/cbom-scan.sh",
+     "symbols": [
+      "scan_generic()",
+      "keytext_alg()"
+     ]
+    },
+    {
+     "file": "pqlite/scan.py",
+     "symbols": [
+      "def _classify"
+     ]
+    },
+    {
+     "file": "pqlite/tlsprobe.py",
+     "symbols": [
+      "def target_verdict",
+      "OFFER_CLASSICAL"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "Hardware and protocols other than TLS are not mapped."
+   ],
+   "remaining_ko": [
+    "하드웨어와 TLS 밖의 프로토콜은 파악하지 않는다."
+   ]
+  },
+  {
+   "id": "C3",
+   "ref": {
+    "section": "Planning your PQC migration: discovery and assessment"
+   },
+   "quote": "forming a record of the data you hold (including its expected lifetime and its value to an adversary)",
+   "about_en": "Keep a record of the data held, with its expected lifetime and value to an attacker.",
+   "about_ko": "보유한 데이터를 예상 보존 기간·공격자에게의 가치와 함께 기록한다.",
+   "status": "gap",
+   "note_en": "PQ-Proof does not record what data is held or for how long. It only tells apart code kept to read data written before the migration.",
+   "note_ko": "PQ-Proof는 어떤 데이터를 얼마나 오래 두는지 기록하지 않는다. 전환 전에 쓴 데이터를 읽으려고 남긴 코드만 따로 가린다.",
+   "evidence": [],
+   "remaining_en": [
+    "Data records are out of scope."
+   ],
+   "remaining_ko": [
+    "데이터 기록은 범위 밖이다."
+   ]
+  },
+  {
+   "id": "C4",
+   "ref": {
+    "section": "Timelines for PQC migration, 2035"
+   },
+   "quote": "Complete your migration to PQC, taking the opportunity to build more robust general cyber resilience into your systems.",
+   "about_en": "By 2035, complete the migration to PQC.",
+   "about_ko": "2035년까지 PQC 전환을 마친다.",
+   "status": "partial",
+   "note_en": "For one system at a time, PQ-Proof judges whether a migration is complete: c-classic counts classical public-key lines left without a recorded reason, and a-cbom blocks classical CBOM rows.",
+   "note_ko": "PQ-Proof는 시스템 하나씩 전환이 끝났는지 판정한다. c-classic이 사유 없이 남은 기존 공개키 줄을 세고, a-cbom이 기존 공개키 CBOM 행을 막는다.",
+   "evidence": [
+    {
+     "file": "pqlite/rules.py",
+     "symbols": [
+      "FAMILIES = "
+     ]
+    },
+    {
+     "file": "scan/residue.sh",
+     "symbols": [
+      "GEN@@G-RSA@@"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "Dates are not encoded, and an estate is judged one tree pair at a time."
+   ],
+   "remaining_ko": [
+    "날짜는 규칙에 없고, 전체 자산은 트리 한 쌍씩 판정한다."
+   ]
+  },
+  {
+   "id": "C5",
+   "ref": {
+    "section": "Planning your PQC migration: developing your migration plan"
+   },
+   "quote": "You should therefore seek solutions that offer cryptographic agility; that is, the ability to readily support alternative suites of cryptographic algorithms, and you should identify the criteria you will use to determine when to end support for the traditional algorithms.",
+   "about_en": "Choose crypto-agile solutions and set criteria for ending support for traditional algorithms.",
+   "about_ko": "암호 민첩성을 갖춘 방식을 고르고, 기존 알고리즘 지원을 끝낼 기준을 정한다.",
+   "status": "partial",
+   "note_en": "Ending traditional support is a checked setting: with CLASSIC=deny, b-tls fails a target that still accepts an old client (X25519, P-256). Classical lines kept on purpose need an allowlist entry with a reason and a person's review.",
+   "note_ko": "기존 방식 지원 종료를 설정으로 확인한다. CLASSIC=deny이면 옛 클라이언트(X25519, P-256)를 아직 받는 대상을 b-tls가 실패로 본다. 일부러 남긴 기존 공개키 줄은 사유와 사람 확인이 있는 허용 목록 항목이 있어야 한다.",
+   "evidence": [
+    {
+     "file": "pqlite/tlsprobe.py",
+     "symbols": [
+      "def target_verdict",
+      "OFFER_CLASSICAL"
+     ]
+    },
+    {
+     "file": "pqlite/allowlist.py",
+     "symbols": [
+      "REVIEW_KEYS"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "No agility measure yet. A candidate is reporting algorithm names fixed in code against names read from configuration (ROADMAP.md)."
+   ],
+   "remaining_ko": [
+    "민첩성 측정은 아직 없다. 후보는 코드에 박힌 알고리즘 이름과 설정에서 읽는 이름을 나눠 보이는 것이다(ROADMAP.md)."
+   ]
+  },
+  {
+   "id": "C6",
+   "ref": {
+    "section": "Planning your PQC migration: executing your migration plan"
+   },
+   "quote": "For example, once standardised PQC cipher suites are available for TLS, you will need to check that your systems are actually using them, and not falling back to traditional cryptography.",
+   "about_en": "Check that systems really use PQC suites in TLS and do not fall back to traditional cryptography.",
+   "about_ko": "시스템이 TLS에서 실제로 PQC 묶음을 쓰고 기존 암호로 내려가지 않는지 확인한다.",
+   "status": "partial",
+   "note_en": "b-tls connects to each TLS target twice from a pinned client: once offering only the hybrid group, which must be negotiated, and once as an old client, which CLASSIC=deny requires to be refused.",
+   "note_ko": "b-tls가 고정한 클라이언트로 TLS 대상마다 두 번 접속한다. 한 번은 하이브리드 그룹만 제시해 그 그룹으로 협상해야 하고, 한 번은 옛 클라이언트로 접속해 CLASSIC=deny이면 거절돼야 한다.",
+   "evidence": [
+    {
+     "file": "pqlite/tlsprobe.py",
+     "symbols": [
+      "def target_verdict",
+      "OFFER_CLASSICAL"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "Only the TLS targets given to a run are checked; production clients and other protocols are not."
+   ],
+   "remaining_ko": [
+    "실행에 준 TLS 대상만 본다. 운영 중인 클라이언트와 다른 프로토콜은 보지 않는다."
+   ]
+  },
+  {
+   "id": "C7",
+   "ref": {
+    "section": "Planning your PQC migration: executing your migration plan"
+   },
+   "quote": "For example, you should be able to quantify how many of your software clients are using PQC, and be able to identify those that are not.",
+   "about_en": "Count how many software clients use PQC and identify those that do not.",
+   "about_ko": "PQC를 쓰는 소프트웨어 클라이언트 수를 세고 쓰지 않는 것을 가려낸다.",
+   "status": "gap",
+   "note_en": "PQ-Proof does not watch traffic or count clients.",
+   "note_ko": "PQ-Proof는 트래픽을 보거나 클라이언트를 세지 않는다.",
+   "evidence": [],
+   "remaining_en": [
+    "Client measurement is out of scope."
+   ],
+   "remaining_ko": [
+    "클라이언트 측정은 범위 밖이다."
+   ]
+  }
+ ]
+}
