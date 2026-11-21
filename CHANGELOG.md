@@ -14,6 +14,10 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 **Verdict impact (판정 영향): none.**
 
+### Added
+
+- OpenSSF Scorecard (`.github/workflows/scorecard.yml`, actions pinned by commit, write permissions only in its one job) with a README badge, and GitHub code scanning with CodeQL default setup.
+
 ## [0.5.0] - 2026-11-21
 
 Tool 0.5.0, ruleset 6, evidence format 4 (unchanged).
