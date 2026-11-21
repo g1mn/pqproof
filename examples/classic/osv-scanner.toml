@@ -1,0 +1,5 @@
+# Demo app before migration: the old cryptography lower bound is part of what PQ-Proof flags. Never installed.
+[[PackageOverrides]]
+ecosystem = "PyPI"
+ignore = true
+reason = "example input for the scanner, never installed; requirements.txt gives only a lower bound"
