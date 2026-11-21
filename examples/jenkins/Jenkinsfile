@@ -15,7 +15,7 @@ pipeline {
       steps {
         sh '''
           python3 -m venv .pqproof-venv
-          .pqproof-venv/bin/pip install --quiet "pqproof==0.4.1"
+          .pqproof-venv/bin/pip install --quiet "pqproof==0.5.0"
           rm -rf original && mkdir original
           git archive "$BASE_COMMIT" | tar -x -C original
           if git cat-file -e "$BASE_COMMIT:notes/unconverted.json" 2>/dev/null; then

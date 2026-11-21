@@ -25,7 +25,7 @@ jobs:
           persist-credentials: false
 
       - name: Install PQ-Proof
-        run: python3 -m pip install --user "pqproof==0.4.1"
+        run: python3 -m pip install --user "pqproof==0.5.0"
 
       - name: PQ-Proof check (one tree)
         env:
