@@ -1,5 +1,6 @@
 """문서 링크(교차 리뷰 X51·X69·X70): 저장소 안 마크다운의 상대 링크와 github.com/g1mn/pqproof/blob/main/ 링크가 있는 파일·제목을
 가리키는지, SARIF helpUri 의 앵커가 사이트에 있는지, 도구가 출력에 찍는 문서 주소가 있는 파일인지 본다. 문서가 없는 설치본에서는 건너뛴다."""
+import collections
 import pathlib
 import re
 import sys
@@ -8,7 +9,8 @@ import unittest
 PROOF = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROOF))
 sys.path.insert(0, str(PROOF / "src"))
-DOCS = [PROOF / n for n in ("README.md", "DESIGN.md", "HISTORY.md", "CHANGELOG.md", "CONTRIBUTING.md", "SECURITY.md")]
+DOCS = [PROOF / n for n in ("README.md", "README.ko.md", "DESIGN.md", "HISTORY.md", "CHANGELOG.md", "CONTRIBUTING.md", "CONTRIBUTING.ko.md",
+                             "SECURITY.md")]
 DOCS += sorted((PROOF / "guide").glob("*.md")) + sorted((PROOF / "examples").rglob("README.md"))
 BLOB = "https://github.com/g1mn/pqproof/blob/main/"
 
@@ -76,8 +78,49 @@ class SiteMatchesVersion(unittest.TestCase):
     def test_readme_is_english_only(self):
         # Korean text belongs on the site, which switches between Korean and English. README and the PyPI page stay English.
         readme = (PROOF / "README.md").read_text(encoding="utf-8")
-        hangul = [(n, line) for n, line in enumerate(readme.splitlines(), 1) if re.search("[\u1100-\u11ff\u3130-\u318f\uac00-\ud7a3]", line)]
-        self.assertEqual(hangul, [], "README.md must stay English; put Korean on the site")
+        # 예외는 한국어 사본(README.ko.md)으로 가는 언어 전환 한 줄뿐이다
+        hangul = [(n, line) for n, line in enumerate(readme.splitlines(), 1) if re.search("[\u1100-\u11ff\u3130-\u318f\uac00-\ud7a3]", line)
+                  and "README.ko.md" not in line]
+        self.assertEqual(hangul, [], "README.md must stay English; put Korean on the site or in README.ko.md")
+
+
+KO_PAIRS = [("README.md", "README.ko.md"), ("CONTRIBUTING.md", "CONTRIBUTING.ko.md")]
+
+
+def doc_shape(path):
+    """번역해도 바뀌면 안 되는 것: 제목 단계별 수, 코드 블록의 명령(줄 끝 '# 주석'은 뺀다), 본문의 코드 표기, 표 행 수, 링크.
+    링크는 .ko.md 를 .md 로 읽고 사이트 주소의 ?lang= 은 뺀다(그래서 서로를 가리키는 언어 전환 링크는 같은 것으로 센다)."""
+    text = path.read_text(encoding="utf-8")
+    lines = text.splitlines()
+    heads = collections.Counter(len(m.group(1)) for m in (re.match(r"^(#{1,6})\s", line) for line in lines) if m)
+    code, inside = [], False
+    for line in lines:
+        if line.startswith("```"):
+            inside = not inside
+        elif inside:
+            code.append(re.sub(r"\s+#\s.*$", "", line).rstrip())
+    prose = re.sub(r"```.*?```", "", text, flags=re.S)
+    spans = set(re.findall(r"`([^`\n]+)`", prose))
+    rows = sum(1 for line in lines if line.startswith("|"))
+    links = {re.sub(r"\?lang=\w+", "", a or b).replace(".ko.md", ".md") for a, b in re.findall(r'\]\(([^)\s]+)\)|href="([^"]+)"', text)}
+    return {"headings": heads, "commands": code, "code spans": spans, "table rows": rows, "links": links}
+
+
+@unittest.skipUnless(all((PROOF / ko).is_file() for _, ko in KO_PAIRS), "한국어 사본 없음(설치본)")
+class KoreanCopies(unittest.TestCase):
+    """README.md·CONTRIBUTING.md 와 한국어 사본은 같은 커밋에서 함께 고친다(CONTRIBUTING.md, Layout). 한쪽만 고치면 여기서 어긋난다."""
+
+    def test_korean_copies_match_the_english_files(self):
+        for en, ko in KO_PAIRS:
+            a, b = doc_shape(PROOF / en), doc_shape(PROOF / ko)
+            for key in a:
+                with self.subTest(file=ko, part=key):
+                    self.assertEqual(b[key], a[key], f"{ko} and {en} differ in {key}")
+
+    def test_each_copy_links_to_the_other(self):
+        for en, ko in KO_PAIRS:
+            self.assertIn(ko, (PROOF / en).read_text(encoding="utf-8"))
+            self.assertIn(en, (PROOF / ko).read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

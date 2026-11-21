@@ -1,15 +1,17 @@
 <p align="center">
-  <a href="https://g1mn.github.io/pqproof/">
+  <a href="https://g1mn.github.io/pqproof/?lang=en">
     <img src="https://raw.githubusercontent.com/g1mn/pqproof/main/assets/hero-readme.svg" alt="PQ-Proof" width="100%">
   </a>
 </p>
+
+<p align="center"><b>English</b> · <a href="https://github.com/g1mn/pqproof/blob/main/README.ko.md">한국어</a></p>
 
 <p align="center">
   <a href="https://github.com/g1mn/pqproof/actions/workflows/ci.yml"><img src="https://github.com/g1mn/pqproof/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/g1mn/pqproof/releases"><img src="https://img.shields.io/github/v/release/g1mn/pqproof?color=blue&label=release" alt="Release"></a>
   <a href="https://pypi.org/project/pqproof/"><img src="https://img.shields.io/pypi/v/pqproof?color=blue" alt="PyPI"></a>
   <a href="https://github.com/g1mn/pqproof/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
-  <a href="https://g1mn.github.io/pqproof/"><img src="https://img.shields.io/badge/site-g1mn.github.io%2Fpqproof-brightgreen" alt="Site"></a>
+  <a href="https://g1mn.github.io/pqproof/?lang=en"><img src="https://img.shields.io/badge/site-g1mn.github.io%2Fpqproof-brightgreen" alt="Site"></a>
 </p>
 
 <p align="center">
@@ -19,7 +21,7 @@
 
 ---
 
-### [Everything is on the site: g1mn.github.io/pqproof](https://g1mn.github.io/pqproof/)
+### [Everything is on the site: g1mn.github.io/pqproof](https://g1mn.github.io/pqproof/?lang=en)
 > Usage, what it judges, public test results, the KpqC implementation check, PQC standards mappings (NIST IR 8547, the Korean pilot call, and the KISA guide once published), the KISA AI security manual mapping, limits and release notes, in English and Korean. Built by a contest participant; the Ministry of Science and ICT and KISA have not reviewed or endorsed it.
 
 ---

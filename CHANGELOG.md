@@ -14,6 +14,11 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 **Verdict impact (판정 영향): none.**
 
+### Added
+
+- Korean copies of the README and the contributing guide, `README.ko.md` and `CONTRIBUTING.ko.md`, linked from the top of the English files. `tests/test_docs.py` checks that each copy keeps the same headings, commands, code spans, table rows and links as the English file, so a change to one side alone fails. The README site links open the site in the matching language (`?lang=en`, `?lang=ko`), and the site's Korean view links to the Korean contributing guide.
+- The source distribution also ships `ROADMAP.md` and `mappings/`, which `tests/test_mappings.py` reads.
+
 ## [0.4.0] - 2026-11-21
 
 Tool 0.4.0, ruleset 4 (new name and hash, the same fourteen rule files), evidence format 4 (unchanged). SLH-DSA from FIPS 205 counts as an expected signature at categories 3 and 5, standards mappings in `mappings/`, and a roadmap.

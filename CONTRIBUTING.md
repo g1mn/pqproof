@@ -1,5 +1,7 @@
 # Contributing
 
+English · [한국어](CONTRIBUTING.ko.md)
+
 Issues and pull requests are welcome. Security problems go through [SECURITY.md](SECURITY.md), not a public issue.
 
 ## First contribution
@@ -39,7 +41,7 @@ ruff check . && shellcheck -S warning prove.sh build-probe.sh scan/residue.sh sc
 | `action.yml`, `.github/` | the GitHub Action, CI, Pages and release workflows, hash-pinned tool lists, Dependabot |
 | `docs/` | the site, deployed to GitHub Pages |
 
-Code comments and tool output are in Korean; documentation is in English, with a Korean summary in DESIGN.md.
+Code comments and tool output are in Korean; documentation is in English, with a Korean summary in DESIGN.md. README.md and CONTRIBUTING.md also have Korean copies, README.ko.md and CONTRIBUTING.ko.md: change both in the same commit, and `tests/test_docs.py` checks that their headings, commands, code spans, tables and links still match.
 
 ## Changing a rule
 
