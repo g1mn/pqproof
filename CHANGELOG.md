@@ -17,6 +17,13 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 ### Added
 
 - OpenSSF Scorecard (`.github/workflows/scorecard.yml`, actions pinned by commit, write permissions only in its one job) with a README badge, and CodeQL code scanning (`.github/workflows/codeql.yml`: Python, Go for `probe/`, and the workflows; test fixtures, examples and the site are left out in `.github/codeql/codeql-config.yml`).
+- Fuzz tests for `tls_probe` (`probe/fuzz_test.go`: the `-groups` list parser and the filter for names printed from peers). CI runs their seeds with `go test`; the release binaries are unchanged, since `go build` leaves test files out.
+- Releases attach the build provenance as a Sigstore bundle (`pqproof-<tag>-provenance.intoto.jsonl`), so it can be checked with `gh attestation verify --bundle`. The bundles of 0.2.0 to 0.5.0 were added to those releases from the attestations they already had.
+
+### Changed
+
+- CI installs jsonschema from a hash-pinned file (`.github/requirements/schema.txt`), like the other CI tools.
+- `osv-scanner.toml` in the scanner test fixtures (`scan/fixtures/{python,go,java}`, `tests/fixtures/orders-edge`) marks their old dependency versions as fixtures, so vulnerability scanners no longer report them as the project's own. They are never installed or built.
 
 ## [0.5.0] - 2026-11-21
 

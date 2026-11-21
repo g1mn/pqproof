@@ -3,3 +3,4 @@ from g1mn/pq-proof 7b7803f (MIT, 저장소 루트 LICENSE)
 - orders-edge-scripted-model.json  = pq-proof e2e/orders-edge-scripted-model.json (prove.sh --selftest S4)
 - orders-edge-injected-model.json  = pq-proof e2e/orders-edge-injected-model.json (prove.sh --selftest S5)
 수정 없음. JSON에는 주석을 달 수 없어 출처를 이 파일에 적는다.
+(2026-11-21) orders-edge/osv-scanner.toml 만 이 저장소에서 더했다. 취약점 검사기가 고정물의 옛 의존성을 이 저장소의 것으로 세지 않게 하려는 것이고, 원래 파일은 그대로다.

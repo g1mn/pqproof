@@ -1,0 +1,5 @@
+# Scanner test fixture: old versions on purpose so the scanners have something to find. Never installed, built or shipped.
+[[PackageOverrides]]
+ecosystem = "Go"
+ignore = true
+reason = "scanner test fixture, intentionally outdated, never installed"

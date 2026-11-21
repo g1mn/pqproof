@@ -210,6 +210,7 @@ jobs:
         working-directory: assets
         run: shasum -a 256 -c SHA256SUMS
       - name: Build provenance for every release asset
+        id: provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
         with:
           subject-path: |
@@ -217,6 +218,11 @@ jobs:
             assets/SHA256SUMS
             assets/BUILDINFO
             assets/pqproof-*
+      - name: Keep the provenance bundle as a release asset
+        env:
+          BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+          TAG: ${{ github.ref_name }}
+        run: cp "$BUNDLE" "assets/pqproof-${TAG}-provenance.intoto.jsonl"
       - name: Find the SBOM
         id: sbom
         run: |
@@ -239,7 +245,7 @@ jobs:
           - Python package: \`pip install pqproof\` (console command \`pqproof\`)
           - tls_probe binaries for TLS live checks: download the one for your machine and SHA256SUMS into one folder, run \`shasum -a 256 -c --ignore-missing SHA256SUMS\`, then set \`PROBE_BIN_DIR\` to that folder.
           - BUILDINFO records the Go version, build flags and source hashes. pqproof-*.cdx.json is the CycloneDX SBOM of the package, with the tls_probe binaries and the external programs PQ-Proof runs (bash, OpenSSL, keytool).
-          - Check where an asset came from: \`gh attestation verify <file> --repo ${GITHUB_REPOSITORY}\`. The wheel also has an SBOM attestation (\`--predicate-type https://cyclonedx.org/bom\`).
+          - Check where an asset came from: \`gh attestation verify <file> --repo ${GITHUB_REPOSITORY}\`. pqproof-${TAG}-provenance.intoto.jsonl is the same provenance as a Sigstore bundle, for checks without the attestation API (\`--bundle\`). The wheel also has an SBOM attestation (\`--predicate-type https://cyclonedx.org/bom\`).
           EOF
           gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "PQ-Proof $TAG" --notes-file notes.md \
             assets/tls_probe-* assets/SHA256SUMS assets/BUILDINFO assets/pqproof-*

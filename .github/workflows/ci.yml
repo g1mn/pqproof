@@ -95,9 +95,12 @@ jobs:
       - name: Build tls_probe (offline, Go standard library only)
         run: bash build-probe.sh
 
+      - name: tls_probe tests and fuzz seeds (offline)
+        run: GOPROXY=off GOTOOLCHAIN=local go test -C probe ./...
+
       - name: SARIF schema and jsonschema
         run: |
-          python3 -m pip install --quiet "jsonschema==4.25.1"
+          python3 -m pip install --quiet --require-hashes -r .github/requirements/schema.txt
           curl -sSfL -o "$RUNNER_TEMP/sarif-schema.json" "$SARIF_SCHEMA_URL"
           echo "$SARIF_SCHEMA_SHA256  $RUNNER_TEMP/sarif-schema.json" | shasum -a 256 -c -
           echo "SARIF_SCHEMA=$RUNNER_TEMP/sarif-schema.json" >> "$GITHUB_ENV"

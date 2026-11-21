@@ -1,0 +1,4 @@
+# jsonschema for the SARIF and evidence schema tests in CI only (tests/test_pqproof_pkg.py, tests/test_schemas.py).
+# PQ-Proof does not depend on it at run time. Regenerate schema.txt (hashes for every file of each pin, all CI Pythons):
+#   uv pip compile --universal --generate-hashes --python-version 3.9 --exclude-newer <two weeks ago> --no-header -o .github/requirements/schema.txt .github/requirements/schema.in
+jsonschema==4.25.1
