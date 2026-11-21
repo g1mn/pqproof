@@ -100,8 +100,8 @@
       },
       {
         "path": "Dockerfile",
-        "old": "FROM nginx:1.28-bookworm\n",
-        "new": "FROM nginx:1.30-trixie\n"
+        "old": "FROM nginx:1.28-bookworm@sha256:552e7481ca93ffccd046aa658dbbed22caefbc09c66fa7cd247cbb90b8a5c609\n",
+        "new": "FROM nginx:1.30-trixie@sha256:7fad6c0dff97965adbddf28027d934b111fc0221a554315dc274712f3fba24d3\n"
       }
     ]
   ]

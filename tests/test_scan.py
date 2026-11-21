@@ -26,7 +26,7 @@ class OrdersEdgeSnapshot(unittest.TestCase):
     def test_expected_rows(self):
         got = [(r.path, r.line, r.kind, r.algorithm, r.blocks_hybrid, r.auto_fix) for r in scan(SNAPSHOT)]
         self.assertEqual(got, [
-            ("Dockerfile", 8, "base-image", "nginx:1.28-bookworm", True, True),
+            ("Dockerfile", 8, "base-image", "nginx:1.28-bookworm@sha256:552e7481ca93ffccd046aa658dbbed22caefbc09c66fa7cd247cbb90b8a5c609", True, True),
             ("go.mod", 3, "toolchain", "go 1.22", True, True),
             ("internal/auth/jwt.go", 29, "signature", "JWT RS256 (RSA)", False, False),
             ("internal/tlsconf/tlsconf.go", 12, "key-exchange", "P-256", True, True),

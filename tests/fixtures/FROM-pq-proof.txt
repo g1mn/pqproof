@@ -3,4 +3,4 @@ from g1mn/pq-proof 7b7803f (MIT, 저장소 루트 LICENSE)
 - orders-edge-scripted-model.json  = pq-proof e2e/orders-edge-scripted-model.json (prove.sh --selftest S4)
 - orders-edge-injected-model.json  = pq-proof e2e/orders-edge-injected-model.json (prove.sh --selftest S5)
 수정 없음. JSON에는 주석을 달 수 없어 출처를 이 파일에 적는다.
-(2026-11-21) orders-edge/osv-scanner.toml 만 이 저장소에서 더했다. 취약점 검사기가 고정물의 옛 의존성을 이 저장소의 것으로 세지 않게 하려는 것이고, 원래 파일은 그대로다.
+(2026-11-21) orders-edge/osv-scanner.toml 을 이 저장소에서 더했고, orders-edge/Dockerfile 의 FROM 두 줄과 두 모델 JSON 의 Dockerfile 편집(old·new)을 같은 이미지의 다이제스트로 고정했다(OpenSSF Scorecard Pinned-Dependencies). 이미지와 태그는 그대로다. e2e_orders_edge.py 는 클론 사본의 Dockerfile 을 이 고정물과 같게 맞춘 뒤 편집한다. 취약점 검사기가 고정물의 옛 의존성을 이 저장소의 것으로 세지 않게 하려는 것이고, 원래 파일은 그대로다.

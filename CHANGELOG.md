@@ -26,6 +26,7 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 ### Changed
 
+- The orders-edge test fixture pins its two base images by digest (`tests/fixtures/orders-edge/Dockerfile`), and the two model edit files and `tests/e2e_orders_edge.py` follow it. Same images and tags; verdicts unchanged (selftest S4 and S5 pass, golden: 0 of 41 cases moved).
 - CI installs jsonschema from a hash-pinned file (`.github/requirements/schema.txt`), like the other CI tools.
 - `osv-scanner.toml` in the scanner test fixtures (`scan/fixtures/{python,go,java}`, `tests/fixtures/orders-edge`) marks their old dependency versions as fixtures, so vulnerability scanners no longer report them as the project's own. They are never installed or built.
 - The same file in `examples/classic` and `examples/pqc`: their `requirements.txt` give only a lower bound (the old one in `classic` is part of what the demo flags), and the examples are never installed. Verdicts and counts for the examples are unchanged (golden: 0 of 41 cases moved).

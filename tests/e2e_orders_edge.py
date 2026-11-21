@@ -26,6 +26,7 @@ import argparse
 import json
 import os
 import platform
+import re
 import socket
 import subprocess
 import sys
@@ -69,8 +70,14 @@ def build_variants(work):
     model = json.loads(prove.slurp(os.path.join(fx, "orders-edge-scripted-model.json")))
     inj = json.loads(prove.slurp(os.path.join(fx, "orders-edge-injected-model.json")))
     paths = {n: os.path.join(work, n) for n in ("orig", "fixed", "injected")}
+    pinned = prove.slurp(os.path.join(fx, "orders-edge", "Dockerfile"))  # 고정물은 FROM 을 다이제스트로 고정했다(2026-11-21)
     for p in paths.values():
         prove.copy_tree(ORDERS_EDGE, p)
+        df = os.path.join(p, "Dockerfile")
+        if prove.slurp(df) != re.sub(r"@sha256:[0-9a-f]{64}", "", pinned):
+            raise SystemExit("orders-edge 클론의 Dockerfile 이 고정물과 다르다(FROM 다이제스트 말고도)")
+        with open(df, "w", encoding="utf-8") as f:
+            f.write(pinned)
     prove.apply_edits(paths["fixed"], model["attempts"][-1])   # 정답: nginx 그룹·CurvePreferences·go 1.27·trixie
     prove.apply_edits(paths["injected"], inj["attempts"][0])    # 같은 수정 + InsecureSkipVerify: true
     info = {}
@@ -79,7 +86,7 @@ def build_variants(work):
         files = rc.tree_files(p)
         info[n] = {"path": p, "files": len(files), "tree_sha256": rc.tree_sha256(files),
                    "changed_from_orig": sorted(rel for rel, d, _ in files if o.get(rel) != d),
-                   "edits_from": {"orig": "없음(원본 그대로)", "fixed": "fixtures/orders-edge-scripted-model.json attempts[-1]",
+                   "edits_from": {"orig": "Dockerfile FROM 다이제스트 고정만(고정물과 같게)", "fixed": "fixtures/orders-edge-scripted-model.json attempts[-1]",
                                   "injected": "fixtures/orders-edge-injected-model.json attempts[0]"}[n]}
     return paths, info
 
