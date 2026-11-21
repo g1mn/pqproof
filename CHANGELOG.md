@@ -16,7 +16,7 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 ### Added
 
-- OpenSSF Scorecard (`.github/workflows/scorecard.yml`, actions pinned by commit, write permissions only in its one job) with a README badge, and GitHub code scanning with CodeQL default setup.
+- OpenSSF Scorecard (`.github/workflows/scorecard.yml`, actions pinned by commit, write permissions only in its one job) with a README badge, and CodeQL code scanning (`.github/workflows/codeql.yml`: Python, Go for `probe/`, and the workflows; test fixtures, examples and the site are left out in `.github/codeql/codeql-config.yml`).
 
 ## [0.5.0] - 2026-11-21
 

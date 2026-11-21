@@ -1,0 +1,9 @@
+# CodeQL 이 보지 않는 곳: 스캐너 셀프 시험·변이 시험의 고정물(일부러 약한 암호·옛 의존성), 예제 트리, 생성된 사이트.
+# 이 파일들은 배포되거나 실행되지 않고, 분석하면 오탐과 Go·Java 추출 경고만 남는다.
+paths-ignore:
+  - scan/fixtures
+  - tests/fixtures
+  - tests/mutations/files
+  - tests/golden/evidence
+  - examples
+  - docs
