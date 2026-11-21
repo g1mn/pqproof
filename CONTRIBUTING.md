@@ -36,9 +36,9 @@ ruff check . && shellcheck -S warning prove.sh build-probe.sh scan/residue.sh sc
 | `probe/`, `build-probe.sh` | `tls_probe` source (Go standard library) and its offline build script |
 | `mappings/` | standards mappings: each item of a public document and the code that checks it, tested by `tests/test_mappings.py` (see `mappings/README.md`) |
 | `examples/` | the before and after trees used by the tests, an allowlist, and CI examples for GitHub, GitLab and Jenkins |
-| `tests/` | unit tests, the mutation suite, golden verdicts, older evidence and a snapshot of the orders-edge fixture |
+| `tests/` | unit tests, the mutation suite, golden verdicts, older evidence, fuzz targets (`tests/fuzz/`) and a snapshot of the orders-edge fixture |
 | `guide/`, `DESIGN.md`, `HISTORY.md` | how to use it, the rules and the evidence format, and the contest story |
-| `action.yml`, `.github/` | the GitHub Action, CI, Pages, release, Scorecard and CodeQL workflows, hash-pinned tool lists, Dependabot |
+| `action.yml`, `.github/`, `.clusterfuzzlite/` | the GitHub Action, CI, Pages, release, Scorecard, CodeQL and ClusterFuzzLite workflows, hash-pinned tool lists, Dependabot |
 | `docs/` | the site, deployed to GitHub Pages |
 
 Code comments and tool output are in Korean; documentation is in English, with a Korean summary in DESIGN.md. README.md and CONTRIBUTING.md also have Korean copies, README.ko.md and CONTRIBUTING.ko.md: change both in the same commit, and `tests/test_docs.py` checks that their headings, commands, code spans, tables and links still match.

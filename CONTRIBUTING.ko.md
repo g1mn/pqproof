@@ -36,9 +36,9 @@ ruff check . && shellcheck -S warning prove.sh build-probe.sh scan/residue.sh sc
 | `probe/`, `build-probe.sh` | `tls_probe` 소스(Go 표준 라이브러리)와 오프라인 빌드 스크립트 |
 | `mappings/` | 기준 대응표: 공개 문서의 항목마다 그것을 확인하는 코드. `tests/test_mappings.py`가 검사합니다(`mappings/README.md` 참고) |
 | `examples/` | 시험에 쓰는 전환 전후 트리, 허용 목록, GitHub·GitLab·Jenkins CI 예시 |
-| `tests/` | 단위 시험, 변이 시험 묶음, golden 판정, 옛 증적, orders-edge 고정물 사본 |
+| `tests/` | 단위 시험, 변이 시험 묶음, golden 판정, 옛 증적, 퍼징 대상(`tests/fuzz/`), orders-edge 고정물 사본 |
 | `guide/`, `DESIGN.md`, `HISTORY.md` | 사용법, 규칙과 증적 형식, 대회 이야기 |
-| `action.yml`, `.github/` | GitHub Action, CI·Pages·릴리스·Scorecard·CodeQL 워크플로, 해시로 고정한 도구 목록, Dependabot |
+| `action.yml`, `.github/`, `.clusterfuzzlite/` | GitHub Action, CI·Pages·릴리스·Scorecard·CodeQL·ClusterFuzzLite 워크플로, 해시로 고정한 도구 목록, Dependabot |
 | `docs/` | GitHub Pages로 배포하는 사이트 |
 
 코드 주석과 도구 출력은 한국어이고, 문서는 영어이며 DESIGN.md에 한국어 요약이 있습니다. README.md와 CONTRIBUTING.md에는 한국어 사본 README.ko.md와 CONTRIBUTING.ko.md가 있습니다. 둘은 같은 커밋에서 함께 고치세요. `tests/test_docs.py`가 두 판의 제목, 명령, 코드 표기, 표, 링크가 서로 맞는지 봅니다.
