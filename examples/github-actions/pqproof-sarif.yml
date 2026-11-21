@@ -5,7 +5,7 @@
 # 허용 목록은 기준 커밋의 사본을 쓴다: PR 작성자가 허용 항목과 사람 확인 칸(reviewed_by·reviewed_at)을 같은 PR 에서 함께 고쳐
 # 통과시키지 못하게. 허용 목록을 바꾸는 PR 은 경고가 뜨고, 바뀐 목록은 병합된 뒤에야 쓰인다. 목록 경로는 CODEOWNERS 로
 # 보안 담당 승인을 받게 둔다(같은 폴더 CODEOWNERS.example).
-# g1mn/pqproof 는 v0.4.0 태그의 커밋 SHA 로 고정했다. 새 릴리스로 올릴 때 SHA 와 주석을 같이 바꾸고, 받은 휠은
+# g1mn/pqproof 는 v0.4.1 태그의 커밋 SHA 로 고정했다. 새 릴리스로 올릴 때 SHA 와 주석을 같이 바꾸고, 받은 휠은
 # `gh attestation verify <파일> --repo g1mn/pqproof` 로 확인할 수 있다.
 name: PQC migration check
 
@@ -48,7 +48,7 @@ jobs:
 
       - name: PQ-Proof
         id: pqproof
-        uses: g1mn/pqproof@b7709ae08c0f0a9ebe688f19cb306818c664f4b8  # v0.4.0
+        uses: g1mn/pqproof@f518b82ca62ce909e9ef0e18b254e9dfecb18218  # v0.4.1
         with:
           original: ${{ runner.temp }}/original
           converted: .
