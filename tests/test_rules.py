@@ -180,7 +180,10 @@ RESIDUE_CASES = [
     R("c/Wq8.java", 'String a = "ML_DSA_44";', G_WEAK_PQC=L),
     R("c/Wq9.java", 'String a = "Kyber512";', G_WEAK_PQC=L),
     R("c/Wq10.java", 'String a = "Dilithium2";', G_WEAK_PQC=L),
+    R("c/Wq11.java", 'String a = "SLH-DSA-SHA2-128s";', G_WEAK_PQC=L),
+    R("c/Wq12.py", 'a = "slh_dsa_shake_128f"', G_WEAK_PQC=L),
     R("c/WqNo1.java", 'String a = "ML-KEM-768";', G_WEAK_PQC=None),
+    R("c/WqNo3.java", 'String a = "SLH-DSA-SHA2-192s";', G_WEAK_PQC=None),
     R("c/WqNo2.java", 'String a = "Dilithium3";', G_WEAK_PQC=None),
     # 분류: 같은 줄 legacy(쓰기 연산이 없을 때만), Legacy*.java, 시험 경로, 주석·문서
     R("c/Gate1.java", 'Cipher c = Cipher.getInstance("RSA"); // legacy read path', G_RSA=L),  # 주석의 legacy 는 아니다(X01)
@@ -248,6 +251,7 @@ EXPECT_TREE = {
     "e/Sig.java": 'String a = "ML-DSA-65";\nString b = "MLDSA65";\nString c = "ml_dsa_65";\nString d = "ML_DSA_65";\n',
     "e/Kem5.js": "const a = crypto.generateKeyPairSync('ml-kem-1024');\n",
     "e/Sig5.go": 'const name = "ML-DSA-87"\n',
+    "e/SigSlh.py": 'a = "SLH-DSA-SHA2-192s"\nb = "slh_dsa_shake_256f"\nc = "SLHDSA-SHA2-256s"\nd = "SLH-DSA-SHA2-128s"\ne = "SPHINCS+-SHA2-192s-simple"\n',
     "e/KpqcKem.py": 'kem = kpqc.KEM("SMAUG-T3")\nkem2 = kpqc.KEM("NTRU+576")\nkem3 = "ntruplus"\n',
     "e/KpqcSig.py": 'sig = kpqc.Signature("HAETAE3")\nsig2 = kpqc.Signature("AIMer128f")\nnote = "disclaimer"\n',
     "e/Cm.java": "// ML-KEM-768 ML-DSA-65\n",
@@ -359,8 +363,8 @@ class ResidueRules(unittest.TestCase):
 
     def test_level5_names_are_counted_apart(self):
         # X11(규칙 묶음 2): ML-KEM-1024·ML-DSA-87 은 따로 센다. c-expect 는 프로필(scan/profiles.json)이 고른 규칙을 더한다
-        self.assertEqual(self.gaps["expect"], {"E-MLKEM768": 0, "E-MLKEM1024": 1, "E-MLDSA65": 0, "E-MLDSA87": 1, "E-KPQC-KEM": 0,
-                                               "E-KPQC-SIG": 0})
+        self.assertEqual(self.gaps["expect"], {"E-MLKEM768": 0, "E-MLKEM1024": 1, "E-MLDSA65": 0, "E-MLDSA87": 1, "E-SLHDSA": 0,
+                                               "E-KPQC-KEM": 0, "E-KPQC-SIG": 0})
 
     def test_x21_residue_alone_misses_a_newline_name_so_prove_refuses_it(self):
         # residue.sh 는 파일 목록을 줄 단위로 읽어 이름에 줄바꿈이 든 파일을 놓친다. 그래서 prove 는 그런 이름을 입력 오류로 막는다(X21)
@@ -370,8 +374,8 @@ class ResidueRules(unittest.TestCase):
             prove.prepare_input(g, os.path.join(self.tmp, "x21-out"), "fixed")
 
     def test_expect_counts_code_lines_outside_test_paths(self):
-        self.assertEqual(self.expect["expect"], {"E-MLKEM768": 4, "E-MLKEM1024": 1, "E-MLDSA65": 4, "E-MLDSA87": 1, "E-KPQC-KEM": 3,
-                                                 "E-KPQC-SIG": 2})
+        self.assertEqual(self.expect["expect"], {"E-MLKEM768": 4, "E-MLKEM1024": 1, "E-MLDSA65": 4, "E-MLDSA87": 1, "E-SLHDSA": 3,
+                                                 "E-KPQC-KEM": 3, "E-KPQC-SIG": 2})
 
     def test_every_rule_and_alternative_has_rows(self):
         rules = rulesrc.residue_rules()

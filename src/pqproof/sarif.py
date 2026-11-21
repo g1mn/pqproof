@@ -64,8 +64,8 @@ RULES = {
               "실제 TLS 주소가 기대한 하이브리드 ML-KEM 협상을 하지 않는다"),
     "c-classic": ("ClassicPublicKeyLine", "Classical public-key code lines remain without a recorded reason",
                   "사유 없이 남은 고전 공개키 코드 줄"),
-    "c-expect": ("ExpectedPqcMissing", "Expected post-quantum algorithms (by default ML-KEM-768 or 1024 and ML-DSA-65 or 87, see PROFILE) "
-                 "are not used", "기대한 PQC 알고리즘(기본은 ML-KEM-768·1024, ML-DSA-65·87, PROFILE 참고)을 쓰지 않는다"),
+    "c-expect": ("ExpectedPqcMissing", "Expected post-quantum algorithms (by default ML-KEM-768 or 1024 and ML-DSA-65 or 87 or SLH-DSA 192 or "
+                 "256, see PROFILE) are not used", "기대한 PQC 알고리즘(기본은 ML-KEM-768·1024, ML-DSA-65·87·SLH-DSA 192·256, PROFILE 참고)을 쓰지 않는다"),
     "r-review": ("VerificationRemoved", "Signature verification or decryption calls were removed or stubbed out",
                  "서명 검증·복호 호출이 줄었거나 늘 성공만 돌려준다"),
     "r-allow": ("AllowListReview", "Allow-list entry without human review, unused in the converted tree, or covering a write path",

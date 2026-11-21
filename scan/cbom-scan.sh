@@ -166,7 +166,7 @@ autouse() { case "$(lc "$1")" in
   *) echo 암호화;; esac; }
 
 # 위협·우선순위·권장 판정 → TH PR RP WN. P1=키교환·암호화(HNDL 직접 노출) P2=서명·인증서·고전 취약 P3=그로버 약화
-WEAKPQ='ml[-_]?kem[-_]?512|ml[-_]?dsa[-_]?44|kyber[-_]?512|dilithium[-_]?2([^0-9]|$)'   # NIST 보안레벨 3 미만 PQC(교차 리뷰 X07)
+WEAKPQ='ml[-_]?kem[-_]?512|ml[-_]?dsa[-_]?44|kyber[-_]?512|dilithium[-_]?2([^0-9]|$)|slh[-_]?dsa[-_]?(sha2|shake)[-_]?128'   # NIST 보안레벨 3 미만 PQC(교차 리뷰 X07, SLH-DSA 128 은 규칙 묶음 4)
 # 복합 서명(ML-DSA 와 고전 서명을 한 키로 묶은 IETF LAMPS·BC 이름). residue.sh RES_COMPOSITE·pqlite/rules.py COMPOSITE 와 같은 뜻(교차 리뷰 X26)
 COMPRE='ml[-_]?dsa[-_]?(44|65|87)[-_](rsa|ecdsa|ed25519|ed448)'
 COMPTH="복합 서명(PQC+고전)"; COMPRP="복합 서명은 허용 여부를 정책으로 정하고 사람이 확인(목표는 ML-DSA-65 단독)"
@@ -684,7 +684,7 @@ scan_embedded() {
 
 # ---------- 일반 패턴(놓치지 않기) ----------
 scan_generic() {
-  local CORE='rsa|ecdsa|ecdhe?|dsa|ed25519|x25519|secp256r1|secp384r1|secp521r1|secp256k1|prime256v1|[rpe]s(256|384|512)|eddsa|md5|sha-?1|3?des|desede|tripledes|rc4|arc4|arcfour|ecb|sslv3|ml-?kem-?[0-9]*|ml-?dsa-?[0-9]*|x25519mlkem768|sha[0-9]*with(rsa|ecdsa|dsa)[a-z]*' RE
+  local CORE='rsa|ecdsa|ecdhe?|dsa|ed25519|x25519|secp256r1|secp384r1|secp521r1|secp256k1|prime256v1|[rpe]s(256|384|512)|eddsa|md5|sha-?1|3?des|desede|tripledes|rc4|arc4|arcfour|ecb|sslv3|ml-?kem-?[0-9]*|ml-?dsa-?[0-9]*|slh-?dsa(-(sha2|shake)-?[0-9]+[sf]?)?|x25519mlkem768|sha[0-9]*with(rsa|ecdsa|dsa)[a-z]*' RE
   # TLSv1·1.0·1.1만. 뒤가 '.'·숫자면(TLSv1.2·1.3) 안 맞게 경계를 따로 둔다(시험에서 proxy_ssl_protocols TLSv1.3 등 4행 오탐)
   RE="(^|[^A-Za-z0-9_])($CORE)([^A-Za-z0-9_]|\$)|(^|[^A-Za-z0-9_])(tlsv1(\\.[01])?)([^.0-9A-Za-z_]|\$)"
   G -i $CODE $CFG $NOLOCK -e "$RE" | while IFS= read -r h; do
@@ -900,6 +900,9 @@ selftest() {
   ck r2/python/tls.py:1 "Python TLS 상한" "쇼어로 깨짐" P1; ck r2/python/tls.py:2 "Ed25519(PyNaCl" "쇼어로 깨짐" P2; ck r2/python/tls.py:3 "Python TLS 상한" "쇼어로 깨짐" P1
   ck r2/java/Composite.java:1 MLDSA65-ECDSA "복합 서명" P2; nck r2/java/Composite.java:1 "안전(PQC)"
   ck r2/java/Composite.java:2 "Nimbus" "쇼어로 깨짐" ""
+  # FIPS 205: 일반 패턴이 SLH-DSA 의 DSA 를 고전 DSA 로 읽지 않는다. 128 은 보안레벨 1(규칙 묶음 4)
+  ck r2/java/Slh.java:1 SLH-DSA-SHA2-192s "안전" ""; nck r2/java/Slh.java:1 "쇼어로 깨짐"
+  ck r2/java/Slh.java:2 SLH-DSA-SHA2-128s "보안레벨 3 미만" P2; nck r2/java/Slh.java:2 "쇼어로 깨짐"
   ck r2/c/rsa.c:1 rsa "쇼어로 깨짐" ""; nck r2/c/rsa.c:1 "주석"
   ck r2/ssh/.ssh/config:2 ssh-rsa "쇼어로 깨짐" P2
   ck r2/ssh/known_hosts 25519 "쇼어로 깨짐" P2   # ssh-keygen 이 없어도 공개키 줄의 형식 이름으로 읽는다

@@ -12,7 +12,17 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 ## [Unreleased]
 
-**Verdict impact (판정 영향): none.**
+Ruleset 4 (new name and hash, the same fourteen rule files). Evidence format 4, unchanged.
+
+**Verdict impact (판정 영향): yes.** The 39 golden tree cases of 0.3.0 give the same verdicts, check statuses and counts; the only change in them is a new count, `E-SLHDSA`, which is 0 in all of them. Two new mutation cases show what moves:
+
+| Change | 0.3.0 (ruleset 3) | Now (ruleset 4) |
+|---|---|---|
+| A migration that signs with an SLH-DSA 192 or 256 parameter set from FIPS 205 (`SLH-DSA-SHA2-192s`, `slh_dsa_shake_256f`) instead of ML-DSA (`m30`) | `c-expect` fail (no expected signature), and `a-cbom` fail because the CBOM scanner read the `DSA` in `SLH-DSA` as classical DSA | pass: `E-SLHDSA` counts for `EXPECT=sig` under `nist-cat3` and `kpqc`, and the CBOM scanner names the whole SLH-DSA parameter set |
+| SLH-DSA 128 (category 1, `SLH-DSA-SHA2-128s`) (`m30b`) | `c-expect` fail, `a-cbom` fail as classical DSA, `c-classic` pass | `c-expect` fail, and `a-cbom` and `c-classic` fail as below category 3 (`G-WEAK-PQC`, the CBOM scanner and the Java scanner agree) |
+| `cnsa2` profile | | unchanged: it does not count SLH-DSA |
+
+Only names with the hash family count (`SLH-DSA-SHA2-192s`, not `SLH-DSA-192s`), and `SPHINCS+` names do not count, because FIPS 205 changed the scheme. The security categories follow NIST IR 8547 (SLH-DSA 128, 192 and 256 are categories 1, 3 and 5).
 
 ### Changed
 

@@ -81,6 +81,13 @@ class JavaRules(unittest.TestCase):
         self.assertIn((15, "pqc-parameter", "dilithium3", "pqc"), got)
         self.assertIn((16, "key-generation", "unrecognized (variable)", "unknown"), got)
 
+    def test_slhdsa_levels(self):
+        # 규칙 묶음 4: FIPS 205 SLH-DSA 128 은 보안레벨 1이라 막고, 192·256 은 PQC. 해시 이름이 없는 SLH-DSA 는 예전처럼 PQC
+        got = {n: S._classify(n)[1] for n in ("SLH-DSA-SHA2-128s", "slh_dsa_shake_128f", "SLH-DSA-SHA2-192s",
+                                                 "SLH-DSA-SHAKE-256f", "SLH-DSA")}
+        self.assertEqual(got, {"SLH-DSA-SHA2-128s": "weak-pqc", "slh_dsa_shake_128f": "weak-pqc", "SLH-DSA-SHA2-192s": "pqc",
+                               "SLH-DSA-SHAKE-256f": "pqc", "SLH-DSA": "pqc"})
+
     def test_prestandard_names_are_flagged_in_detail(self):
         rows = rows_of({"src/main/java/x/P.java": PQC})
         dil = next(r for r in rows if r.algorithm == "dilithium3")

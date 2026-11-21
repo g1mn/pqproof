@@ -36,7 +36,7 @@ While it runs, stderr shows the applied settings and one line per step. The cons
 [b-weakening] 통과  deny 0 · 본 파일 4
 [b-tls] 해당 없음  TLS 서버·클라이언트 신호 0
 [c-classic] 통과  공개키 code 0(원본 17) · 보안레벨 3 미만 0 · 레거시 쓰기 0
-[c-expect] 통과  E-MLKEM768 2 + E-MLKEM1024 0 = 2 · E-MLDSA65 2 + E-MLDSA87 0 = 2
+[c-expect] 통과  E-MLKEM768 2 + E-MLKEM1024 0 = 2 · E-MLDSA65 2 + E-MLDSA87 0 + E-SLHDSA 0 = 2
 [r-review] 통과  0건
 [r-allow] 해당 없음  허용 목록 없음
 VERDICT=PASS  receipt_id=b17355b74d9f…

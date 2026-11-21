@@ -40,7 +40,7 @@ The inputs are untrusted. The tool reads files and never runs them. zip entries 
 | `b-weakening` | a changed file adds a weakening construct or removes a protection | never |
 | `b-tls` | a target does not negotiate the profile's hybrid group (`X25519MLKEM768`, or `SecP384r1MLKEM1024` under `cnsa2`) when offered only that group, or the old client (`X25519,P-256`) is accepted under `CLASSIC=deny` or refused under `CLASSIC=allow`, or `EXPECT=cert` and the certificate key is not one the profile accepts (ML-DSA-65 or 87 by default) | the code shows a TLS server but no `TLS_TARGETS` were given; the original had a TLS server and the fixed tree has none; the reference controls failed; or OpenSSL 3.5 disagrees with the probe |
 | `c-classic` | the fixed tree has classical code lines left in the nine families after allowed lines are taken out, any ML-KEM-512 or ML-DSA-44 (below NIST security category 3), or a write inside a `Legacy*.java` file | `residue.sh` did not produce a summary |
-| `c-expect` | a requested algorithm has zero code lines (`kem` and `sig` add up the `EXPECT` rules the profile names: ML-KEM-768 or 1024 and ML-DSA-65 or 87 by default), or `tls`/`cert` was requested and `b-tls` failed or did not apply | the count is missing, or `b-tls` is undecided |
+| `c-expect` | a requested algorithm has zero code lines (`kem` and `sig` add up the `EXPECT` rules the profile names: ML-KEM-768 or 1024 and ML-DSA-65, 87 or SLH-DSA 192, 256 by default), or `tls`/`cert` was requested and `b-tls` failed or did not apply | the count is missing, or `b-tls` is undecided |
 | `r-review` | never | never |
 | `r-allow` | `REQUIRE_REVIEW=1`, and an allowlist entry that allows a line or sends one to review has no accepted review record (see Human review below) or is past its `expires_at`, or an entry is unused (see Unused entries below), or a line passes on the name rule alone | never |
 
@@ -81,9 +81,10 @@ A runtime base image whose OpenSSL is too old to offer `X25519MLKEM768` blocks o
 | `G-EDDSA` | Ed25519, Ed448, EdDSA, Curve25519, and the lower-case forms as their own word (`'ed25519'`, `ssh-ed25519`, `ed25519_dalek`) |
 | `G-X25519` | X25519, X448, XDH, ECDH, KeyAgreement, lower-case `x25519`, `x448`, `ecdh` (same line with ML-KEM in any case counts as hybrid, as in `pqlite/rules.py`) |
 | `G-DH-DSA` | DiffieHellman, diffie-hellman, `"DH"`, `'dh'`, `"DSA"`, `ssh-dss`, ElGamal, ECIES |
-| `G-WEAK-PQC` | ML-KEM-512, ML-DSA-44, Kyber512, Dilithium2, in any case and with `-`, `_` or nothing between the parts (`ml-kem-512`, `mldsa44`) |
+| `G-WEAK-PQC` | ML-KEM-512, ML-DSA-44, Kyber512, Dilithium2 and SLH-DSA 128 (ruleset 4), in any case and with `-`, `_` or nothing between the parts (`ml-kem-512`, `mldsa44`) |
 | `LW-legacy-write` | encryption, signing, key generation or file writes inside `Legacy*.java` |
 | `E-MLKEM768`, `E-MLKEM1024`, `E-MLDSA65`, `E-MLDSA87` | ML-KEM-768, ML-KEM-1024, ML-DSA-65 and ML-DSA-87 in code outside test paths, in any case and separator |
+| `E-SLHDSA` | an SLH-DSA 192 or 256 parameter set from FIPS 205 (`SLH-DSA-SHA2-192s`, `slh_dsa_shake_256f`): the name needs the hash family, so `SPHINCS+` names and SLH-DSA 128 are not counted (ruleset 4) |
 | `E-KPQC-KEM`, `E-KPQC-SIG` | the Korean KpqC algorithms SMAUG-T and NTRU+, HAETAE and AIMer (counted only under `PROFILE=kpqc`) |
 
 `G-AES128` is also printed for information. It does not take part in any check.
@@ -94,9 +95,9 @@ A runtime base image whose OpenSSL is too old to offer `X25519MLKEM768` blocks o
 
 | Profile | `kem` | `sig` | TLS group | Certificate |
 |---|---|---|---|---|
-| `nist-cat3` (default) | ML-KEM-768 or ML-KEM-1024 | ML-DSA-65 or ML-DSA-87 | `X25519MLKEM768` | ML-DSA-65 or 87 |
+| `nist-cat3` (default) | ML-KEM-768 or ML-KEM-1024 | ML-DSA-65, ML-DSA-87 or SLH-DSA 192, 256 | `X25519MLKEM768` | ML-DSA-65 or 87 |
 | `cnsa2` | ML-KEM-1024 | ML-DSA-87 | `SecP384r1MLKEM1024` | ML-DSA-87 |
-| `kpqc` | ML-KEM-768, 1024 or SMAUG-T, NTRU+ | ML-DSA-65, 87 or HAETAE, AIMer | `X25519MLKEM768` | ML-DSA-65 or 87 |
+| `kpqc` | ML-KEM-768, 1024 or SMAUG-T, NTRU+ | ML-DSA-65, 87, SLH-DSA 192, 256 or HAETAE, AIMer | `X25519MLKEM768` | ML-DSA-65 or 87 |
 
 A profile only changes what counts as expected post-quantum use. It never makes a classical line pass, and ML-KEM-512 and ML-DSA-44 block under every profile. `pqlite/scan.py` reads the KpqC names as post-quantum rows with the note that NIST has not approved them. Before ruleset 2, `c-expect` counted only ML-KEM-768 and ML-DSA-65, so a move to category 5 failed.
 

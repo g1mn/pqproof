@@ -1,11 +1,11 @@
 {
- "about": "Algorithm profiles for c-expect and b-tls (PROFILE=<name>). Each profile lists the residue.sh EXPECT rules that count for EXPECT=kem and EXPECT=sig, the hybrid TLS group b-tls offers alone, and the certificate keys EXPECT=cert accepts. This file is in the ruleset hash, and receipt.json records the profile name in params.profile. nist-cat3 is the default: NIST security category 3 or above (ML-KEM-768 or ML-KEM-1024, ML-DSA-65 or ML-DSA-87). cnsa2 asks for category 5 only (ML-KEM-1024, ML-DSA-87, SecP384r1MLKEM1024), as CNSA 2.0 does. kpqc also counts the Korean KpqC algorithms (SMAUG-T, NTRU+, HAETAE, AIMer), which NIST has not approved. impl_accept (kpqc only) lists the KpqC reference KAT versions that pqproof impl judge accepts: latest, <parameter>@<version> or <algorithm>@<version>; a match with any other version needs review. A profile never makes a classical line pass.",
+ "about": "Algorithm profiles for c-expect and b-tls (PROFILE=<name>). Each profile lists the residue.sh EXPECT rules that count for EXPECT=kem and EXPECT=sig, the hybrid TLS group b-tls offers alone, and the certificate keys EXPECT=cert accepts. This file is in the ruleset hash, and receipt.json records the profile name in params.profile. nist-cat3 is the default: NIST security category 3 or above (ML-KEM-768 or ML-KEM-1024; ML-DSA-65, ML-DSA-87 or an SLH-DSA 192 or 256 parameter set from FIPS 205, ruleset 4). cnsa2 asks for category 5 only (ML-KEM-1024, ML-DSA-87, SecP384r1MLKEM1024), as CNSA 2.0 does; it does not count SLH-DSA. kpqc also counts the Korean KpqC algorithms (SMAUG-T, NTRU+, HAETAE, AIMer), which NIST has not approved. impl_accept (kpqc only) lists the KpqC reference KAT versions that pqproof impl judge accepts: latest, <parameter>@<version> or <algorithm>@<version>; a match with any other version needs review. A profile never makes a classical line pass.",
  "default": "nist-cat3",
  "profiles": {
   "nist-cat3": {
    "title": "NIST security category 3 or above",
    "kem": ["E-MLKEM768", "E-MLKEM1024"],
-   "sig": ["E-MLDSA65", "E-MLDSA87"],
+   "sig": ["E-MLDSA65", "E-MLDSA87", "E-SLHDSA"],
    "tls_group": "X25519MLKEM768",
    "cert_keys": ["ML-DSA-65", "ML-DSA-87"]
   },
@@ -19,7 +19,7 @@
   "kpqc": {
    "title": "NIST category 3 or above, or the Korean KpqC algorithms",
    "kem": ["E-MLKEM768", "E-MLKEM1024", "E-KPQC-KEM"],
-   "sig": ["E-MLDSA65", "E-MLDSA87", "E-KPQC-SIG"],
+   "sig": ["E-MLDSA65", "E-MLDSA87", "E-SLHDSA", "E-KPQC-SIG"],
    "tls_group": "X25519MLKEM768",
    "cert_keys": ["ML-DSA-65", "ML-DSA-87"],
    "impl_accept": ["latest"]

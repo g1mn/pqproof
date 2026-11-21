@@ -8,7 +8,7 @@ Settings are environment variables, the same for `pqproof` and `bash prove.sh`. 
 | `ALLOW` | `<W>/notes/unconverted.json` when the original is `<W>/orig` | allowlist file, or `none` ([allowlist.md](allowlist.md)) |
 | `REQUIRE_REVIEW` | `0` | `1`: an allowlist entry without a person's review, or an unused entry, fails the run. Recommended for real reviews |
 | `EXPECT` | `kem,sig` | what the fixed tree must use: `kem` (ML-KEM), `sig` (ML-DSA), `tls` (hybrid TLS), `cert` (ML-DSA certificate), or `none`. `PROFILE` says which sizes count |
-| `PROFILE` | `nist-cat3` | algorithm profile from `scan/profiles.json`: `nist-cat3` counts ML-KEM-768 or 1024 and ML-DSA-65 or 87; `cnsa2` counts only ML-KEM-1024 and ML-DSA-87 and offers `SecP384r1MLKEM1024` to TLS targets; `kpqc` also counts SMAUG-T, NTRU+, HAETAE and AIMer |
+| `PROFILE` | `nist-cat3` | algorithm profile from `scan/profiles.json`: `nist-cat3` counts ML-KEM-768 or 1024 and ML-DSA-65, 87 or SLH-DSA 192, 256 (FIPS 205); `cnsa2` counts only ML-KEM-1024 and ML-DSA-87 and offers `SecP384r1MLKEM1024` to TLS targets; `kpqc` also counts SMAUG-T, NTRU+, HAETAE and AIMer |
 | `SCOPE` | `all` | `kex`: judge key exchange only; signatures and encryption are listed as out of scope |
 | `FAIL_ON_REVIEW` | `0` | `1`: a pass with a check that needs review exits 5 instead of 0. The verdict stays pass |
 | `REQUIRE_RESOLVED` | `0` | `1`: key material the scanner could not open (an encrypted PKCS#8 key, a keystore without its password) or a public-key API whose algorithm name it could not read fails `a-cbom` |

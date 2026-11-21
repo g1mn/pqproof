@@ -20,7 +20,7 @@ from .receipt import STATUS_KO
 
 # 공개키 9계열(residue.sh GEN 규칙 앞의 아홉 줄, c-classic 이 센다)과 EXPECT 규칙 이름
 FAMILIES = ["G-RSA", "G-EC", "G-CURVE", "G-OAEP-PKCS1", "G-CLASSIC-SIG", "G-JWT-ALG", "G-EDDSA", "G-X25519", "G-DH-DSA"]
-EXPECT_IDS = ("E-MLKEM768", "E-MLKEM1024", "E-MLDSA65", "E-MLDSA87", "E-KPQC-KEM", "E-KPQC-SIG")  # residue.sh EXPECT 규칙
+EXPECT_IDS = ("E-MLKEM768", "E-MLKEM1024", "E-MLDSA65", "E-MLDSA87", "E-SLHDSA", "E-KPQC-KEM", "E-KPQC-SIG")  # residue.sh EXPECT 규칙
 # 알고리즘 프로필(교차 리뷰 X11·X28): c-expect 가 EXPECT=kem·sig 마다 세는 EXPECT 규칙, b-tls 가 홀로 제시하는 하이브리드 그룹,
 # EXPECT=cert 가 받는 인증서 키. scan/profiles.json 한 곳에 두고 규칙 묶음 해시에 든다. PROFILE=<이름>, 기본 nist-cat3
 PROFILES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scan", "profiles.json")
@@ -711,6 +711,7 @@ def expect_count(jf, ids):
 # EXPECT 규칙 이름 → 같은 뜻의 파이썬 정규식(EXPECT_FROM=api 가 CBOM 행 알고리즘에 맞춘다. residue.sh EXPECT 와 tests/test_rule_sync.py 가 대조)
 EXPECT_RE = {"E-MLKEM768": r"(?i)ml[-_]?kem[-_]?768", "E-MLKEM1024": r"(?i)ml[-_]?kem[-_]?1024",
              "E-MLDSA65": r"(?i)ml[-_]?dsa[-_]?65", "E-MLDSA87": r"(?i)ml[-_]?dsa[-_]?87",
+             "E-SLHDSA": r"(?i)slh[-_]?dsa[-_]?(sha2|shake)[-_]?(192|256)",
              "E-KPQC-KEM": r"(?i)smaug-?t|ntru\+|ntru_?plus", "E-KPQC-SIG": r"(?i)haetae|(?<![a-z])aimer(?![a-z])"}
 API_KINDS = {"key-generation", "signature", "key-encapsulation", "key-exchange", "key-encryption"}  # scan.py 의 API 행(이름 상수 pqc-parameter 는 뺀다)
 

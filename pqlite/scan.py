@@ -17,7 +17,7 @@
   getInstance 호출마다 한 행. 알고리즘 이름은 인자 속 문자열, 같은 파일의 `final String 이름 = "..."` 상수,
   삼항식의 두 문자열까지 읽는다. 공급자 이름("BC" 등)은 알고리즘이 아니라 비고로 간다.
 - ML-KEM·ML-DSA·Kyber·Dilithium·SLH-DSA·Falcon 이름(식별자·문자열)은 'pqc-parameter' 행. NIST 보안레벨 3 미만
-  (ML-KEM-512, ML-DSA-44, Kyber512, Dilithium2)은 threat 'weak-pqc'.
+  (ML-KEM-512, ML-DSA-44, Kyber512, Dilithium2, SLH-DSA 128)은 threat 'weak-pqc'.
 - BC 공급자 등록(Security.addProvider/insertProviderAt(new BouncyCastle...Provider()))은 'provider' 행(info).
 - TLS 그룹: SSLParameters.setNamedGroups(...)와 jdk.tls.namedGroups 설정은 key-exchange 행.
 - 보탬: getInstance 인자 속 식별자는 같은 파일 대입을 중괄호 범위로 따라간다(_JavaValues: 가장 가까운 선언과
@@ -105,7 +105,7 @@ NIST_PQ = "includes ML-KEM-768 (NIST IR 8547, Table 5)"
 NIST_MLKEM = "ML-KEM (FIPS 203)"
 NIST_MLDSA = "ML-DSA (FIPS 204)"
 NIST_OTHER_PQ = "post-quantum (FIPS 205 SLH-DSA, FN-DSA draft, HQC)"
-NIST_WEAK_PQ = "post-quantum but below NIST security category 3 (ML-KEM-512, ML-DSA-44)"
+NIST_WEAK_PQ = "post-quantum but below NIST security category 3 (ML-KEM-512, ML-DSA-44, SLH-DSA 128)"
 SHOR, PQC, WEAK_PQC, INFO, UNKNOWN = "shor", "pqc", "weak-pqc", "info", "unknown"
 COMPOSITE = "composite"  # ML-DSA 와 고전 서명을 한 키로 묶은 복합 서명(교차 리뷰 X26): 막지 않고 검토 필요로 센다
 NIST_KPQC = "post-quantum, Korean KpqC standard (not NIST-approved)"
@@ -434,6 +434,11 @@ def _classify(name):
         if size == "44":
             return name, WEAK_PQC, NIST_WEAK_PQ, f"보안레벨 2(ML-DSA-44){pre}"
         return name, PQC, NIST_MLDSA, (f"ML-DSA-{size}" if size else "ML-DSA(매개변수는 다른 줄)") + pre
+    m = re.search(r"slh[-_]?dsa[-_]?(?:sha2|shake)[-_]?(128|192|256)", low)  # FIPS 205 이름(규칙 묶음 4)
+    if m:
+        if m[1] == "128":
+            return name, WEAK_PQC, NIST_WEAK_PQ, "보안레벨 1(SLH-DSA-128)"
+        return name, PQC, NIST_OTHER_PQ, f"SLH-DSA-{m[1]}(FIPS 205)"
     if re.search(r"slh[-_]?dsa|sphincs|falcon|fn[-_]?dsa|\bhqc|ntru|\blms\b|xmss", low):
         return name, PQC, NIST_OTHER_PQ, "양자내성"
     if SHOR_ALG.search(name.strip()):

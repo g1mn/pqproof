@@ -416,7 +416,8 @@ class SiteCheck(unittest.TestCase):
 
     def setUp(self):
         self.kat = VP.kat_counts(json.loads((PROOF / "scan" / "kat-kpqc.json").read_text(encoding="utf-8")))
-        self.ver, self.rs = V.tool_version(), RULESET["current"]
+        self.ver = V.tool_version()
+        self.rs = VP.shipped_ruleset(RULESET, self.ver) or RULESET["current"]  # 사이트가 보일 묶음: 이 판이 낸 것
         self.good = {"schema": "pqproof-site-build 1", "tool_version": self.ver, "release_date": "2026-11-20", "ruleset": str(self.rs),
                      "format_version": V.FORMAT_VERSION, "format_reads": list(V.FORMAT_READS), "tests_version": self.ver,
                      "example_version": self.ver, "release_top": self.ver,
@@ -472,10 +473,11 @@ class SiteCheck(unittest.TestCase):
         # 다음 릴리스 몫 묶음(since 가 지금 판보다 뒤)이 트리에 있으면 사이트는 이 판이 낸 묶음과 비교하고, KAT 목록·증적 형식은 판 올림 때 본다
         rules = copy.deepcopy(RULESET)
         nxt = "next-test"
+        shipped = str(VP.shipped_ruleset(RULESET, self.ver))  # 이 판이 낸 묶음(트리에 다음 릴리스 몫 묶음이 이미 있어도 같다)
         rules["versions"][nxt] = dict(rules["versions"][str(self.rs)], sha256="f" * 64, since="99.0.0")
         rules["current"] = nxt
         expect, note = VP.site_expected(self.ver, rules)
-        self.assertEqual(str(expect), str(self.rs))
+        self.assertEqual(str(expect), shipped)
         self.assertIn("ships in 99.0.0", note)
         more_kat = dict(self.kat, versions=self.kat["versions"] + 1)
         self.assertEqual(VP.check_site(self.ver, expect, None, None, self.good, None), [])
@@ -484,8 +486,10 @@ class SiteCheck(unittest.TestCase):
         expect, note = VP.site_expected("99.0.0", rules)
         self.assertEqual((expect, note), (nxt, None))
         self.assertTrue(VP.check_site("99.0.0", expect, V.FORMAT_VERSION, V.FORMAT_READS, self.good, self.kat))
-        # 지금 트리에는 다음 릴리스 몫 묶음이 없다
-        self.assertEqual(VP.site_expected(self.ver, RULESET), (RULESET["current"], None))
+        # 지금 트리: 사이트는 이 판이 낸 묶음과 비교한다(다음 릴리스 몫 묶음이 있으면 알림이 붙는다)
+        expect, note = VP.site_expected(self.ver, RULESET)
+        self.assertEqual(str(expect), shipped)
+        self.assertEqual(note is None, shipped == str(RULESET["current"]))
 
     def test_release_date_and_visible_marks(self):
         chip = (self.ver, "2026-11-20")

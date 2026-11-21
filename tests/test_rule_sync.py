@@ -62,7 +62,8 @@ class ResidueAndProve(unittest.TestCase):
         # EXPECT_FROM=api 의 파이썬 정규식이 residue.sh EXPECT 규칙과 같은 이름을 잡는다
         res = {r["id"]: r["re"] for r in rulesrc.residue_rules() if r["kind"] == "EXPECT"}
         samples = ["ML-KEM-768", "mlkem768", "ML_KEM_1024", "ml-dsa-65", "MLDSA87", "SMAUG-T3", "NTRU+576", "ntruplus", "HAETAE3",
-                   "AIMer128f", "disclaimer", "ML-KEM-512", "MLDSA44"]
+                   "AIMer128f", "disclaimer", "ML-KEM-512", "MLDSA44", "SLH-DSA-SHA2-192s", "slh_dsa_shake_256f",
+                   "SLHDSA-SHA2-256s", "SLH-DSA-SHA2-128s", "SPHINCS+-SHA2-192s-simple", "SLH-DSA"]
         self.assertEqual(set(res), set(rules.EXPECT_RE))
         for rid in res:
             for s in samples:

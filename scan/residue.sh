@@ -104,12 +104,13 @@ GEN@@G-EDDSA@@-@@*@@Ed25519|Ed448|EdDSA|Curve25519|(^|[^A-Za-z0-9])(ed25519|ed44
 GEN@@G-X25519@@-@@*@@X25519|X448|XDH|ECDH|KeyAgreement|(^|[^A-Za-z0-9])(x25519|x448|ecdh)@@X25519/ECDH 단독(같은 줄 ML-KEM 이면 하이브리드 허용)@@[Mm][Ll][-_]?[Kk][Ee][Mm]
 GEN@@G-DH-DSA@@-@@*@@[Dd]iffie-?[Hh]ellman|"DH"|"DHE"|"DSA"|'(DH|DHE|DSA|dh|dhe|dsa)'|"(dh|dhe|dsa)"|ssh-dss|ElGamal|ECIES@@DH·DSA·ElGamal(diffie-hellman·ssh-dss·작은따옴표 'dh' 포함)
 GEN@@G-AES128@@-@@*@@AES-?128|AES_128|[Aa]es-?128|\.init\(128\)@@AES-128(보안레벨 1)
-GEN@@G-WEAK-PQC@@-@@*@@[Mm][Ll][-_]?[Kk][Ee][Mm][-_]?512|[Mm][Ll][-_]?[Dd][Ss][Aa][-_]?44|[Kk][Yy][Bb][Ee][Rr][-_]?512|[Dd][Ii][Ll][Ii][Tt][Hh][Ii][Uu][Mm][-_]?2([^0-9]|$)@@보안레벨 3 미만 PQC(대소문자·구분자 무관)
+GEN@@G-WEAK-PQC@@-@@*@@[Mm][Ll][-_]?[Kk][Ee][Mm][-_]?512|[Mm][Ll][-_]?[Dd][Ss][Aa][-_]?44|[Kk][Yy][Bb][Ee][Rr][-_]?512|[Dd][Ii][Ll][Ii][Tt][Hh][Ii][Uu][Mm][-_]?2([^0-9]|$)|[Ss][Ll][Hh][-_]?[Dd][Ss][Aa][-_]?([Ss][Hh][Aa]2|[Ss][Hh][Aa][Kk][Ee])[-_]?128@@보안레벨 3 미만 PQC(대소문자·구분자 무관, SLH-DSA 128 은 규칙 묶음 4)
 LWRITE@@LW-legacy-write@@-@@*@@ENCRYPT_MODE|WRAP_MODE|initSign|KeyPairGenerator|generateKeyPair|Files\.(write|writeString|move|copy)@@Legacy*.java 는 읽기·검증 전용이어야 함
 EXPECT@@E-MLKEM768@@kem@@*@@[Mm][Ll][-_]?[Kk][Ee][Mm][-_]?768@@ML-KEM-768 사용(대소문자·구분자 무관)
 EXPECT@@E-MLKEM1024@@kem@@*@@[Mm][Ll][-_]?[Kk][Ee][Mm][-_]?1024@@ML-KEM-1024 사용(보안레벨 5)
 EXPECT@@E-MLDSA65@@sig@@*@@[Mm][Ll][-_]?[Dd][Ss][Aa][-_]?65@@ML-DSA-65 사용(대소문자·구분자 무관)
 EXPECT@@E-MLDSA87@@sig@@*@@[Mm][Ll][-_]?[Dd][Ss][Aa][-_]?87@@ML-DSA-87 사용(보안레벨 5)
+EXPECT@@E-SLHDSA@@sig@@*@@[Ss][Ll][Hh][-_]?[Dd][Ss][Aa][-_]?([Ss][Hh][Aa]2|[Ss][Hh][Aa][Kk][Ee])[-_]?(192|256)@@SLH-DSA 192·256 사용(FIPS 205, 보안레벨 3·5, 해시 이름이 붙은 FIPS 205 이름만. SPHINCS+ 는 세지 않음)
 EXPECT@@E-KPQC-KEM@@kpqc-kem@@*@@[Ss][Mm][Aa][Uu][Gg]-?[Tt]|NTRU\+|[Nn][Tt][Rr][Uu]_?[Pp][Ll][Uu][Ss]@@KpqC KEM 사용(SMAUG-T·NTRU+, 국내 표준, NIST 비승인)
 EXPECT@@E-KPQC-SIG@@kpqc-sig@@*@@[Hh][Aa][Ee][Tt][Aa][Ee]|(^|[^A-Za-z])(AIMer|AIMER|aimer)([^a-z]|$)@@KpqC 서명 사용(HAETAE·AIMer, 국내 표준, NIST 비승인)
 RULES

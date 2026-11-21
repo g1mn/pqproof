@@ -1356,6 +1356,75 @@
    }
   },
   {
+   "id": "m30-slhdsa-192",
+   "title": "FIPS 205: a migration that signs with SLH-DSA-SHA2-192s instead of ML-DSA passes c-expect (ruleset 4)",
+   "title_ko": "FIPS 205: ML-DSA 대신 SLH-DSA-SHA2-192s 로 서명하는 전환은 c-expect 통과(규칙 묶음 4)",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "replace",
+     "file": "src/main/java/demo/sealer/Sealer.java",
+     "find": "\"ML-DSA-65\"",
+     "replace": "\"SLH-DSA-SHA2-192s\""
+    },
+    {
+     "op": "replace",
+     "file": "tools/sign_manifest.py",
+     "find": "mldsa.MLDSA65PrivateKey.generate()",
+     "replace": "slh_dsa_sha2_192s.generate()"
+    }
+   ],
+   "expect": {
+    "exit": 0,
+    "verdict": "pass",
+    "checks": {
+     "c-expect": "pass",
+     "c-classic": "pass"
+    },
+    "min": {
+     "java.fixed.expect.E-SLHDSA": 1
+    }
+   },
+   "sarif": {
+    "absent": [
+     "c-expect"
+    ]
+   }
+  },
+  {
+   "id": "m30b-slhdsa-128",
+   "title": "FIPS 205: SLH-DSA-SHA2-128s (category 1) is not an expected signature, and c-classic and a-cbom block it as below category 3",
+   "title_ko": "FIPS 205: SLH-DSA-SHA2-128s(보안 등급 1)는 기대 서명이 아니고, c-classic·a-cbom 이 보안레벨 3 미만으로 막음",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "replace",
+     "file": "src/main/java/demo/sealer/Sealer.java",
+     "find": "\"ML-DSA-65\"",
+     "replace": "\"SLH-DSA-SHA2-128s\""
+    },
+    {
+     "op": "replace",
+     "file": "tools/sign_manifest.py",
+     "find": "mldsa.MLDSA65PrivateKey.generate()",
+     "replace": "slh_dsa_sha2_128s.generate()"
+    }
+   ],
+   "expect": {
+    "exit": 1,
+    "verdict": "fail",
+    "checks": {
+     "c-expect": "fail",
+     "c-classic": "fail",
+     "a-cbom": "fail"
+    }
+   }
+  },
+  {
    "id": "i01-impl-latest",
    "title": "Implementation check: answers of the latest reference versions (SMAUG-T 1.2.0, HAETAE 1.2.0)",
    "title_ko": "구현 검증: 최신 참조판(SMAUG-T 1.2.0, HAETAE 1.2.0)의 답안은 통과",
