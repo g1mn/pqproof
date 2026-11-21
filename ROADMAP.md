@@ -25,5 +25,5 @@ KISA's plan to publish a PQC migration guide in 2026 was [reported in January 20
 
 ## Not planned
 
-- Compliance or certification claims. A PQ-Proof verdict is not a certified test.
+- Claims that a product meets a standard. A verdict says what PQ-Proof found in two trees.
 - Running the code under test. PQ-Proof reads source and answers; it does not build or execute them (DESIGN.md).

@@ -12,8 +12,8 @@
   "edition": "Final, October 2026",
   "url": "https://csrc.nist.gov/pubs/ir/8547/final"
  },
- "wording_en": "How PQ-Proof addresses each item. It is not a compliance, conformity or certification finding, and the publisher has not reviewed or endorsed it.",
- "wording_ko": "항목마다 PQ-Proof가 어떻게 대응하는지 보인다. 준수·부합·인증 판정이 아니며, 발행처가 검토하거나 승인한 표가 아니다.",
+ "wording_en": "How PQ-Proof addresses each item. It does not say that a product meets the document, and the publisher has not reviewed or endorsed it.",
+ "wording_ko": "항목마다 PQ-Proof가 어떻게 대응하는지 보인다. 제품이 이 문서를 충족한다는 뜻이 아니며, 발행처가 검토하거나 승인한 표가 아니다.",
  "items": [
   {
    "id": "N1",

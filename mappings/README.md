@@ -1,6 +1,6 @@
 # Standards mappings
 
-Each file maps the items of one public document to what PQ-Proof checks. A mapping says how the tool addresses an item. It is not a compliance, conformity or certification finding, and no publisher has reviewed it.
+Each file maps the items of one public document to what PQ-Proof checks. A mapping says how the tool addresses an item. It does not say that a product meets the document, and no publisher has reviewed it.
 
 | File | Document | Items |
 |---|---|---|

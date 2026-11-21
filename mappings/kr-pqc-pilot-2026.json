@@ -12,8 +12,8 @@
   "edition": "2026-01-30 (과기정통부 공고 제2026-0094호)",
   "url": "https://www.kisa.or.kr/401/form?lang_type=KO&page=1&postSeq=3592"
  },
- "wording_en": "How PQ-Proof addresses each item. It is not a compliance, conformity or certification finding, and the publisher has not reviewed or endorsed it. The call sets requirements for pilot projects; it is not a migration guide.",
- "wording_ko": "항목마다 PQ-Proof가 어떻게 대응하는지 보인다. 준수·부합·인증 판정이 아니며, 발행처가 검토하거나 승인한 표가 아니다. 공모안내서는 시범전환 사업의 요구 사항이며, 전환 가이드가 아니다.",
+ "wording_en": "How PQ-Proof addresses each item. It does not say that a product meets the document, and the publisher has not reviewed or endorsed it. The call sets requirements for pilot projects; it is not a migration guide.",
+ "wording_ko": "항목마다 PQ-Proof가 어떻게 대응하는지 보인다. 제품이 이 문서를 충족한다는 뜻이 아니며, 발행처가 검토하거나 승인한 표가 아니다. 공모안내서는 시범전환 사업의 요구 사항이며, 전환 가이드가 아니다.",
  "items": [
   {
    "id": "K1",
@@ -85,10 +85,10 @@
     }
    ],
    "remaining_en": [
-    "A KAT match is not a certified test, and the KpqC reference versions can still change on the way to a KS standard."
+    "A KAT match shows agreement with a reference version only, and the KpqC reference versions can still change on the way to a KS standard."
    ],
    "remaining_ko": [
-    "KAT 일치는 공인 시험이 아니고, KpqC 참조판은 KS 제정 과정에서 바뀔 수 있다."
+    "KAT 일치는 참조판과 같다는 뜻일 뿐이고, KpqC 참조판은 KS 제정 과정에서 바뀔 수 있다."
    ]
   },
   {
