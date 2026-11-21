@@ -21,6 +21,10 @@ KISA's plan to publish a PQC migration guide in 2026 was [reported in January 20
 - A PQC-only profile that does not count a hybrid result as finished (NIST IR 8547, section 3.2).
 - An agility signal: algorithm names fixed in code against names read from configuration (NIST IR 8547, section 1.1).
 - Export the inventory in the CycloneDX CBOM format (EU PQC roadmap, section 6.2).
+- Exception records in the allow list: optional residual risk, compensating control and replacement plan fields for systems that cannot move by 2035 (NIS draft guidebook, G9).
+- A key size floor: flag classical keys below 112-bit security (NIS draft cryptographic security guideline, S1).
+- PQ/PQ hybrids (an ML-KEM pair with a KpqC KEM, for example) as a recognised result (NIS draft guideline, S2).
+- TLS report detail: certificate expiry and the negotiated TLS version next to the group (NIS draft guidebook, G7).
 - LMS and XMSS (NIST SP 800-208) as expected firmware signatures under the cnsa2 profile (CNSA 2.0 FAQ).
 - More mappings as public documents come out, the KISA guide first.
 - FIPS 206 (FN-DSA) and FIPS 207 (HQC) once NIST publishes them.

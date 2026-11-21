@@ -237,10 +237,10 @@
     }
    ],
    "remaining_en": [
-    "Certificate expiry, TLS versions and the full cipher suite list are not reported."
+    "Certificate expiry, TLS versions and the full cipher suite list are not reported. A candidate in ROADMAP.md."
    ],
    "remaining_ko": [
-    "인증서 만료일, TLS 버전, 전체 암호 스위트 목록은 보고하지 않는다."
+    "인증서 만료일, TLS 버전, 전체 암호 스위트 목록은 보고하지 않는다. 후보로 ROADMAP.md 에 있다."
    ]
   },
   {
@@ -304,10 +304,10 @@
     }
    ],
    "remaining_en": [
-    "Residual risk, compensating controls and replacement plans are not separate fields."
+    "Residual risk, compensating controls and replacement plans are not separate fields. A candidate is optional fields in the allow list (ROADMAP.md)."
    ],
    "remaining_ko": [
-    "잔여 위험, 보완통제, 교체 계획은 따로 적는 칸이 없다."
+    "잔여 위험, 보완통제, 교체 계획은 따로 적는 칸이 없다. 후보는 허용 목록 항목에 선택 칸을 두는 것이다(ROADMAP.md)."
    ]
   },
   {

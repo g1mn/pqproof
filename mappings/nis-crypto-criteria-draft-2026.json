@@ -49,10 +49,10 @@
     }
    ],
    "remaining_en": [
-    "Key sizes are not judged against the 112-bit floor."
+    "Key sizes are not judged against the 112-bit floor. A candidate in ROADMAP.md."
    ],
    "remaining_ko": [
-    "키 길이를 112비트 하한과 비교하지는 않는다."
+    "키 길이를 112비트 하한과 비교하지는 않는다. 후보로 ROADMAP.md 에 있다."
    ]
   },
   {
@@ -76,10 +76,10 @@
     }
    ],
    "remaining_en": [
-    "PQ/PQ hybrids are not recognised yet."
+    "PQ/PQ hybrids are not recognised yet. A candidate in ROADMAP.md."
    ],
    "remaining_ko": [
-    "PQ/PQ 하이브리드는 아직 알아보지 못한다."
+    "PQ/PQ 하이브리드는 아직 알아보지 못한다. 후보로 ROADMAP.md 에 있다."
    ]
   },
   {
