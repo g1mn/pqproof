@@ -307,6 +307,11 @@ class SkipDirs(unittest.TestCase):
         self.assertFalse(hasattr(rc, "TREE_SKIP_DIRS"))
         self.assertEqual(rc.LEGACY_TREE_SKIP_DIRS, {".git", "node_modules", "target", "build", "__pycache__", ".gradle", ".idea",
                                                     "__MACOSX", ".venv", "venv"})
+        # 두 셸 스캐너의 가림(MASKFN)도 같은 글이다
+        mask = re.compile(r"(?s)# --- 가림\(mask\) 시작.*?# --- 가림 끝")
+        blocks = [mask.search((PROOF / "scan" / n).read_text(encoding="utf-8")) for n in ("residue.sh", "cbom-scan.sh")]
+        self.assertTrue(all(blocks))
+        self.assertEqual(blocks[0][0], blocks[1][0], "the MASKFN block of scan/residue.sh and scan/cbom-scan.sh differs: change both")
         # 두 셸 스캐너의 skip_dirs 함수는 같은 글이다
         part = re.compile(r"(?s)# --- 건너뛰는 폴더\(scan/skip-dirs\).*?# --- 건너뛰는 폴더 끝")
         texts = [part.search((PROOF / "scan" / n).read_text(encoding="utf-8")) for n in ("residue.sh", "cbom-scan.sh")]

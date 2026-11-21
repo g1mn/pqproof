@@ -449,6 +449,7 @@ def csv_text(head, rows):
 REDACT = (
     r"(?i)(-(?:src|dest)?(?:storepass|keypass)\s+)(\"[^\"]*\"|'[^']*'|[^\s\"'`]+)",
     r"(?i)(\bpass:)(\"[^\"]*\"|'[^']*'|[^\s\"'`]+)",
+    r"(\b(?i:ssh-keygen)\b[^\n]*?\s-N\s+)(\"[^\"]*\"|'[^']*'|[^\s\"'`]+)",
     r"(?i)(\b(?:password|passwd|passphrase|pwd|secret|client_secret|api[_-]?key|access[_-]?key|secret[_-]?key|private[_-]?key|token|"
     r"(?:access|refresh|auth|api|bearer)[_-]?token)\b[\"']?\s*[:=]\s*)(\"[^\"]*\"|'[^']*'|[^\s\"'`,;)]+)",
     r"(?i)(\bbearer\s+)([A-Za-z0-9._~+/=-]{8,})",
@@ -1189,8 +1190,8 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
                  + " (통과로 세는 것은 '통과'뿐)"
                  + f" · 도구 {r['tool_version']} · 규칙 묶음 {r['ruleset_version']} · 증적 형식 {r['format_version']}")
     if masked:
-        lines.append(f"비밀번호·토큰처럼 보이는 값 {masked}곳을 표 발췌에서 *** 로 가렸다(원문은 in/ 과 artifacts/ 의 residue·scan 출력에 "
-                     "그대로 있다. 폴더를 넘기기 전에 확인한다)")
+        lines.append(f"비밀번호·토큰처럼 보이는 값 {masked}곳을 발췌에서 *** 로 가렸다(표·SARIF·스캐너 출력. 원문은 입력 폴더와 "
+                     "zip 입력을 푼 in/ 에만 있다. 폴더를 넘기기 전에 확인한다)")
     lines.append(f"검증 증적 다시 확인: {'ok' if not bad else 'FAIL'} ({len(vres)}개 검사)" + ("" if not bad else ": " + "; ".join(bad[:3])))
     lines += next_steps(r, cbom_items["fixed"], out)
     if bad:

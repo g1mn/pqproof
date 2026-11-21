@@ -91,6 +91,7 @@ class EvidenceError(Exception):
 REDACT = (
     r"(?i)(-(?:src|dest)?(?:storepass|keypass)\s+)(\"[^\"]*\"|'[^']*'|[^\s\"'`]+)",
     r"(?i)(\bpass:)(\"[^\"]*\"|'[^']*'|[^\s\"'`]+)",
+    r"(\b(?i:ssh-keygen)\b[^\n]*?\s-N\s+)(\"[^\"]*\"|'[^']*'|[^\s\"'`]+)",
     r"(?i)(\b(?:password|passwd|passphrase|pwd|secret|client_secret|api[_-]?key|access[_-]?key|secret[_-]?key|private[_-]?key|token|"
     r"(?:access|refresh|auth|api|bearer)[_-]?token)\b[\"']?\s*[:=]\s*)(\"[^\"]*\"|'[^']*'|[^\s\"'`,;)]+)",
     r"(?i)(\bbearer\s+)([A-Za-z0-9._~+/=-]{8,})",
@@ -276,8 +277,9 @@ class Builder:
         if level is None:
             return
         if snippet:
+            pre = redact(snippet.replace(MASK, "x" * 8))[1] if MASK in snippet else 0  # 스캐너가 먼저 가린 값도 센다(규칙 묶음 6)
             snippet, n = redact(snippet)
-            self.masked += n
+            self.masked += max(n, pre)
         key = redact(key)[0]
         norm = re.sub(r"[ \t]+", " ", key or snippet or text).strip()
         base = f"{rule}|{path}|{norm}"

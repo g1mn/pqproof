@@ -1,6 +1,6 @@
 {
- "about": "Ruleset versions: a name for each hash of the rule files (pqlite/version.py RULESET_FILES). A run records ruleset_version and ruleset_sha256 in receipt.json. Each version lists sha256, since (the first tool version that shipped it), verdict_impact (yes when the same trees can get a different verdict, check status or count than under the previous ruleset; no when only comments, wording or code layout changed) and files (path and sha256 of each rule file). The file list can differ between versions: ruleset 1 hashed six files, ruleset 2 hashes eleven: it adds scan/skip-dirs, scan/profiles.json, pqlite/rules.py, pqlite/skipdirs.py and pqlite/tlsprobe.py. Ruleset 3 hashes fourteen: it adds pqlite/impl.py, scan/kat-kpqc.json and scan/kat (the reference KAT excerpts, one digest over the *.json files of the folder, pqlite/version.py path_sha256). Ruleset 4 hashes the same fourteen and counts SLH-DSA 192 and 256 (FIPS 205) as an expected signature (E-SLHDSA) and blocks SLH-DSA 128 as below category 3. --verify recomputes a receipt's ruleset_sha256 from the files of the ruleset it names. Changing a rule file needs a new name here, a new current, and a CHANGELOG entry with its verdict impact. A ruleset with verdict_impact yes first ships in a MINOR release (MAJOR from 1.0), never a PATCH release (tests/version_policy.py). pqlite/version.py --ruleset-json prints sha256 and files for the rule files on disk. Ruleset 5 hashes the same fourteen files with the same rules as ruleset 4; only comments changed. From ruleset 5 a record also keeps comment_free (the hash of the rule files without comments) and aliases: a later edit that changes only comments is recorded as an alias of the same name (pqlite/version.py --alias), so comments no longer rename a ruleset. --verify accepts the recorded hash or an alias.",
- "current": "5",
+ "about": "Ruleset versions: a name for each hash of the rule files (pqlite/version.py RULESET_FILES). A run records ruleset_version and ruleset_sha256 in receipt.json. Each version lists sha256, since (the first tool version that shipped it), verdict_impact (yes when the same trees can get a different verdict, check status or count than under the previous ruleset; no when only comments, wording or code layout changed) and files (path and sha256 of each rule file). The file list can differ between versions: ruleset 1 hashed six files, ruleset 2 hashes eleven: it adds scan/skip-dirs, scan/profiles.json, pqlite/rules.py, pqlite/skipdirs.py and pqlite/tlsprobe.py. Ruleset 3 hashes fourteen: it adds pqlite/impl.py, scan/kat-kpqc.json and scan/kat (the reference KAT excerpts, one digest over the *.json files of the folder, pqlite/version.py path_sha256). Ruleset 4 hashes the same fourteen and counts SLH-DSA 192 and 256 (FIPS 205) as an expected signature (E-SLHDSA) and blocks SLH-DSA 128 as below category 3. --verify recomputes a receipt's ruleset_sha256 from the files of the ruleset it names. Changing a rule file needs a new name here, a new current, and a CHANGELOG entry with its verdict impact. A ruleset with verdict_impact yes first ships in a MINOR release (MAJOR from 1.0), never a PATCH release (tests/version_policy.py). pqlite/version.py --ruleset-json prints sha256 and files for the rule files on disk. Ruleset 5 hashes the same fourteen files with the same rules as ruleset 4; only comments changed. From ruleset 5 a record also keeps comment_free (the hash of the rule files without comments) and aliases: a later edit that changes only comments is recorded as an alias of the same name (pqlite/version.py --alias), so comments no longer rename a ruleset. --verify accepts the recorded hash or an alias. Ruleset 6 hashes the same fourteen files: one awk mask (MASKFN, the same text in scan/cbom-scan.sh and scan/residue.sh) hides the same values as prove.py REDACT, residue.sh masks its excerpts too, and both add ssh-keygen -N. Verdict impact yes only for a file over MAX_FILE_MIB, where prove falls back to the residue.sh excerpt and a masked secret value could hold a rule word.",
+ "current": "6",
  "versions": {
   "1": {
    "sha256": "b0bff18e90b4f981b7b5df07236e5d132d7c0aa3458bc1a79810ca5e10f49645",
@@ -322,6 +322,131 @@
      {
       "path": "scan/residue.sh",
       "sha256": "eb5b390bfde0039db54a5f3a2e43c512649ac5e4bf2b5076e6fe63d72eb04262"
+     },
+     {
+      "path": "scan/skip-dirs",
+      "sha256": "aa87a3c8d124abcd2cc7ebbbb6d5d4f69c8a7d5015851ef9ce45a892e827d4a5"
+     },
+     {
+      "path": "scan/test-paths.ere",
+      "sha256": "77aa57bcc8932a372c5c541c6d9ee0d93b15a4b2dc1bf0210c44ccb02595a103"
+     }
+    ]
+   },
+   "aliases": []
+  },
+  "6": {
+   "sha256": "e8ef19a65199509339c771d71461525ff843c42541987a18ed3e20098b525c99",
+   "since": "0.5.0",
+   "verdict_impact": "yes",
+   "files": [
+    {
+     "path": "pqlite/allowlist.py",
+     "sha256": "440e8c9cf43ee2272138e13587c8bb26361bbe036515e5b55d323a2f67a49aa3"
+    },
+    {
+     "path": "pqlite/impl.py",
+     "sha256": "274ba53d95c161d8adbf136a53c6fe31e5e746c254b3c2b1cf25df83a389457a"
+    },
+    {
+     "path": "pqlite/rules.py",
+     "sha256": "e54e7e8c36d17302847fc081f3f87ce65eaa9a91e71f3e014560c1a0b0182f61"
+    },
+    {
+     "path": "pqlite/scan.py",
+     "sha256": "9b69a0b6e62e9cecbca8be93fcd54f384392522baf021caa82b92b67c52b9be9"
+    },
+    {
+     "path": "pqlite/skipdirs.py",
+     "sha256": "99928889442aa1808fef94ed18dd063a169bc626c75d198bd7602cef338e3c25"
+    },
+    {
+     "path": "pqlite/tlsprobe.py",
+     "sha256": "8c85b99d1148ebb570d497ec2b91eab82d7b74d40cb690f0cd02c7b81fb1c443"
+    },
+    {
+     "path": "pqlite/verify.py",
+     "sha256": "8829cc3849554cb51e7cd1059b70e7066308f3766e116551b25ce43d59192c00"
+    },
+    {
+     "path": "scan/cbom-scan.sh",
+     "sha256": "01f18d9a3de0c6db78be3a9decf534b2357100ba905834b2c456d3b8652af13c"
+    },
+    {
+     "path": "scan/kat",
+     "sha256": "182a5384a6acf8f789f2e068d834d1d968d37aff4ae8e0275dbdd96aaef741e9"
+    },
+    {
+     "path": "scan/kat-kpqc.json",
+     "sha256": "628d6e88552908d9a2eaf7c827a698f84278cd320531f1c8f7324f8947bcd9f5"
+    },
+    {
+     "path": "scan/profiles.json",
+     "sha256": "3a5fa9f1d8d8ebdafa53b1dc136e561a580eb5df4b86e9ec4d4ec5651788fdab"
+    },
+    {
+     "path": "scan/residue.sh",
+     "sha256": "12bb381e98ccfee5053e92e54ddc9a47cbe5be49cd6e545736f3d8b29c3a3b50"
+    },
+    {
+     "path": "scan/skip-dirs",
+     "sha256": "685fda3e7ac9ead22c216540301847dfc31b043918e920148ec74a08515ae1f7"
+    },
+    {
+     "path": "scan/test-paths.ere",
+     "sha256": "1c57d266eb7365ec1766652c6d43277ce0e59fb9924aa02b6bf3a3a5faf89bfa"
+    }
+   ],
+   "comment_free": {
+    "sha256": "e0e7e8f5c93f9af3ed603d135a2bf963f5151f266e9ec3f67c1929d4b9d8028f",
+    "files": [
+     {
+      "path": "pqlite/allowlist.py",
+      "sha256": "026dd6b7050b5589e0743ce1a9ffd400969a1bbd8050656359039a95f041f3ef"
+     },
+     {
+      "path": "pqlite/impl.py",
+      "sha256": "ab99557c1dd97ccf33bf3924cc7f9b196636425722a6a5aad3695d95540b9555"
+     },
+     {
+      "path": "pqlite/rules.py",
+      "sha256": "067b9e8e6c0f5a6282c4b8b7ff8f835a59c466155a8014bb6110bceb5fcb775f"
+     },
+     {
+      "path": "pqlite/scan.py",
+      "sha256": "7722a64bd0b499ea13d8b9ebbdb7c12bb086c88c2ef87931b917c95eed1ee868"
+     },
+     {
+      "path": "pqlite/skipdirs.py",
+      "sha256": "42fa6257ae96b0b16637a89312d9bcf26b46ae50f3dfe682de2cbdf9e1a6dd6b"
+     },
+     {
+      "path": "pqlite/tlsprobe.py",
+      "sha256": "5093c9556267d0a4412500f91bc7a1f00c88eae9d7e50880200df73cdbde17fb"
+     },
+     {
+      "path": "pqlite/verify.py",
+      "sha256": "c4bf380b070e91102ce9369b1b5a6ae9152db3721101623cd29290ad35116d22"
+     },
+     {
+      "path": "scan/cbom-scan.sh",
+      "sha256": "3a047496cdfb12e882fe19d1e48c75d65ef0527d4a4fcb60788e8c1ec4f78621"
+     },
+     {
+      "path": "scan/kat",
+      "sha256": "182a5384a6acf8f789f2e068d834d1d968d37aff4ae8e0275dbdd96aaef741e9"
+     },
+     {
+      "path": "scan/kat-kpqc.json",
+      "sha256": "628d6e88552908d9a2eaf7c827a698f84278cd320531f1c8f7324f8947bcd9f5"
+     },
+     {
+      "path": "scan/profiles.json",
+      "sha256": "3a5fa9f1d8d8ebdafa53b1dc136e561a580eb5df4b86e9ec4d4ec5651788fdab"
+     },
+     {
+      "path": "scan/residue.sh",
+      "sha256": "962b26cabd19b5d3f636ab7941f2452bae8afa8edef8d409e08665d81054075d"
      },
      {
       "path": "scan/skip-dirs",

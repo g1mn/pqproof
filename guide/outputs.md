@@ -26,7 +26,7 @@ Re-check with `pqproof --verify <folder>`. It fails on any file that is not list
 
 - Absolute paths on your machine: the input folders, the tools and the output folder in `receipt.json` and `receipt.html`, and the scanned folder and command line at the top of each CBOM report.
 - For a zip input, `in/` holds the whole unpacked source.
-- The scanner output under `artifacts/` quotes source lines as they are. The excerpts the tool writes itself (`tables/cbom-*.csv` notes, `tables/report.md`, SARIF snippets) and, from 0.2.0, the excerpts in the CBOM reports under `artifacts/cbom-*/` replace values that look like secrets with `***`: after `-storepass`, `-keypass`, `pass:`, `password=`, `token=` and similar names, after `Bearer`, and strings with known token prefixes. The console says how many.
+- Excerpts of source lines replace values that look like secrets with `***`: after `-storepass`, `-keypass`, `pass:`, an `ssh-keygen -N` passphrase, `password=`, `token=`, `secret_key=` and similar names, after `Bearer`, and strings with known token prefixes (AWS, GitHub, GitLab, Slack and others). From 0.5.0 that covers every excerpt in the folder: `tables/`, `tables/report.md`, SARIF snippets and the scanner output under `artifacts/` (CBOM reports and `residue-*.txt`). Before 0.5.0, `artifacts/residue-*.txt` quoted lines as they were and the CBOM reports missed some of these values. The console says how many. Other text on the line stays, so read the excerpts before you share the folder.
 
 ## Evidence hash
 

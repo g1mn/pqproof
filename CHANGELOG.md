@@ -14,6 +14,21 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 **Verdict impact (판정 영향): none.**
 
+## [0.5.0] - 2026-11-21
+
+Tool 0.5.0, ruleset 6, evidence format 4 (unchanged).
+
+**Verdict impact (판정 영향): yes, in one narrow case.** The 41 golden tree cases keep every verdict, check status and count (only the ruleset name in the golden file moved). The case: for a file larger than `MAX_FILE_MIB`, PQ-Proof cannot read the line itself and falls back to the excerpt `residue.sh` prints; that excerpt is now masked, so a secret value that contains a rule word such as `legacy` no longer feeds the allow rules.
+
+### Security
+
+- Secret values in the scanner output under `artifacts/`. `tables/`, `report.md` and SARIF already hid values that look like secrets, but the raw scanner output did not hide all of them: `residue.sh` quoted matching source lines as they were, and `cbom-scan.sh` missed a value after `secret_key` and similar names, AWS access key IDs and bare tokens with known prefixes. Nothing hid an `ssh-keygen -N` passphrase, not even the tables. A run on a tree with such values on lines that use classical crypto kept them in the evidence folder. Now one awk mask (`MASKFN`, the same text in `scan/cbom-scan.sh` and `scan/residue.sh`) hides the same values as `prove.py` `REDACT`, `residue.sh` masks its excerpts, and all of them hide an `ssh-keygen -N` passphrase. Only the input copy `in/` of a zip input keeps the original source. If you shared an evidence folder made before 0.5.0 from code with secrets on such lines, check `artifacts/residue-*.txt` and `artifacts/cbom-*/` and rotate what you find. The evidence published with PQ-Proof (the site, the examples, the golden evidence) holds no real secret: it was made from bundled examples and fake fixtures, and a scan of the full history of the repository found none.
+
+### Changed
+
+- Tests: the awk mask and `REDACT` are compared on the same lines, both ways (values to hide and values to keep, such as the `ssh-keygen -n` principals); the two copies of `MASKFN` must be the same text; an end-to-end run must leave no secret value anywhere in the output folder outside `in/`. The known-gap list of 0.4.1 is gone.
+- SARIF `redactedSnippets` and the console count also count values the scanners hid first.
+
 ## [0.4.1] - 2026-11-21
 
 Tool 0.4.1, ruleset 5, evidence format 4 (unchanged).

@@ -115,19 +115,50 @@ lc() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 trim() { local s=$1; s=${s#"${s%%[![:space:]]*}"}; s=${s%"${s##*[![:space:]]}"}; printf '%s' "$s"; }
 note() { local o="" x; for x in "$@"; do [ -n "$x" ] && o="${o:+$o · }$x"; done; printf '%s' "$o"; }
 # 근거 줄 발췌. 키·토큰일 수 있는 긴 base64 덩어리는 가린다(증거 파일이 보고서에 그대로 붙으므로)
-# 비밀번호·토큰처럼 보이는 값(-storepass 뒤, pass:, password=·token= 대입, Bearer)도 *** 로 가린다(교차 리뷰 X33)
-MASKAWK='function msk(re,   o, p) {
+# --- 가림(mask) 시작: residue.sh 와 cbom-scan.sh 에 같은 글로 있다. prove.py REDACT 와 같은 값을 *** 로 가린다(교차 리뷰 X33)
+MASKFN='function mskv(re, vre,   o, p) {
   o = ""
-  while (match(L, re)) {
-    p = RSTART + RLENGTH - 1; o = o substr(S, 1, p) "***"; S = substr(S, p + 1); L = substr(L, p + 1)
-    if (match(L, /^("[^"]*"|\047[^\047]*\047|[^ \t"\047`,;)]+)/)) { S = substr(S, RLENGTH + 1); L = substr(L, RLENGTH + 1) }
+  while (match(MS_L, re)) {
+    p = RSTART + RLENGTH - 1; o = o substr(MS_S, 1, p); MS_S = substr(MS_S, p + 1); MS_L = substr(MS_L, p + 1)
+    if (match(MS_L, vre)) { o = o "***"; MS_S = substr(MS_S, RLENGTH + 1); MS_L = substr(MS_L, RLENGTH + 1) }
   }
-  S = o S; L = tolower(S)
+  MS_S = o MS_S; MS_L = tolower(MS_S)
 }
-{ S = $0; L = tolower(S)
-  msk("-(src|dest)?(storepass|keypass)[ \t]+"); msk("pass:"); msk("bearer[ \t]+")
-  msk("(password|passwd|passphrase|pwd|secret|api[_-]?key|access[_-]?key|private[_-]?key|token)[\"\047]?[ \t]*[:=][ \t]*")
-  print S }'
+function mskn(vre,   i, o, r, p) {
+  i = index(MS_L, "ssh-keygen")
+  if (!i) return
+  o = substr(MS_S, 1, i + 9); r = substr(MS_S, i + 10)
+  if (match(r, "[ \t]-N[ \t]+")) {
+    p = RSTART + RLENGTH - 1; o = o substr(r, 1, p); r = substr(r, p + 1)
+    if (match(r, vre)) { o = o "***"; r = substr(r, RLENGTH + 1) }
+  }
+  MS_S = o r; MS_L = tolower(MS_S)
+}
+function mskt(re,   o) {
+  o = ""
+  while (match(MS_S, re)) {
+    if (substr(MS_S, RSTART, 1) ~ /[A-Za-z0-9_]/) o = o substr(MS_S, 1, RSTART - 1) "***"
+    else o = o substr(MS_S, 1, RSTART) "***"
+    MS_S = substr(MS_S, RSTART + RLENGTH)
+  }
+  MS_S = o MS_S; MS_L = tolower(MS_S)
+}
+function mask(s,   w, v, k, b, t) {
+  MS_S = s; MS_L = tolower(s); w = "(^|[^a-z0-9_])"
+  v = "^(\"[^\"]*\"|\047[^\047]*\047|[^ \t\"\047`]+)"; k = "^(\"[^\"]*\"|\047[^\047]*\047|[^ \t\"\047`,;)]+)"
+  b = "[a-z0-9._~+/=-]"; b = "^" b b b b b b b b b "*"
+  t = "[A-Za-z0-9_-]"; t = t t t t t t t t t t t "*"
+  mskv("-(src|dest)?(storepass|keypass)[ \t]+", v)
+  mskv(w "pass:", v)
+  mskn(v)
+  mskv(w "(password|passwd|passphrase|pwd|secret|client_secret|api[_-]?key|access[_-]?key|secret[_-]?key|private[_-]?key|token|(access|refresh|auth|api|bearer)[_-]?token)[\"\047]?[ \t]*[:=][ \t]*", k)
+  mskv(w "bearer[ \t]+", b)
+  mskt("(^|[^A-Za-z0-9_])(ghp_|gho_|ghu_|ghs_|ghr_|github_pat_|glpat-|xox[abprs]-|sk-|AKIA|ASIA|AIza)" t)
+  return MS_S
+}'
+# --- 가림 끝
+MASKAWK="$MASKFN"'
+{ print mask($0) }'
 snip() { local s; s=$(trim "$1" | sed -E 's#[A-Za-z0-9+/=]{40,}#<가림>#g' | awk "$MASKAWK"); s=${s//$TAB/ }; [ ${#s} -gt 90 ] && s="${s:0:90}…"; printf '%s' "\`$s\`"; }
 # ROOT 안에서 '.'을 찾는다: GNU grep의 --exclude-dir는 명령줄 디렉터리 이름(예: 루트가 build)에도 걸리기 때문
 # shellcheck disable=SC2086  # GX 는 --exclude-dir=이름 목록(이름에 공백·글롭 문자가 없다, set -f)

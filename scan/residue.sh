@@ -148,7 +148,49 @@ if [ -n "$LC" ]; then echo "INFO 레거시 호출처(쓰기 경로에서 부르�
 [ ${#FILES[@]} -gt 0 ] || { echo "검사할 파일 없음"; exit 2; }
 printf '%s\n' "${FILES[@]}" > "$TMPD/files"
 
-LC_ALL=C awk -v RES_LIST="$TMPD/files" '
+# --- 가림(mask) 시작: residue.sh 와 cbom-scan.sh 에 같은 글로 있다. prove.py REDACT 와 같은 값을 *** 로 가린다(교차 리뷰 X33)
+MASKFN='function mskv(re, vre,   o, p) {
+  o = ""
+  while (match(MS_L, re)) {
+    p = RSTART + RLENGTH - 1; o = o substr(MS_S, 1, p); MS_S = substr(MS_S, p + 1); MS_L = substr(MS_L, p + 1)
+    if (match(MS_L, vre)) { o = o "***"; MS_S = substr(MS_S, RLENGTH + 1); MS_L = substr(MS_L, RLENGTH + 1) }
+  }
+  MS_S = o MS_S; MS_L = tolower(MS_S)
+}
+function mskn(vre,   i, o, r, p) {
+  i = index(MS_L, "ssh-keygen")
+  if (!i) return
+  o = substr(MS_S, 1, i + 9); r = substr(MS_S, i + 10)
+  if (match(r, "[ \t]-N[ \t]+")) {
+    p = RSTART + RLENGTH - 1; o = o substr(r, 1, p); r = substr(r, p + 1)
+    if (match(r, vre)) { o = o "***"; r = substr(r, RLENGTH + 1) }
+  }
+  MS_S = o r; MS_L = tolower(MS_S)
+}
+function mskt(re,   o) {
+  o = ""
+  while (match(MS_S, re)) {
+    if (substr(MS_S, RSTART, 1) ~ /[A-Za-z0-9_]/) o = o substr(MS_S, 1, RSTART - 1) "***"
+    else o = o substr(MS_S, 1, RSTART) "***"
+    MS_S = substr(MS_S, RSTART + RLENGTH)
+  }
+  MS_S = o MS_S; MS_L = tolower(MS_S)
+}
+function mask(s,   w, v, k, b, t) {
+  MS_S = s; MS_L = tolower(s); w = "(^|[^a-z0-9_])"
+  v = "^(\"[^\"]*\"|\047[^\047]*\047|[^ \t\"\047`]+)"; k = "^(\"[^\"]*\"|\047[^\047]*\047|[^ \t\"\047`,;)]+)"
+  b = "[a-z0-9._~+/=-]"; b = "^" b b b b b b b b b "*"
+  t = "[A-Za-z0-9_-]"; t = t t t t t t t t t t t "*"
+  mskv("-(src|dest)?(storepass|keypass)[ \t]+", v)
+  mskv(w "pass:", v)
+  mskn(v)
+  mskv(w "(password|passwd|passphrase|pwd|secret|client_secret|api[_-]?key|access[_-]?key|secret[_-]?key|private[_-]?key|token|(access|refresh|auth|api|bearer)[_-]?token)[\"\047]?[ \t]*[:=][ \t]*", k)
+  mskv(w "bearer[ \t]+", b)
+  mskt("(^|[^A-Za-z0-9_])(ghp_|gho_|ghu_|ghs_|ghr_|github_pat_|glpat-|xox[abprs]-|sk-|AKIA|ASIA|AIza)" t)
+  return MS_S
+}'
+# --- 가림 끝
+LC_ALL=C awk -v RES_LIST="$TMPD/files" "$MASKFN"'
 function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t\r]+$/, "", s); return s }
 function short(s) { s = trim(s); if (length(s) > 150) s = substr(s, 1, 147) "..."; return s }
 function ftype(b) {
@@ -206,7 +248,7 @@ function splitpy(s,   t, d, p) {  # 파이썬: 줄 끝 # 주석, 문장 자리�
 }
 function add(r, t, ln, txt) {
   CNT[r, t]++
-  if (CNT[r, t] <= MAXD) DET[r, t] = DET[r, t] "      " t " " REL ":" ln ": " short(txt) "\n"
+  if (CNT[r, t] <= MAXD) DET[r, t] = DET[r, t] "      " t " " REL ":" ln ": " short(mask(txt)) "\n"
   if (CNT[r, t] <= 14) LOC[r, t] = LOC[r, t] (LOC[r, t] == "" ? "" : ",") ln
 }
 BEGIN {
