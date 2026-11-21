@@ -23,6 +23,7 @@ Tool 0.5.0, ruleset 6, evidence format 4 (unchanged).
 ### Security
 
 - Secret values in the scanner output under `artifacts/`. `tables/`, `report.md` and SARIF already hid values that look like secrets, but the raw scanner output did not hide all of them: `residue.sh` quoted matching source lines as they were, and `cbom-scan.sh` missed a value after `secret_key` and similar names, AWS access key IDs and bare tokens with known prefixes. Nothing hid an `ssh-keygen -N` passphrase, not even the tables. A run on a tree with such values on lines that use classical crypto kept them in the evidence folder. Now one awk mask (`MASKFN`, the same text in `scan/cbom-scan.sh` and `scan/residue.sh`) hides the same values as `prove.py` `REDACT`, `residue.sh` masks its excerpts, and all of them hide an `ssh-keygen -N` passphrase. Only the input copy `in/` of a zip input keeps the original source. If you shared an evidence folder made before 0.5.0 from code with secrets on such lines, check `artifacts/residue-*.txt` and `artifacts/cbom-*/` and rotate what you find. The evidence published with PQ-Proof (the site, the examples, the golden evidence) holds no real secret: it was made from bundled examples and fake fixtures, and a scan of the full history of the repository found none.
+- Advisory: [GHSA-6jq9-vjc7-xwm2](https://github.com/g1mn/pqproof/security/advisories/GHSA-6jq9-vjc7-xwm2) (low, CVSS 3.3).
 
 ### Changed
 
