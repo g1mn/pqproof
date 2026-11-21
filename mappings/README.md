@@ -11,6 +11,9 @@ Each file maps the items of one public document to what PQ-Proof checks. A mappi
 | `us-quantum-readiness-2023.json` | CISA, NSA and NIST factsheet Quantum-Readiness: Migration to Post-Quantum Cryptography (August 2023) | 4 |
 | `uk-ncsc-pqc-timelines.json` | UK NCSC, Timelines for migration to post-quantum cryptography (March 2025) | 7 |
 | `eu-pqc-roadmap-2025.json` | EU coordinated implementation roadmap for the transition to PQC (NIS Cooperation Group, June 2025) | 6 |
+| `nis-pqc-guidebook-draft-2026.json` | NIS and NSR, PQC migration guidebook for national and public institutions (draft, posted 2026-11-16) | 17 |
+| `nis-crypto-criteria-draft-2026.json` | NIS and NSR, cryptographic security guideline for national and public institutions (draft, posted 2026-11-16) | 5 |
+| `nis-pqc-candidates-2026.json` | NIS notice of PQC candidates for cryptographic module validation (2026-09-01) | 2 |
 | `kisa-pqc-guide.json` | KISA PQC migration guide, not published yet | 0 |
 
 The site shows them as tables. `tests/test_mappings.py` checks every file.

@@ -27,7 +27,8 @@ class Draft(unittest.TestCase):
         self.assertEqual((g1["status"], g1["ref"]), ("todo", {"page": 3, "section": "2.1"}))
         self.assertEqual(set(g1) - {"_suggest"}, set(__import__("test_mappings").ITEM_KEYS))
         self.assertIn("inventory", g1["_suggest"]["topics"])
-        self.assertTrue({"nist-ir8547/N1", "kr-pqc-pilot-2026/K1"} <= {x["from"] for x in g1["_suggest"]["like"]})
+        like = g1["_suggest"]["like"]
+        self.assertTrue(like and all("inventory" in x["shared_topics"] and x["evidence"] for x in like), like)
         self.assertIn("hybrid", g2["_suggest"]["topics"])
 
     def test_empty_quote_or_repeated_id_stops(self):

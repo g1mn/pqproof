@@ -1,0 +1,167 @@
+{
+ "schema": "pqproof-mapping 1",
+ "id": "nis-crypto-criteria-draft-2026",
+ "published": true,
+ "checked": "2026-11-21",
+ "applies_from": "0.5.0",
+ "title_en": "PQ-Proof against the NIS cryptographic security guideline for national and public institutions (draft, November 2026)",
+ "title_ko": "국가·공공기관 암호 안전성 기준(초안)과 PQ-Proof 대응표",
+ "source": {
+  "title": "국가·공공기관 암호 안전성 기준 (Cryptographic Security Guideline)",
+  "publisher": "국가정보원·국가보안기술연구소",
+  "edition": "Draft, posted on the National Cyber Security Center notice board on 2026-11-16",
+  "url": "https://www.ncsc.go.kr/api/file/getfile?filename=5d057171-e433-4e59-9efa-9864b350e879",
+  "sha256": "61253120d22a4089c63f51dc65602b124aa0c6de625b85c4cc154d975685fa25"
+ },
+ "wording_en": "How PQ-Proof addresses each item. It does not say that a product meets the document, and the publisher has not reviewed or endorsed it. The document is a draft, and items may change in the final version.",
+ "wording_ko": "항목마다 PQ-Proof가 어떻게 대응하는지 보인다. 제품이 이 문서를 충족한다는 뜻이 아니며, 발행처가 검토하거나 승인한 표가 아니다. 초안 문서라 확정판에서 항목이 바뀔 수 있다.",
+ "items": [
+  {
+   "id": "S1",
+   "ref": {
+    "section": "2",
+    "page": 15
+   },
+   "quote": "양자내성암호로 전면 전환되는 2036년 이전까지 보안 강도가 112비트인 기존 비대칭 키 암호의 사용을 한시적으로 허용하여 불필요한 사회적 비용을 줄이는 방향으로 기준을 수립하였다.",
+   "about_en": "Classical asymmetric cryptography at 112-bit strength stays allowed for a limited time, until 2036.",
+   "about_ko": "보안 강도 112비트 기존 비대칭 키 암호는 2036년 전까지 한시적으로 허용한다.",
+   "status": "partial",
+   "note_en": "c-classic counts every classical public-key line left without a recorded reason. Keeping classical cryptography within this allowance is recorded as an allowlist entry with a reason and a person's review.",
+   "note_ko": "c-classic은 사유 없이 남은 기존 공개키 줄을 모두 센다. 이 허용 범위에서 기존 암호를 남기려면 사유와 사람 확인이 있는 허용 목록 항목으로 적는다.",
+   "evidence": [
+    {
+     "file": "pqlite/rules.py",
+     "symbols": [
+      "FAMILIES = "
+     ]
+    },
+    {
+     "file": "scan/residue.sh",
+     "symbols": [
+      "GEN@@G-RSA@@"
+     ]
+    },
+    {
+     "file": "pqlite/allowlist.py",
+     "symbols": [
+      "REVIEW_KEYS"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "Key sizes are not judged against the 112-bit floor."
+   ],
+   "remaining_ko": [
+    "키 길이를 112비트 하한과 비교하지는 않는다."
+   ]
+  },
+  {
+   "id": "S2",
+   "ref": {
+    "section": "2",
+    "page": 16
+   },
+   "quote": "2035년까지는 기존 비대칭 키 암호와 양자내성암호의 하이브리드(PQ/T, Post-quantum/Traditional)를 권장하고, 2036년부터는 양자내성암호끼리의 하이브리드(PQ/PQ, Post-quantum/Post-quantum)를 권장하는 방향으로 기준을 수립하였다.",
+   "about_en": "PQ/T hybrids are recommended until 2035 and PQ/PQ hybrids from 2036.",
+   "about_ko": "2035년까지는 PQ/T 하이브리드를, 2036년부터는 PQ/PQ 하이브리드를 권장한다.",
+   "status": "partial",
+   "note_en": "b-tls checks the PQ/T hybrid groups (X25519MLKEM768, SecP256r1MLKEM768, SecP384r1MLKEM1024) on live TLS targets.",
+   "note_ko": "b-tls가 실측 TLS 대상에서 PQ/T 하이브리드 그룹(X25519MLKEM768, SecP256r1MLKEM768, SecP384r1MLKEM1024)을 확인한다.",
+   "evidence": [
+    {
+     "file": "pqlite/tlsprobe.py",
+     "symbols": [
+      "HYBRID_GROUPS"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "PQ/PQ hybrids are not recognised yet."
+   ],
+   "remaining_ko": [
+    "PQ/PQ 하이브리드는 아직 알아보지 못한다."
+   ]
+  },
+  {
+   "id": "S3",
+   "ref": {
+    "table": "4",
+    "page": 22
+   },
+   "quote": null,
+   "about_en": "'Restricted' means an algorithm may only process data already protected, not protect new data.",
+   "about_ko": "'제한'은 보호된 데이터의 처리에만 쓸 수 있고 새로운 데이터의 보호에는 쓸 수 없다는 뜻이다.",
+   "status": "covered",
+   "note_en": "Code that only reads or verifies data written before the migration passes when it is named legacy or allowlisted, while encryption, signing, key generation or file writes inside legacy files count as legacy writes and fail c-classic.",
+   "note_ko": "전환 전에 쓴 데이터를 읽거나 검증하기만 하는 코드는 legacy 이름이나 허용 목록으로 통과하고, legacy 파일 안의 암호화·서명·키 생성·파일 쓰기는 레거시 쓰기로 세어 c-classic을 실패로 만든다.",
+   "evidence": [
+    {
+     "file": "pqlite/rules.py",
+     "symbols": [
+      "LEGACY_REASONS",
+      "\"legacy_write\""
+     ]
+    },
+    {
+     "file": "scan/residue.sh",
+     "symbols": [
+      "LWRITE@@LW-legacy-write@@"
+     ]
+    }
+   ],
+   "remaining_en": [],
+   "remaining_ko": []
+  },
+  {
+   "id": "S4",
+   "ref": {
+    "section": "4.3",
+    "page": 47
+   },
+   "quote": "하이브리드의 보안 강도는 결합한 두 성분 중 해당 시기의 주된 위협에 대응할 수 있는 성분의 안전성으로 정의한다.",
+   "about_en": "A hybrid's strength is that of the component facing the main threat of the time (classical until 2035, PQC from 2036).",
+   "about_ko": "하이브리드의 보안 강도는 그 시기 주된 위협에 대응하는 성분의 안전성이다(2035년까지는 기존 성분, 2036년부터는 양자내성 성분).",
+   "status": "partial",
+   "note_en": "The profile judges the post-quantum component of a hybrid group: ML-KEM-768 in X25519MLKEM768 for nist-cat3 and kpqc, ML-KEM-1024 in SecP384r1MLKEM1024 for cnsa2.",
+   "note_ko": "프로필은 하이브리드 그룹의 양자내성 성분을 판정한다. nist-cat3·kpqc는 X25519MLKEM768의 ML-KEM-768, cnsa2는 SecP384r1MLKEM1024의 ML-KEM-1024다.",
+   "evidence": [
+    {
+     "file": "scan/profiles.json",
+     "symbols": [
+      "X25519MLKEM768",
+      "SecP384r1MLKEM1024"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "The strength of the classical component is not judged."
+   ],
+   "remaining_ko": [
+    "기존 성분의 강도는 판정하지 않는다."
+   ]
+  },
+  {
+   "id": "S5",
+   "ref": {
+    "section": "4.3",
+    "page": 47
+   },
+   "quote": "하이브리드 KEM은 IETF를 중심으로 표준화를 진행 중이며, 관련 초안은 MLKEM768-P256, MLKEM768-X25519, MLKEM1024-P384 세 가지 하이브리드 KEM을 제시한다.",
+   "about_en": "IETF drafts give three hybrid KEMs: MLKEM768-P256, MLKEM768-X25519 and MLKEM1024-P384.",
+   "about_ko": "IETF 초안은 하이브리드 KEM 셋(MLKEM768-P256, MLKEM768-X25519, MLKEM1024-P384)을 제시한다.",
+   "status": "covered",
+   "note_en": "tls_probe knows all three as TLS groups (SecP256r1MLKEM768, X25519MLKEM768, SecP384r1MLKEM1024) and counts a connection on any of them as hybrid.",
+   "note_ko": "tls_probe는 셋 모두를 TLS 그룹(SecP256r1MLKEM768, X25519MLKEM768, SecP384r1MLKEM1024)으로 알고, 그중 하나로 붙으면 하이브리드로 센다.",
+   "evidence": [
+    {
+     "file": "pqlite/tlsprobe.py",
+     "symbols": [
+      "HYBRID_GROUPS"
+     ]
+    }
+   ],
+   "remaining_en": [],
+   "remaining_ko": []
+  }
+ ]
+}

@@ -1,0 +1,538 @@
+{
+ "schema": "pqproof-mapping 1",
+ "id": "nis-pqc-guidebook-draft-2026",
+ "published": true,
+ "checked": "2026-11-21",
+ "applies_from": "0.5.0",
+ "title_en": "PQ-Proof against the NIS PQC migration guidebook for national and public institutions (draft, November 2026)",
+ "title_ko": "국가·공공기관 양자내성암호 전환 가이드북(초안)과 PQ-Proof 대응표",
+ "source": {
+  "title": "국가·공공기관 양자내성암호 전환 가이드북 (Post-Quantum Cryptography Migration Guidebook)",
+  "publisher": "국가정보원·국가보안기술연구소",
+  "edition": "Draft, posted on the National Cyber Security Center notice board on 2026-11-16",
+  "url": "https://www.ncsc.go.kr/api/file/getfile?filename=90089b7f-db57-4265-b204-9b34bb31ff9c",
+  "sha256": "b61db5358b3482dbf34883a3d4f55e82090a9473a65ede0ee48df6763905d358"
+ },
+ "wording_en": "How PQ-Proof addresses each item. It does not say that a product meets the document, and the publisher has not reviewed or endorsed it. The document is a draft, and items may change in the final version.",
+ "wording_ko": "항목마다 PQ-Proof가 어떻게 대응하는지 보인다. 제품이 이 문서를 충족한다는 뜻이 아니며, 발행처가 검토하거나 승인한 표가 아니다. 초안 문서라 확정판에서 항목이 바뀔 수 있다.",
+ "items": [
+  {
+   "id": "G1",
+   "ref": {
+    "section": "3.3, milestone (~2028)",
+    "page": 73
+   },
+   "quote": "모든 국가·공공기관은 주요 암호자산의 현황을 식별하여 인벤토리를 구축하고, 이를 기반으로 전환 우선순위를 설정하여 기관별 전환 로드맵을 수립한다.",
+   "about_en": "By 2028, every institution inventories its main cryptographic assets, sets priorities and writes its roadmap.",
+   "about_ko": "2028년까지 모든 기관이 주요 암호자산 인벤토리를 만들고 우선순위와 전환 로드맵을 정한다.",
+   "status": "partial",
+   "note_en": "It builds a static inventory (CBOM rows) of the code, configuration and key files in both trees and blocks classical rows left in the converted tree.",
+   "note_ko": "두 트리의 코드·설정·키 파일에서 정적 암호 자산 목록(CBOM 행)을 만들고, 고친 판에 남은 기존 공개키 행을 막는다.",
+   "evidence": [
+    {
+     "file": "scan/cbom-scan.sh",
+     "symbols": [
+      "scan_generic()",
+      "keytext_alg()"
+     ]
+    },
+    {
+     "file": "pqlite/scan.py",
+     "symbols": [
+      "def _classify"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "Running systems, network traffic and hardware are not inventoried.",
+    "Priorities and roadmaps are out of scope."
+   ],
+   "remaining_ko": [
+    "실행 중인 시스템·네트워크 트래픽·하드웨어는 목록에 넣지 않는다.",
+    "우선순위와 로드맵 수립은 범위 밖이다."
+   ]
+  },
+  {
+   "id": "G2",
+   "ref": {
+    "section": "4.2 ①",
+    "page": 99
+   },
+   "quote": "암호자산 인벤토리란 기관이 운영하는 시스템과 서비스에서 공개 키 암호가 어디에, 어떤 방식으로, 어떤 알고리즘이 사용되고 있는지를 체계적으로 정리한 목록이다.",
+   "about_en": "The inventory records where, how and with which algorithm public-key cryptography is used.",
+   "about_ko": "인벤토리는 공개 키 암호가 어디에, 어떤 방식으로, 어떤 알고리즘으로 쓰이는지 정리한다.",
+   "status": "partial",
+   "note_en": "Each CBOM row names the algorithm, its use (key exchange, encryption, signature, certificate) and the file and line, for code, configuration and key files in both trees.",
+   "note_ko": "CBOM 행마다 알고리즘, 쓰임(키 교환, 암호화, 서명, 인증서), 파일과 줄을 적는다. 두 트리의 코드·설정·키 파일이 대상이다.",
+   "evidence": [
+    {
+     "file": "scan/cbom-scan.sh",
+     "symbols": [
+      "scan_generic()",
+      "keytext_alg()"
+     ]
+    },
+    {
+     "file": "pqlite/scan.py",
+     "symbols": [
+      "def _classify"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "Running systems, network traffic and hardware are not inventoried."
+   ],
+   "remaining_ko": [
+    "실행 중인 시스템·네트워크 트래픽·하드웨어는 목록에 넣지 않는다."
+   ]
+  },
+  {
+   "id": "G3",
+   "ref": {
+    "section": "4.2 ①",
+    "page": 99
+   },
+   "quote": "현재 공개 키 암호로 암호화된 데이터뿐 아니라, 대칭 키로 암호화된 데이터라도 키 교환 과정에 공개 키 암호(TLS, VPN 등)가 사용된 경우 향후 양자컴퓨터로 해독될 수 있으므로, 장기 보호 데이터와 해당 데이터의 전송·접근 경로를 함께 식별하고 대응해야 한다.",
+   "about_en": "Data protected by symmetric keys is also exposed if a public-key key exchange (TLS, VPN) protected it; find long-lived data and its paths.",
+   "about_ko": "대칭 키로 암호화한 데이터도 키 교환에 공개 키 암호(TLS, VPN)를 썼다면 위험하니, 장기 보호 데이터와 그 경로를 함께 찾는다.",
+   "status": "partial",
+   "note_en": "CBOM rows for key exchange and encryption get priority P1 as directly exposed to harvest-now-decrypt-later, and b-tls checks the key exchange of live TLS targets.",
+   "note_ko": "키 교환·암호화 CBOM 행은 수집 후 복호화(HNDL)에 바로 노출된다고 보고 우선순위 P1로 두고, b-tls가 실측 TLS 대상의 키 교환을 확인한다.",
+   "evidence": [
+    {
+     "file": "scan/cbom-scan.sh",
+     "symbols": [
+      "verdict()",
+      "PR=P1"
+     ]
+    },
+    {
+     "file": "pqlite/tlsprobe.py",
+     "symbols": [
+      "def target_verdict",
+      "OFFER_CLASSICAL"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "What data is held and for how long is not known to PQ-Proof; VPN configurations are found only as files in the tree."
+   ],
+   "remaining_ko": [
+    "어떤 데이터를 얼마나 오래 두는지는 모르고, VPN 설정은 트리 안 파일로만 찾는다."
+   ]
+  },
+  {
+   "id": "G4",
+   "ref": {
+    "section": "4.2 ①",
+    "page": 100
+   },
+   "quote": "암호자산 인벤토리 구축 과정에서는 양자컴퓨터에 취약한 RSA·ECC 등의 공개 키 암호뿐 아니라, 기존 시스템에 남아 있는 SHA-1, DES, TDEA(3DES) 등 현재 보안 용도로 사용하기에 부적절하거나 사용이 제한·폐지된 기존 암호 알고리즘이 함께 발견될 수 있다.",
+   "about_en": "The inventory also turns up unsuitable or withdrawn algorithms such as SHA-1, DES and 3DES.",
+   "about_ko": "인벤토리를 만들다 보면 SHA-1, DES, 3DES처럼 부적절하거나 폐지된 알고리즘도 함께 나온다.",
+   "status": "covered",
+   "note_en": "The CBOM scanner reports MD5, SHA-1, DES, 3DES, RC4 and ECB use as weak, with a replacement (SHA-256 or above, AES-256-GCM).",
+   "note_ko": "CBOM 스캐너가 MD5·SHA-1·DES·3DES·RC4·ECB 사용을 약한 암호로 보고하고 대체안(SHA-256 이상, AES-256-GCM)을 적는다.",
+   "evidence": [
+    {
+     "file": "scan/cbom-scan.sh",
+     "symbols": [
+      "verdict()",
+      "*3des*"
+     ]
+    }
+   ],
+   "remaining_en": [],
+   "remaining_ko": []
+  },
+  {
+   "id": "G5",
+   "ref": {
+    "section": "4.2 ②, static analysis",
+    "page": 110
+   },
+   "quote": "소프트웨어를 실행하지 않고 소스코드, 바이너리, 설정 파일 등을 분석하는 방식으로, 소프트웨어 개발 단계 또는 CI/CD 파이프라인에 통합하여 활용할 수 있다.",
+   "about_en": "Static analysis reads source, binaries and configuration without running the software, and fits into development or CI/CD.",
+   "about_ko": "정적 분석은 소프트웨어를 실행하지 않고 소스코드·바이너리·설정 파일을 분석하며, 개발 단계나 CI/CD에 넣을 수 있다.",
+   "status": "partial",
+   "note_en": "PQ-Proof is static: it reads source, configuration and key files and never runs the code it checks. It runs in CI as a GitHub Action that can report SARIF.",
+   "note_ko": "PQ-Proof는 정적 분석이다. 소스·설정·키 파일을 읽고 검사 대상 코드를 실행하지 않는다. CI에서 SARIF를 낼 수 있는 GitHub Action으로 돈다.",
+   "evidence": [
+    {
+     "file": "scan/cbom-scan.sh",
+     "symbols": [
+      "scan_generic()",
+      "keytext_alg()"
+     ]
+    },
+    {
+     "file": "pqlite/scan.py",
+     "symbols": [
+      "def _classify"
+     ]
+    },
+    {
+     "file": "action.yml",
+     "symbols": [
+      "sarif"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "Binaries are not read."
+   ],
+   "remaining_ko": [
+    "바이너리는 읽지 않는다."
+   ]
+  },
+  {
+   "id": "G6",
+   "ref": {
+    "section": "4.2 ②, CBOM",
+    "page": 110
+   },
+   "quote": "소프트웨어 구성요소의 암호 라이브러리 및 암호기능 사용 현황을 기계 가독형 형식으로 정리한 목록.",
+   "about_en": "A CBOM lists the cryptographic libraries and functions of software components in a machine-readable form.",
+   "about_ko": "CBOM은 소프트웨어 구성요소의 암호 라이브러리와 암호 기능 사용 현황을 기계가 읽을 수 있는 형식으로 정리한 목록이다.",
+   "status": "covered",
+   "note_en": "Each run writes a CBOM for both trees as CSV and Markdown: algorithm, use, location, priority and recommendation per row.",
+   "note_ko": "실행마다 두 트리의 CBOM을 CSV와 Markdown으로 쓴다. 행마다 알고리즘, 쓰임, 위치, 우선순위, 권고가 있다.",
+   "evidence": [
+    {
+     "file": "scan/cbom-scan.sh",
+     "symbols": [
+      "scan_generic()",
+      "keytext_alg()"
+     ]
+    },
+    {
+     "file": "pqlite/scan.py",
+     "symbols": [
+      "def _classify"
+     ]
+    }
+   ],
+   "remaining_en": [],
+   "remaining_ko": []
+  },
+  {
+   "id": "G7",
+   "ref": {
+    "section": "4.2 ②, dynamic analysis",
+    "page": 110
+   },
+   "quote": "도메인별 인증서 암호, 만료일, TLS 버전, 암호 스위트 설정 등을 일괄 확인.",
+   "about_en": "TLS and certificate scanners check certificate algorithms, expiry, TLS versions and cipher suites per domain.",
+   "about_ko": "TLS·인증서 스캐너로 도메인별 인증서 암호, 만료일, TLS 버전, 암호 스위트를 한 번에 확인한다.",
+   "status": "partial",
+   "note_en": "b-tls records, for each live TLS target, the negotiated group and the certificate's key and signature algorithms, from a pinned client.",
+   "note_ko": "b-tls가 고정한 클라이언트로 실측 TLS 대상마다 협상한 그룹과 인증서의 키·서명 알고리즘을 남긴다.",
+   "evidence": [
+    {
+     "file": "pqlite/tlsprobe.py",
+     "symbols": [
+      "def target_verdict",
+      "cert_key"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "Certificate expiry, TLS versions and the full cipher suite list are not reported."
+   ],
+   "remaining_ko": [
+    "인증서 만료일, TLS 버전, 전체 암호 스위트 목록은 보고하지 않는다."
+   ]
+  },
+  {
+   "id": "G8",
+   "ref": {
+    "section": "4.4 ⑤, RFP example",
+    "page": 160
+   },
+   "quote": "가. 암호 구성 현황서(CBOM) : 납품 시스템에 사용된 암호 라이브러리 명칭·버전·알고리즘 목록을 정리하여 제출할 것",
+   "about_en": "A supplier submits a CBOM of the libraries, versions and algorithms in the delivered system.",
+   "about_ko": "공급자는 납품 시스템의 암호 라이브러리 이름·버전·알고리즘 목록(CBOM)을 낸다.",
+   "status": "partial",
+   "note_en": "Run on the delivered source, PQ-Proof writes such a CBOM: algorithms by location and the cryptographic library dependencies, with versions, that it finds in manifests such as requirements.txt, package.json and go.mod.",
+   "note_ko": "납품 소스에 돌리면 그런 CBOM을 쓴다. 위치별 알고리즘과, requirements.txt·package.json·go.mod 같은 의존성 목록에서 찾은 암호 라이브러리와 버전이 들어간다.",
+   "evidence": [
+    {
+     "file": "scan/cbom-scan.sh",
+     "symbols": [
+      "scan_generic()",
+      "keytext_alg()"
+     ]
+    },
+    {
+     "file": "pqlite/scan.py",
+     "symbols": [
+      "def _classify"
+     ]
+    },
+    {
+     "file": "scan/cbom-scan.sh",
+     "symbols": [
+      "h_pydep()"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "Libraries linked into binaries or bundled without a manifest are not listed."
+   ],
+   "remaining_ko": [
+    "바이너리에 링크되거나 의존성 목록 없이 묶인 라이브러리는 목록에 없다."
+   ]
+  },
+  {
+   "id": "G9",
+   "ref": {
+    "section": "3.3 ①, 2035",
+    "page": 76
+   },
+   "quote": "장수명 장비, 폐쇄망 내 특수시스템, 산업제어시스템, 일부 중요 기반 시설의 장비, 물리적 교체 주기가 긴 현장 장비 등은 기술적·운영적 제약으로 인해 2035년까지 전환하기 어려운 경우가 있을 수 있다. 이러한 시스템은 단순히 미전환 상태로 남겨두는 것이 아니라 예외 사유와 잔여 위험을 확인하고, 필요한 보완통제와 향후 전환·교체 계획을 수립하여 지속적으로 관리할 필요가 있다.",
+   "about_en": "Systems that cannot migrate by 2035 are not just left: record the reason and residual risk, add compensating controls and a plan.",
+   "about_ko": "2035년까지 전환하기 어려운 시스템은 그대로 두지 말고 예외 사유와 잔여 위험을 확인하고 보완통제와 향후 계획을 세운다.",
+   "status": "partial",
+   "note_en": "Classical lines kept on purpose pass only through an allowlist entry with a reason, and r-allow asks for a person's review (reviewed_by, reviewed_at).",
+   "note_ko": "일부러 남긴 기존 공개키 줄은 사유가 있는 허용 목록 항목으로만 통과하고, r-allow가 사람 확인(reviewed_by, reviewed_at)을 요구한다.",
+   "evidence": [
+    {
+     "file": "pqlite/allowlist.py",
+     "symbols": [
+      "REVIEW_KEYS"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "Residual risk, compensating controls and replacement plans are not separate fields."
+   ],
+   "remaining_ko": [
+    "잔여 위험, 보완통제, 교체 계획은 따로 적는 칸이 없다."
+   ]
+  },
+  {
+   "id": "G10",
+   "ref": {
+    "section": "3.3 ①, milestone (2035)",
+    "page": 77
+   },
+   "quote": "국가·공공기관은 주요 공개 키 암호 사용 영역의 양자내성암호 전환을 완료하고, 암호자산 인벤토리의 정기적 현행화와 암호 민첩성에 기반한 지속 관리 체계를 수립한다.",
+   "about_en": "By 2035, complete the migration, keep the inventory current and manage it with crypto-agility.",
+   "about_ko": "2035년까지 전환을 마치고, 인벤토리를 정기적으로 현행화하며 암호 민첩성에 기반해 관리한다.",
+   "status": "partial",
+   "note_en": "For one system at a time, PQ-Proof judges whether a migration is complete (c-classic, a-cbom), and a later run on the same tree refreshes its inventory.",
+   "note_ko": "PQ-Proof는 시스템 하나씩 전환이 끝났는지 판정하고(c-classic, a-cbom), 같은 트리를 다시 돌리면 인벤토리가 새로 나온다.",
+   "evidence": [
+    {
+     "file": "pqlite/rules.py",
+     "symbols": [
+      "FAMILIES = "
+     ]
+    },
+    {
+     "file": "scan/residue.sh",
+     "symbols": [
+      "GEN@@G-RSA@@"
+     ]
+    },
+    {
+     "file": "scan/cbom-scan.sh",
+     "symbols": [
+      "scan_generic()",
+      "keytext_alg()"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "No agility measure yet. A candidate is reporting algorithm names fixed in code against names read from configuration (ROADMAP.md)."
+   ],
+   "remaining_ko": [
+    "민첩성 측정은 아직 없다. 후보는 코드에 박힌 알고리즘 이름과 설정에서 읽는 이름을 나눠 보이는 것이다(ROADMAP.md)."
+   ]
+  },
+  {
+   "id": "G11",
+   "ref": {
+    "section": "4.6",
+    "page": 181
+   },
+   "quote": "따라서 '적용'보다 '검증'에 더 많은 시간과 인력을 투입하는 것이 결과적으로 전환 실패를 방지하는 현실적인 접근이다.",
+   "about_en": "Spending more time and people on verification than on applying the change is what prevents failed migrations.",
+   "about_ko": "'적용'보다 '검증'에 더 많은 시간과 인력을 들이는 것이 전환 실패를 막는 현실적인 방법이다.",
+   "status": "covered",
+   "note_en": "PQ-Proof is a verification step: it judges the code before and after with the same rules and writes evidence anyone can recompute with --verify.",
+   "note_ko": "PQ-Proof는 검증 단계를 위한 도구다. 전환 전후 코드를 같은 규칙으로 판정하고, 누구나 --verify로 다시 계산할 수 있는 검증 증적을 남긴다.",
+   "evidence": [
+    {
+     "file": "pqlite/receipt.py",
+     "symbols": [
+      "def compute_id",
+      "def consistency"
+     ]
+    }
+   ],
+   "remaining_en": [],
+   "remaining_ko": []
+  },
+  {
+   "id": "G12",
+   "ref": {
+    "section": "4.6",
+    "page": 181
+   },
+   "quote": "현재 시점에서는 상당 기간 기존 공개 키 암호 체계와 양자내성암호 기반 구조가 병행 운영될 가능성이 높으므로, 하이브리드 환경에서의 상호운용성·성능·운영 절차를 함께 검증하는 것이 중요하다.",
+   "about_en": "In a long hybrid period, verify interoperability, performance and operating procedures together.",
+   "about_ko": "기존 체계와 양자내성암호가 오래 병행될 것이므로 하이브리드 환경의 상호운용성·성능·운영 절차를 함께 검증한다.",
+   "status": "partial",
+   "note_en": "b-tls also connects as an old client (X25519, P-256); with CLASSIC=allow that client must still get in, which checks compatibility during the hybrid period.",
+   "note_ko": "b-tls는 옛 클라이언트(X25519, P-256)로도 접속한다. CLASSIC=allow이면 그 클라이언트가 여전히 붙어야 하므로 병행 기간의 호환성을 확인한다.",
+   "evidence": [
+    {
+     "file": "pqlite/tlsprobe.py",
+     "symbols": [
+      "def target_verdict",
+      "OFFER_CLASSICAL"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "Performance and operating procedures are not checked."
+   ],
+   "remaining_ko": [
+    "성능과 운영 절차는 보지 않는다."
+   ]
+  },
+  {
+   "id": "G13",
+   "ref": {
+    "section": "4.6, box",
+    "page": 185
+   },
+   "quote": "모든 전환 작업 착수 전에 롤백(원상 복구) 절차가 준비되어 있어야 한다.",
+   "about_en": "Every migration task needs a rollback procedure ready before it starts.",
+   "about_ko": "모든 전환 작업은 시작 전에 롤백 절차가 준비돼 있어야 한다.",
+   "status": "gap",
+   "note_en": "PQ-Proof judges the converted tree. It does not check rollback procedures.",
+   "note_ko": "PQ-Proof는 고친 판을 판정한다. 롤백 절차는 보지 않는다.",
+   "evidence": [],
+   "remaining_en": [
+    "Rollback is out of scope."
+   ],
+   "remaining_ko": [
+    "롤백은 범위 밖이다."
+   ]
+  },
+  {
+   "id": "G14",
+   "ref": {
+    "section": "5.1 ①",
+    "page": 202
+   },
+   "quote": "PQ/T 방식은 양자내성암호와 기존 공개 키 암호를 결합하는 방식으로, IETF의 RFC 10024에서는 TLS 1.3에서 ML-KEM과 ECDHE를 결합한 PQ/T 하이브리드 키 합의 방식을 규정하고 있다.",
+   "about_en": "RFC 10024 defines the PQ/T hybrid key agreement of ML-KEM and ECDHE in TLS 1.3.",
+   "about_ko": "RFC 10024는 TLS 1.3에서 ML-KEM과 ECDHE를 결합한 PQ/T 하이브리드 키 합의를 정한다.",
+   "status": "covered",
+   "note_en": "b-tls offers each TLS target the hybrid group X25519MLKEM768 (or SecP384r1MLKEM1024 under cnsa2) alone and requires it to be negotiated.",
+   "note_ko": "b-tls는 TLS 대상마다 하이브리드 그룹 X25519MLKEM768(cnsa2는 SecP384r1MLKEM1024)만 제시하고 그 그룹으로 협상해야 통과로 본다.",
+   "evidence": [
+    {
+     "file": "pqlite/tlsprobe.py",
+     "symbols": [
+      "def target_verdict",
+      "HYBRID_GROUPS"
+     ]
+    }
+   ],
+   "remaining_en": [],
+   "remaining_ko": []
+  },
+  {
+   "id": "G15",
+   "ref": {
+    "section": "5.1 ①",
+    "page": "202-203"
+   },
+   "quote": "다만 암호 협상 과정에 대한 보호가 충분하지 않으면 공격자가 양자내성암호를 지원하는 환경에서도 기존 공개 키 암호가 선택되도록 유도하는 다운그레이드(Downgrade) 공격이 발생할 수 있으므로",
+   "about_en": "Without protection of the negotiation, a downgrade attack can force classical cryptography even where PQC is supported.",
+   "about_ko": "협상 보호가 충분하지 않으면 양자내성암호를 지원하는 환경에서도 기존 공개 키 암호로 끌어내리는 다운그레이드 공격이 생길 수 있다.",
+   "status": "partial",
+   "note_en": "With CLASSIC=deny, b-tls fails a target that still accepts a client offering only classical groups.",
+   "note_ko": "CLASSIC=deny이면 고전 그룹만 제시하는 클라이언트를 아직 받는 대상을 b-tls가 실패로 본다.",
+   "evidence": [
+    {
+     "file": "pqlite/tlsprobe.py",
+     "symbols": [
+      "def target_verdict",
+      "OFFER_CLASSICAL"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "Active downgrade attacks on the negotiation are not tested."
+   ],
+   "remaining_ko": [
+    "협상에 대한 능동 다운그레이드 공격은 시험하지 않는다."
+   ]
+  },
+  {
+   "id": "G16",
+   "ref": {
+    "section": "4.4 ⑤, RFP example",
+    "page": 160
+   },
+   "quote": "나. 암호 민첩성 시험 결과서 : 알고리즘 설정 변경 절차 및 변경 후 정상 동작 여부를 확인한 시험 결과를 제출할 것",
+   "about_en": "A supplier submits a crypto-agility test: how algorithm settings are changed and that the system works afterwards.",
+   "about_ko": "공급자는 알고리즘 설정 변경 절차와 변경 뒤 정상 동작을 확인한 암호 민첩성 시험 결과를 낸다.",
+   "status": "gap",
+   "note_en": "PQ-Proof judges the end state of one migration. It does not measure how easily algorithms can be swapped later.",
+   "note_ko": "PQ-Proof는 한 번의 전환이 끝난 상태를 판정한다. 나중에 알고리즘을 얼마나 쉽게 바꿀 수 있는지는 재지 않는다.",
+   "evidence": [],
+   "remaining_en": [
+    "No agility measure yet. A candidate is reporting algorithm names fixed in code against names read from configuration (ROADMAP.md)."
+   ],
+   "remaining_ko": [
+    "민첩성 측정은 아직 없다. 후보는 코드에 박힌 알고리즘 이름과 설정에서 읽는 이름을 나눠 보이는 것이다(ROADMAP.md)."
+   ]
+  },
+  {
+   "id": "G17",
+   "ref": {
+    "section": "1.2",
+    "page": 9
+   },
+   "quote": "대한민국은 2021년부터 KpqC 공모전을 통해 국내외 공개 검증을 진행하고, 2025년 1월 키 캡슐화 2종과 전자서명 2종 등 총 4종을 한국형 양자내성암호로 선정하였다[7].",
+   "about_en": "Korea selected four KpqC algorithms (two KEMs, two signatures) in January 2025.",
+   "about_ko": "한국은 2025년 1월 키 캡슐화 2종과 전자서명 2종, 모두 4종을 한국형 양자내성암호로 선정했다.",
+   "status": "covered",
+   "note_en": "PROFILE=kpqc counts SMAUG-T, NTRU+, HAETAE and AIMer as expected algorithms, and pqproof impl judge matches a KpqC implementation's answers against pinned reference KAT versions without running it.",
+   "note_ko": "PROFILE=kpqc는 SMAUG-T·NTRU+·HAETAE·AIMer를 기대 알고리즘으로 세고, pqproof impl judge는 KpqC 구현을 실행하지 않고 답안을 고정한 참조판 KAT와 대조한다.",
+   "evidence": [
+    {
+     "file": "scan/profiles.json",
+     "symbols": [
+      "\"kpqc\""
+     ]
+    },
+    {
+     "file": "scan/residue.sh",
+     "symbols": [
+      "E-KPQC-KEM",
+      "E-KPQC-SIG"
+     ]
+    },
+    {
+     "file": "pqlite/impl.py",
+     "symbols": [
+      "def match_versions"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "A KAT match shows agreement with a reference version only, and the KpqC reference versions can still change on the way to a KS standard."
+   ],
+   "remaining_ko": [
+    "KAT 일치는 참조판과 같다는 뜻일 뿐이고, KpqC 참조판은 KS 제정 과정에서 바뀔 수 있다."
+   ]
+  }
+ ]
+}

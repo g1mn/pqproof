@@ -10,7 +10,7 @@ No dates. This is what comes next and why. Issues labelled `good first issue` ar
 
 ## When the KISA PQC migration guide is published
 
-KISA's plan to publish a PQC migration guide in 2026 was [reported in January 2026](https://byline.network/2026/01/28-578/). It is not out yet, so nothing here assumes what it will say. When it is published:
+KISA's plan to publish a PQC migration guide in 2026 was [reported in January 2026](https://byline.network/2026/01/28-578/). It is not out yet, so nothing here assumes what it will say. The draft PQC migration guidebook for national and public institutions from NIS and NSR (posted 2026-11-16) is already mapped, and that table follows its final version. When it is published:
 
 1. `mappings/kisa-pqc-guide.json` gets one item per guide item, quoting the published text, each marked covered, partial or gap. `tools/mapping_draft.py` turns the published PDF into reviewable stubs; `mappings/README.md` has the steps.
 2. A release closes the gaps PQ-Proof can close and the site shows the table.
