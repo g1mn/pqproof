@@ -12,7 +12,11 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 ## [Unreleased]
 
-Ruleset 4 (new name and hash, the same fourteen rule files). Evidence format 4, unchanged.
+**Verdict impact (판정 영향): none.**
+
+## [0.4.0] - 2026-11-21
+
+Tool 0.4.0, ruleset 4 (new name and hash, the same fourteen rule files), evidence format 4 (unchanged). SLH-DSA from FIPS 205 counts as an expected signature at categories 3 and 5, standards mappings in `mappings/`, and a roadmap.
 
 **Verdict impact (판정 영향): yes.** The 39 golden tree cases of 0.3.0 give the same verdicts, check statuses and counts; the only change in them is a new count, `E-SLHDSA`, which is 0 in all of them. Two new mutation cases show what moves:
 

@@ -147,7 +147,8 @@
   {
    "id": "N5",
    "ref": {
-    "section": "4.1.2, Tables 3 and 5",
+    "section": "4.1.2",
+    "table": "3, 5",
     "page": "16-17"
    },
    "quote": null,

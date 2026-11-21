@@ -21,7 +21,7 @@ The site shows them as tables. `tests/test_mappings.py` checks every file.
 
 ## Item fields
 
-`id`, `ref` (section and page in the source), `quote` (a short quote in the source language, or `null` for a table or a list), `about_en` and `about_ko` (the item in a sentence), `status`, `note_en` and `note_ko` (how PQ-Proof addresses it), `evidence` (files and the names in them that do it; the test fails if a name is missing) and `remaining_en` and `remaining_ko`.
+`id`, `ref` (where it is in the source: `section`, `table`, `page`, `note`), `quote` (a short quote in the source language, or `null` for a table or a list), `about_en` and `about_ko` (the item in a sentence), `status`, `note_en` and `note_ko` (how PQ-Proof addresses it), `evidence` (files and the names in them that do it; the test fails if a name is missing) and `remaining_en` and `remaining_ko`.
 
 ## When a document comes out
 

@@ -20,7 +20,7 @@
 ---
 
 ### [Everything is on the site: g1mn.github.io/pqproof](https://g1mn.github.io/pqproof/)
-> Usage, what it judges, public test results, the KpqC implementation check, the KISA AI security manual mapping, limits and release notes, in English and Korean. Built by a contest participant; the Ministry of Science and ICT and KISA have not reviewed or endorsed it.
+> Usage, what it judges, public test results, the KpqC implementation check, PQC standards mappings (NIST IR 8547, the Korean pilot call, and the KISA guide once published), the KISA AI security manual mapping, limits and release notes, in English and Korean. Built by a contest participant; the Ministry of Science and ICT and KISA have not reviewed or endorsed it.
 
 ---
 
