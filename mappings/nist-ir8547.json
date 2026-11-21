@@ -1,0 +1,237 @@
+{
+ "schema": "pqproof-mapping 1",
+ "id": "nist-ir8547",
+ "published": true,
+ "checked": "2026-11-21",
+ "applies_from": "0.4.0",
+ "title_en": "PQ-Proof against NIST IR 8547 (Transition to Post-Quantum Cryptography Standards)",
+ "title_ko": "NIST IR 8547(양자내성암호 표준으로의 전환)과 PQ-Proof 대응표",
+ "source": {
+  "title": "NIST IR 8547, Transition to Post-Quantum Cryptography Standards",
+  "publisher": "National Institute of Standards and Technology",
+  "edition": "Final, October 2026",
+  "url": "https://csrc.nist.gov/pubs/ir/8547/final"
+ },
+ "wording_en": "How PQ-Proof addresses each item. It is not a compliance, conformity or certification finding, and the publisher has not reviewed or endorsed it.",
+ "wording_ko": "항목마다 PQ-Proof가 어떻게 대응하는지 보인다. 준수·부합·인증 판정이 아니며, 발행처가 검토하거나 승인한 표가 아니다.",
+ "items": [
+  {
+   "id": "N1",
+   "ref": {
+    "section": "1",
+    "page": 1
+   },
+   "quote": "Organizations should treat the migration to PQC as a current operational priority, beginning with cryptographic inventories, migration planning, and early deployments of PQC-enabled products and services.",
+   "about_en": "Start with cryptographic inventories.",
+   "about_ko": "암호 자산 목록부터 시작한다.",
+   "status": "partial",
+   "note_en": "It builds a static inventory (CBOM rows) of the code, configuration and key files in both trees and blocks classical rows left in the converted tree.",
+   "note_ko": "두 트리의 코드·설정·키 파일에서 정적 암호 자산 목록(CBOM 행)을 만들고, 고친 판에 남은 기존 공개키 행을 막는다.",
+   "evidence": [
+    {
+     "file": "scan/cbom-scan.sh",
+     "symbols": [
+      "scan_generic()",
+      "keytext_alg()"
+     ]
+    },
+    {
+     "file": "pqlite/scan.py",
+     "symbols": [
+      "def _classify"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "Running systems, network traffic and hardware are not inventoried.",
+    "Migration planning is out of scope."
+   ],
+   "remaining_ko": [
+    "실행 중인 시스템·네트워크 트래픽·하드웨어는 목록에 넣지 않는다.",
+    "전환 계획 수립은 범위 밖이다."
+   ]
+  },
+  {
+   "id": "N2",
+   "ref": {
+    "section": "4",
+    "page": 13
+   },
+   "quote": "NIST will deprecate quantum-vulnerable public-key cryptography after 2030 and disallow its use under NIST standards and guidelines after 2035.",
+   "about_en": "Quantum-vulnerable public-key algorithms are deprecated after 2030 and disallowed after 2035.",
+   "about_ko": "양자에 취약한 공개키 알고리즘은 2030년 뒤 deprecated, 2035년 뒤 disallowed.",
+   "status": "covered",
+   "note_en": "c-classic counts lines of nine classical public-key families (RSA, EC and named curves, OAEP and PKCS#1, classical signature names, JWT algorithms, EdDSA, X25519 and ECDH, DH and DSA) left without a recorded reason, and a-cbom blocks classical CBOM rows. It judges code, configuration and key files, not dates.",
+   "note_ko": "c-classic이 사유 없이 남은 기존 공개키 9계열(RSA, EC·곡선, OAEP·PKCS#1, 기존 서명 이름, JWT 알고리즘, EdDSA, X25519·ECDH, DH·DSA) 줄을 세고, a-cbom이 기존 공개키 CBOM 행을 막는다. 날짜가 아니라 코드·설정·키 파일을 판정한다.",
+   "evidence": [
+    {
+     "file": "pqlite/rules.py",
+     "symbols": [
+      "FAMILIES = "
+     ]
+    },
+    {
+     "file": "scan/residue.sh",
+     "symbols": [
+      "GEN@@G-RSA@@"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "The 2030 and 2035 dates are not encoded; a run judges whether the classical lines are gone."
+   ],
+   "remaining_ko": [
+    "2030·2035 날짜는 규칙에 없다. 기존 공개키 줄이 없어졌는지를 판정한다."
+   ]
+  },
+  {
+   "id": "N3",
+   "ref": {
+    "section": "4.1.2",
+    "page": 17
+   },
+   "quote": "At this time, ML-KEM is the only approved post-quantum key-establishment scheme based on public-key cryptography.",
+   "about_en": "ML-KEM is the only approved post-quantum key establishment.",
+   "about_ko": "승인된 양자내성 키 수립 방식은 ML-KEM 하나다.",
+   "status": "covered",
+   "note_en": "Under the default profile nist-cat3, EXPECT=kem counts only ML-KEM-768 and ML-KEM-1024. The kpqc profile also counts SMAUG-T and NTRU+ and says that NIST has not approved them.",
+   "note_ko": "기본 프로필 nist-cat3에서 EXPECT=kem은 ML-KEM-768·1024만 센다. kpqc 프로필은 SMAUG-T·NTRU+도 세고, NIST 비승인이라고 적는다.",
+   "evidence": [
+    {
+     "file": "scan/profiles.json",
+     "symbols": [
+      "\"nist-cat3\"",
+      "\"kpqc\""
+     ]
+    },
+    {
+     "file": "scan/residue.sh",
+     "symbols": [
+      "E-MLKEM768",
+      "E-KPQC-KEM"
+     ]
+    }
+   ],
+   "remaining_en": [],
+   "remaining_ko": []
+  },
+  {
+   "id": "N4",
+   "ref": {
+    "section": "4.1.2",
+    "page": 17
+   },
+   "quote": "NIST recommends using ML-KEM-768 as the default parameter set, as it provides a large security margin at a reasonable performance cost.",
+   "about_en": "ML-KEM-768 is the recommended default parameter set.",
+   "about_ko": "권장 기본 파라미터는 ML-KEM-768이다.",
+   "status": "covered",
+   "note_en": "nist-cat3 accepts ML-KEM-768 or ML-KEM-1024, and b-tls offers TLS targets the hybrid group X25519MLKEM768 alone.",
+   "note_ko": "nist-cat3은 ML-KEM-768·1024를 받고, b-tls는 TLS 대상에 하이브리드 그룹 X25519MLKEM768만 제시한다.",
+   "evidence": [
+    {
+     "file": "scan/profiles.json",
+     "symbols": [
+      "X25519MLKEM768"
+     ]
+    },
+    {
+     "file": "pqlite/tlsprobe.py",
+     "symbols": [
+      "def target_verdict"
+     ]
+    }
+   ],
+   "remaining_en": [],
+   "remaining_ko": []
+  },
+  {
+   "id": "N5",
+   "ref": {
+    "section": "4.1.2, Tables 3 and 5",
+    "page": "16-17"
+   },
+   "quote": null,
+   "about_en": "Security categories: ML-KEM-512, 768 and 1024 are categories 1, 3 and 5; ML-DSA-44, 65 and 87 are 2, 3 and 5; SLH-DSA 128, 192 and 256 are 1, 3 and 5.",
+   "about_ko": "보안 등급: ML-KEM-512·768·1024는 1·3·5, ML-DSA-44·65·87은 2·3·5, SLH-DSA 128·192·256은 1·3·5.",
+   "status": "covered",
+   "note_en": "Below category 3 is blocked (G-WEAK-PQC, the CBOM scanner and the Java scanner: ML-KEM-512, ML-DSA-44, SLH-DSA 128). EXPECT counts category 3 and above; cnsa2 asks for category 5 only.",
+   "note_ko": "보안 등급 3 미만은 막는다(G-WEAK-PQC, CBOM 스캐너, Java 스캐너: ML-KEM-512, ML-DSA-44, SLH-DSA 128). EXPECT는 등급 3 이상만 세고, cnsa2는 등급 5만 받는다.",
+   "evidence": [
+    {
+     "file": "scan/residue.sh",
+     "symbols": [
+      "GEN@@G-WEAK-PQC@@",
+      "E-SLHDSA"
+     ]
+    },
+    {
+     "file": "scan/cbom-scan.sh",
+     "symbols": [
+      "WEAKPQ="
+     ]
+    },
+    {
+     "file": "pqlite/scan.py",
+     "symbols": [
+      "NIST_WEAK_PQ"
+     ]
+    }
+   ],
+   "remaining_en": [],
+   "remaining_ko": []
+  },
+  {
+   "id": "N6",
+   "ref": {
+    "section": "3.2",
+    "page": 10
+   },
+   "quote": "hybrid solutions are typically expected to be temporary measures that lead to a second transition to cryptographic tools that use only PQC algorithms.",
+   "about_en": "Hybrid is expected to be temporary, followed by a move to PQC-only tools.",
+   "about_ko": "하이브리드는 보통 임시 수단이고, 뒤에 PQC 단독으로 한 번 더 전환한다.",
+   "status": "partial",
+   "note_en": "b-tls asks each target to negotiate the profile's hybrid group alone, and composite signatures are counted apart and need review. A hybrid result counts as finished.",
+   "note_ko": "b-tls는 대상마다 프로필의 하이브리드 그룹만으로 협상하는지 보고, 복합 서명은 따로 세어 검토 필요로 올린다. 하이브리드 결과를 전환 완료로 본다.",
+   "evidence": [
+    {
+     "file": "pqlite/tlsprobe.py",
+     "symbols": [
+      "def target_verdict"
+     ]
+    },
+    {
+     "file": "scan/residue.sh",
+     "symbols": [
+      "RES_COMPOSITE"
+     ]
+    }
+   ],
+   "remaining_en": [
+    "No profile treats hybrid as unfinished. A PQC-only profile is on the roadmap."
+   ],
+   "remaining_ko": [
+    "하이브리드를 미완료로 보는 프로필은 없다. PQC 단독 프로필은 로드맵에 있다."
+   ]
+  },
+  {
+   "id": "N7",
+   "ref": {
+    "section": "1.1",
+    "page": 2
+   },
+   "quote": "ensuring this smooth transition requires building long-term cryptographic agility into organizational infrastructure to allow for seamless updates as post-quantum standards evolve.",
+   "about_en": "Build long-term cryptographic agility.",
+   "about_ko": "장기적인 암호 민첩성을 갖춘다.",
+   "status": "gap",
+   "note_en": "PQ-Proof judges the end state of one migration. It does not measure how easily algorithms can be swapped later.",
+   "note_ko": "PQ-Proof는 한 번의 전환이 끝난 상태를 판정한다. 나중에 알고리즘을 얼마나 쉽게 바꿀 수 있는지는 재지 않는다.",
+   "evidence": [],
+   "remaining_en": [
+    "No agility measure yet. A candidate is reporting algorithm names fixed in code against names read from configuration (ROADMAP.md)."
+   ],
+   "remaining_ko": [
+    "민첩성 측정은 아직 없다. 후보는 코드에 박힌 알고리즘 이름과 설정에서 읽는 이름을 나눠 보이는 것이다(ROADMAP.md)."
+   ]
+  }
+ ]
+}

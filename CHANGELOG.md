@@ -24,6 +24,11 @@ Ruleset 4 (new name and hash, the same fourteen rule files). Evidence format 4, 
 
 Only names with the hash family count (`SLH-DSA-SHA2-192s`, not `SLH-DSA-192s`), and `SPHINCS+` names do not count, because FIPS 205 changed the scheme. The security categories follow NIST IR 8547 (SLH-DSA 128, 192 and 256 are categories 1, 3 and 5).
 
+### Added
+
+- `mappings/`: standards mappings, item by item, with the code that checks each item and a status (covered, partial, gap, not applicable). NIST IR 8547 (final, October 2026) has seven items and the 2026 Korean PQC pilot migration call (Ministry of Science and ICT and KISA) five. `kisa-pqc-guide.json` is empty until KISA publishes its PQC migration guide. `tests/test_mappings.py` checks that every named function or rule exists.
+- `ROADMAP.md`, and a first-contribution section in `CONTRIBUTING.md`.
+
 ### Changed
 
 - The README is short now; usage, verdict rules, public test results, the implementation check, limits and releases are on the site, [g1mn.github.io/pqproof](https://g1mn.github.io/pqproof/), which is rebuilt for 0.3.0 (test numbers, example output, KpqC versions and sources, FAQ).

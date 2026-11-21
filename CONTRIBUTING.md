@@ -2,6 +2,14 @@
 
 Issues and pull requests are welcome. Security problems go through [SECURITY.md](SECURITY.md), not a public issue.
 
+## First contribution
+
+- Pick an issue labelled `good first issue`. Each one names the files to change and how to check the change.
+- Docs, examples, mappings and tests need no rule change. Run `bash prove.sh --unit`, and `python3 -I tests/test_mappings.py` for a mapping.
+- A change to a rule file (the list under "Changing a rule") moves the ruleset and needs the steps there.
+- Not sure where something goes? Open an issue first, in English or Korean.
+- [ROADMAP.md](ROADMAP.md) says what comes next.
+
 ## Check locally
 
 ```bash
@@ -24,6 +32,7 @@ ruff check . && shellcheck -S warning prove.sh build-probe.sh scan/residue.sh sc
 | `src/pqproof/` | the `pqproof` command, the SARIF converter and the external-program check |
 | `schemas/` | JSON Schemas of `receipt.json` and the allowlist, written by `tests/make_schemas.py` |
 | `probe/`, `build-probe.sh` | `tls_probe` source (Go standard library) and its offline build script |
+| `mappings/` | standards mappings: each item of a public document and the code that checks it, tested by `tests/test_mappings.py` (see `mappings/README.md`) |
 | `examples/` | the before and after trees used by the tests, an allowlist, and CI examples for GitHub, GitLab and Jenkins |
 | `tests/` | unit tests, the mutation suite, golden verdicts, older evidence and a snapshot of the orders-edge fixture |
 | `guide/`, `DESIGN.md`, `HISTORY.md` | how to use it, the rules and the evidence format, and the contest story |

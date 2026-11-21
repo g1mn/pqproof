@@ -34,7 +34,7 @@ pqproof --verify <output folder>     # recompute the evidence hash and every fil
 FAIL_ON_REVIEW=1 pqproof impl judge answers.json   # KpqC implementation check
 ```
 
-Guides: [Quick start](https://github.com/g1mn/pqproof/blob/main/guide/quickstart.md) · [Configuration](https://github.com/g1mn/pqproof/blob/main/guide/configuration.md) · [Allowlist](https://github.com/g1mn/pqproof/blob/main/guide/allowlist.md) · [Outputs](https://github.com/g1mn/pqproof/blob/main/guide/outputs.md) · [CI](https://github.com/g1mn/pqproof/blob/main/guide/ci.md) · [Implementation check](https://github.com/g1mn/pqproof/blob/main/guide/impl.md) · [Design](https://github.com/g1mn/pqproof/blob/main/DESIGN.md) · [History](https://github.com/g1mn/pqproof/blob/main/HISTORY.md) · [Changelog](https://github.com/g1mn/pqproof/blob/main/CHANGELOG.md) · [Contributing](https://github.com/g1mn/pqproof/blob/main/CONTRIBUTING.md) · [Security](https://github.com/g1mn/pqproof/blob/main/SECURITY.md)
+Guides: [Quick start](https://github.com/g1mn/pqproof/blob/main/guide/quickstart.md) · [Configuration](https://github.com/g1mn/pqproof/blob/main/guide/configuration.md) · [Allowlist](https://github.com/g1mn/pqproof/blob/main/guide/allowlist.md) · [Outputs](https://github.com/g1mn/pqproof/blob/main/guide/outputs.md) · [CI](https://github.com/g1mn/pqproof/blob/main/guide/ci.md) · [Implementation check](https://github.com/g1mn/pqproof/blob/main/guide/impl.md) · [Design](https://github.com/g1mn/pqproof/blob/main/DESIGN.md) · [History](https://github.com/g1mn/pqproof/blob/main/HISTORY.md) · [Changelog](https://github.com/g1mn/pqproof/blob/main/CHANGELOG.md) · [Contributing](https://github.com/g1mn/pqproof/blob/main/CONTRIBUTING.md) · [Roadmap](https://github.com/g1mn/pqproof/blob/main/ROADMAP.md) · [Standards mappings](https://github.com/g1mn/pqproof/tree/main/mappings) · [Security](https://github.com/g1mn/pqproof/blob/main/SECURITY.md)
 
 ## Related
 
@@ -44,4 +44,4 @@ Guides: [Quick start](https://github.com/g1mn/pqproof/blob/main/guide/quickstart
 
 MIT © 2026 [g1mn](https://github.com/g1mn)
 
-Quotes from the AI Security Threat Mitigation Manual (Ministry of Science and ICT and KISA) on the site and in its data are not covered by MIT; they follow KOGL Type 4 (attribution, non-commercial, no derivatives). Fonts embedded in docs/index.html are under the SIL Open Font License 1.1, and the page includes the license text.
+Quotes from the AI Security Threat Mitigation Manual (Ministry of Science and ICT and KISA) on the site and in its data are not covered by MIT; they follow KOGL Type 4 (attribution, non-commercial, no derivatives). Short quotes from public documents in `mappings/` are not covered by MIT either; each file names its source. Fonts embedded in docs/index.html are under the SIL Open Font License 1.1, and the page includes the license text.
