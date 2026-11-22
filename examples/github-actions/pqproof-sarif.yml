@@ -49,7 +49,7 @@ jobs:
 
       - name: PQ-Proof
         id: pqproof
-        uses: g1mn/pqproof@3100ba6b39ff7c29e8e4498df85b05bcd4c06009  # v0.6.0
+        uses: g1mn/pqproof@f5ab8885e6917e0c22c8bdba67593d297457184d  # v0.7.0
         with:
           original: ${{ runner.temp }}/original
           converted: .
