@@ -1,0 +1,33 @@
+name: Bug
+description: PQ-Proof crashed, gave a wrong check result, or wrote evidence that --verify rejects
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "A security problem (a pass that should fail, evidence that --verify accepts after a change) goes through SECURITY.md, not here. English or Korean is fine."
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: "Output of `pqproof --version`"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: "The command, environment variables, and a small tree if you can share one. Leave out secrets and private code."
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: "The check lines and VERDICT line, or the error"
+      render: text

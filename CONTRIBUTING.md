@@ -2,17 +2,29 @@
 
 English · [한국어](CONTRIBUTING.ko.md)
 
-Issues and pull requests are welcome. Security problems go through [SECURITY.md](SECURITY.md), not a public issue.
+Issues and pull requests are welcome. Security problems go through [SECURITY.md](SECURITY.md), not a public issue. Everyone here follows the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+I aim to give a first reply to every issue and pull request within three days. Questions and ideas can go to [Discussions](https://github.com/g1mn/pqproof/discussions).
 
 ## First contribution
 
 - Pick an issue labelled `good first issue`. Each one names the files to change and how to check the change.
+- To take an issue, leave a comment on it ("I'll take this" is enough) and I will assign it to you. If no pull request comes within two weeks, the issue is open to others again.
 - Docs, examples, mappings and tests need no rule change. Run `bash prove.sh --unit`, and `python3 -I tests/test_mappings.py` for a mapping.
 - A change to a rule file (the list under "Changing a rule") moves the ruleset and needs the steps there.
 - Not sure where something goes? Open an issue first, in English or Korean.
 - [ROADMAP.md](ROADMAP.md) says what comes next.
 
 ## Check locally
+
+For most changes this is enough. Skipped tests are listed apart from passes, and a skip is not a failure here:
+
+```bash
+bash prove.sh --unit
+python3 -I tests/test_mappings.py   # after a mapping change
+```
+
+CI runs everything with `STRICT=1`, where any skipped test fails. Locally that needs three extras: `tls_probe` (`bash build-probe.sh`, Go 1.27 or later), `jsonschema` with the SARIF schema file in `SARIF_SCHEMA`, and pq-verify with two test libraries (`bash tests/pqverify_targets.sh <new folder>` builds them and prints the `PQPROOF_PQV_LIB=` and `PQPROOF_PQV_BAD_LIB=` lines; `.github/workflows/ci.yml` shows the rest). Without them `STRICT=1` exits 1 on the skips, which is expected. Before a rule change, run the full set:
 
 ```bash
 STRICT=1 bash prove.sh --unit && STRICT=1 bash prove.sh --selftest \
@@ -22,7 +34,7 @@ python3 -m pip install --require-hashes -r .github/requirements/lint.txt
 ruff check . && shellcheck -S warning prove.sh build-probe.sh scan/residue.sh scan/cbom-scan.sh && zizmor --offline --min-severity medium .github/workflows/ action.yml
 ```
 
-`STRICT=1` fails on any skipped test. The TLS tests need `tls_probe` (`bash build-probe.sh`, Go 1.27 or later) and the SARIF schema test needs `jsonschema` and the schema file in `SARIF_SCHEMA` (see `.github/workflows/ci.yml`). The weekly `python3 -I tests/code_mutants.py --baseline` checks that the behaviour tests still catch small changes to the rule code.
+The weekly `python3 -I tests/code_mutants.py --baseline` checks that the behaviour tests still catch small changes to the rule code.
 
 ## Layout
 
@@ -79,6 +91,6 @@ A field added, removed, renamed or changed in meaning raises `format_version` in
 
 ## Pull requests
 
-Say in the description whether a verdict can move (the template asks). Keep commits small, with tests. Documentation: usage goes in `guide/`, rules and formats in `DESIGN.md`.
+Say in the description whether a verdict can move (the template asks). Keep commits small, with tests. End each commit subject with `Verdict impact: none` or `Verdict impact: yes`, as the history does, so `git log` shows which commits can move a verdict. Documentation: usage goes in `guide/`, rules and formats in `DESIGN.md`.
 
 When the same review comment comes up twice, turn it into a test or a lint rule whose failure message says what to change, instead of a code comment that asks people to remember. Keep comments for reasons and for standard references (FIPS, RFC, KpqC sections).

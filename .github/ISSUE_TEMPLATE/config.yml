@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security problem
+    url: https://github.com/g1mn/pqproof/security/advisories/new
+    about: Report privately, not in a public issue (SECURITY.md)
+  - name: Questions and ideas
+    url: https://github.com/g1mn/pqproof/discussions
+    about: Ask how to use PQ-Proof or discuss a direction

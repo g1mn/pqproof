@@ -1,0 +1,33 @@
+name: Mapping correction
+description: An item in mappings/ quotes a document wrong, has the wrong status, or misses an item
+labels: [documentation, mappings]
+body:
+  - type: markdown
+    attributes:
+      value: "Mappings tie items of public PQC documents (NIST, NSA, NCSC, EU, NIS) to what PQ-Proof checks. PQC practice is enough to help here; no code is needed. You do not need to read Korean: the English fields (about_en, note_en, remaining_en) carry the same content."
+  - type: input
+    id: item
+    attributes:
+      label: File and item
+      description: "For example mappings/nist-ir8547.json, item 3"
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What is wrong
+      options:
+        - "The quote does not match the source"
+        - "The status (covered, partial, gap, na) is wrong"
+        - "The note or remaining text is wrong or unclear"
+        - "An item of the document is missing"
+        - "The source moved or has a newer edition"
+    validations:
+      required: true
+  - type: textarea
+    id: detail
+    attributes:
+      label: Detail
+      description: "What the source says (page or section), and what the item should say"
+    validations:
+      required: true

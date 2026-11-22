@@ -1,0 +1,38 @@
+name: Missed or wrong rule
+description: Classical public-key code that PQ-Proof does not count, or post-quantum code it counts as classical
+labels: [enhancement, rules]
+body:
+  - type: markdown
+    attributes:
+      value: "Changing a rule moves the ruleset (CONTRIBUTING.md, Changing a rule), so a report with one line that should be caught and one near miss that should not helps most. You do not need to write code or read Korean."
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: "Output of `pqproof --version`"
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - "Missed: classical code not counted"
+        - "False alarm: counted as classical but is not"
+        - "Wrong strength: PQC parameter set judged wrong"
+        - "Other"
+    validations:
+      required: true
+  - type: textarea
+    id: line
+    attributes:
+      label: The code
+      description: "Language, library and the line (or a few lines). Use a made-up example if the real code is private."
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it should be judged differently
+      description: "A standard, library documentation or your experience with the migration"

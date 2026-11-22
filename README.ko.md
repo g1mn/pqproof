@@ -40,6 +40,12 @@ FAIL_ON_REVIEW=1 pqproof impl judge answers.json   # KpqC 구현 검증
 
 안내 문서(기여 방법 말고는 영어): [빠른 시작](https://github.com/g1mn/pqproof/blob/main/guide/quickstart.md) · [설정](https://github.com/g1mn/pqproof/blob/main/guide/configuration.md) · [허용 목록](https://github.com/g1mn/pqproof/blob/main/guide/allowlist.md) · [출력](https://github.com/g1mn/pqproof/blob/main/guide/outputs.md) · [CI](https://github.com/g1mn/pqproof/blob/main/guide/ci.md) · [구현 검증](https://github.com/g1mn/pqproof/blob/main/guide/impl.md) · [설계](https://github.com/g1mn/pqproof/blob/main/DESIGN.md) · [대회 이야기](https://github.com/g1mn/pqproof/blob/main/HISTORY.md) · [변경 기록](https://github.com/g1mn/pqproof/blob/main/CHANGELOG.md) · [기여 방법](https://github.com/g1mn/pqproof/blob/main/CONTRIBUTING.ko.md) · [로드맵](https://github.com/g1mn/pqproof/blob/main/ROADMAP.md) · [기준 대응표](https://github.com/g1mn/pqproof/tree/main/mappings) · [보안 신고](https://github.com/g1mn/pqproof/blob/main/SECURITY.md)
 
+## 기여
+
+이슈, 풀 리퀘스트, 대응표 정정을 환영합니다. [처음 기여하기 좋은 이슈](https://github.com/g1mn/pqproof/contribute)부터 보세요. 대응표 정정은 PQC 전환 경험만으로 할 수 있고, 어디서든 영어로 써도 됩니다.
+
+로컬 확인 방법은 [CONTRIBUTING.ko.md](https://github.com/g1mn/pqproof/blob/main/CONTRIBUTING.ko.md)와 [행동 강령](https://github.com/g1mn/pqproof/blob/main/CODE_OF_CONDUCT.md)을 보세요.
+
 ## 관련 저장소
 
 [PQ-Proof Agent](https://github.com/g1mn/pq-proof)(`g1mn/pq-proof`, Vultr Agent Rush 출품작)는 전환을 실행하는 AI 에이전트이고, 이 저장소는 오프라인 검증 도구입니다. [pq-verify](https://pypi.org/project/pq-verify/)는 NIST PQC 라이브러리를 감사하는 도구이며, `pqproof impl judge --pq-verify`를 쓰면 그 감사 결과가 같은 증적에 들어갑니다.

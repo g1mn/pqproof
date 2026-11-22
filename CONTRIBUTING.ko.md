@@ -2,17 +2,29 @@
 
 [English](CONTRIBUTING.md) · 한국어
 
-이슈와 풀 리퀘스트를 환영합니다. 보안 문제는 공개 이슈로 올리지 말고 [SECURITY.md](SECURITY.md)에 적힌 경로로 알려 주세요.
+이슈와 풀 리퀘스트를 환영합니다. 보안 문제는 공개 이슈로 올리지 말고 [SECURITY.md](SECURITY.md)에 적힌 경로로 알려 주세요. 여기서는 모두 [행동 강령](CODE_OF_CONDUCT.md)을 따릅니다.
+
+이슈와 풀 리퀘스트에는 3일 안에 첫 답을 드리려고 합니다. 질문과 아이디어는 [Discussions](https://github.com/g1mn/pqproof/discussions)에 남겨도 됩니다.
 
 ## 첫 기여
 
 - `good first issue` 라벨이 붙은 이슈에서 하나를 고르세요. 이슈마다 고칠 파일과 확인 방법을 적어 두었습니다.
+- 이슈를 맡으려면 그 이슈에 댓글을 남겨 주세요("I'll take this"면 충분합니다). 담당자로 지정해 드립니다. 2주 안에 풀 리퀘스트가 없으면 다른 분도 맡을 수 있게 다시 엽니다.
 - 문서, 예제, 대응표, 시험은 규칙을 바꾸지 않습니다. `bash prove.sh --unit`을 돌리고, 대응표를 고쳤다면 `python3 -I tests/test_mappings.py`도 돌리세요.
 - 규칙 파일('규칙 바꾸기'의 목록)을 고치면 규칙 묶음이 바뀌므로 그 절의 순서를 따라야 합니다.
 - 어디에 넣을지 모르겠다면 먼저 이슈를 열어 주세요. 영어도 한국어도 괜찮습니다.
 - 앞으로 할 일은 [ROADMAP.md](ROADMAP.md)에 있습니다.
 
 ## 로컬에서 확인하기
+
+대부분의 변경은 이것으로 충분합니다. 건너뛴 시험은 통과와 따로 적히고, 여기서는 건너뜀이 실패가 아닙니다.
+
+```bash
+bash prove.sh --unit
+python3 -I tests/test_mappings.py   # after a mapping change
+```
+
+CI는 모든 시험을 `STRICT=1`로 돌리고, 건너뛴 시험이 하나라도 있으면 실패합니다. 로컬에서 그렇게 하려면 세 가지가 더 필요합니다: `tls_probe`(`bash build-probe.sh`, Go 1.27 이상), `jsonschema`와 `SARIF_SCHEMA`에 둔 SARIF 스키마 파일, 시험 라이브러리 둘을 갖춘 pq-verify(`bash tests/pqverify_targets.sh <new folder>`가 만들고 `PQPROOF_PQV_LIB=`와 `PQPROOF_PQV_BAD_LIB=` 줄을 찍습니다. 나머지는 `.github/workflows/ci.yml` 참고). 이것들이 없으면 `STRICT=1`은 건너뜀 때문에 exit 1로 끝나는데, 그게 정상입니다. 규칙을 바꾸기 전에는 전부 돌립니다.
 
 ```bash
 STRICT=1 bash prove.sh --unit && STRICT=1 bash prove.sh --selftest \
@@ -22,7 +34,7 @@ python3 -m pip install --require-hashes -r .github/requirements/lint.txt
 ruff check . && shellcheck -S warning prove.sh build-probe.sh scan/residue.sh scan/cbom-scan.sh && zizmor --offline --min-severity medium .github/workflows/ action.yml
 ```
 
-`STRICT=1`이면 건너뛴 시험이 하나라도 있을 때 실패합니다. TLS 시험에는 `tls_probe`(`bash build-probe.sh`, Go 1.27 이상)가 필요하고, SARIF 스키마 시험에는 `jsonschema`와 `SARIF_SCHEMA`에 둔 스키마 파일이 필요합니다(`.github/workflows/ci.yml` 참고). 매주 도는 `python3 -I tests/code_mutants.py --baseline`은 규칙 코드를 조금 바꿨을 때 동작 시험이 그 변화를 여전히 잡는지 봅니다.
+매주 도는 `python3 -I tests/code_mutants.py --baseline`은 규칙 코드를 조금 바꿨을 때 동작 시험이 그 변화를 여전히 잡는지 봅니다.
 
 ## 저장소 구성
 
@@ -79,6 +91,6 @@ ruff check . && shellcheck -S warning prove.sh build-probe.sh scan/residue.sh sc
 
 ## 풀 리퀘스트
 
-판정이 바뀔 수 있는지 설명에 적어 주세요(템플릿이 묻습니다). 커밋은 작게, 시험과 함께 올려 주세요. 문서는 사용법이면 `guide/`에, 규칙과 형식이면 `DESIGN.md`에 둡니다.
+판정이 바뀔 수 있는지 설명에 적어 주세요(템플릿이 묻습니다). 커밋은 작게, 시험과 함께 올려 주세요. 커밋 제목 끝에는 지금까지의 기록처럼 `Verdict impact: none`이나 `Verdict impact: yes`를 붙여, `git log`만 봐도 판정이 바뀔 수 있는 커밋이 보이게 합니다. 문서는 사용법이면 `guide/`에, 규칙과 형식이면 `DESIGN.md`에 둡니다.
 
 같은 리뷰 지적이 두 번 나오면, 기억해 달라는 주석을 다는 대신 무엇을 고칠지 실패 메시지로 알려 주는 시험이나 린트 규칙으로 바꿉니다. 주석은 이유와 표준 근거(FIPS, RFC, KpqC 절)에 씁니다.
