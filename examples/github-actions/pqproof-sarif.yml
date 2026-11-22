@@ -48,7 +48,7 @@ jobs:
 
       - name: PQ-Proof
         id: pqproof
-        uses: g1mn/pqproof@dfc8b7cb8a0b833c242a06e8b4456a34a9460674  # v0.5.0
+        uses: g1mn/pqproof@3100ba6b39ff7c29e8e4498df85b05bcd4c06009  # v0.6.0
         with:
           original: ${{ runner.temp }}/original
           converted: .
