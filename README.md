@@ -9,7 +9,7 @@
 <p align="center">
   <a href="https://github.com/g1mn/pqproof/actions/workflows/ci.yml"><img src="https://github.com/g1mn/pqproof/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/g1mn/pqproof/releases"><img src="https://img.shields.io/github/v/release/g1mn/pqproof?color=blue&label=release" alt="Release"></a>
-  <a href="https://pypi.org/project/pqproof/"><img src="https://img.shields.io/pypi/v/pqproof?color=blue" alt="PyPI"></a>
+  <a href="https://pypi.org/project/pqproof/"><img src="https://img.shields.io/pypi/v/pqproof?color=blue&label=pypi" alt="PyPI"></a>
   <a href="https://github.com/g1mn/pqproof/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
   <a href="https://scorecard.dev/viewer/?uri=github.com/g1mn/pqproof"><img src="https://api.scorecard.dev/projects/github.com/g1mn/pqproof/badge" alt="OpenSSF Scorecard"></a>
   <a href="https://www.bestpractices.dev/projects/16982"><img src="https://www.bestpractices.dev/projects/16982/badge" alt="OpenSSF Best Practices"></a>
