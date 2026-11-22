@@ -42,6 +42,8 @@ FAIL_ON_REVIEW=1 pqproof impl judge answers.json   # KpqC implementation check
 
 Guides: [Quick start](https://github.com/g1mn/pqproof/blob/main/guide/quickstart.md) · [Configuration](https://github.com/g1mn/pqproof/blob/main/guide/configuration.md) · [Allowlist](https://github.com/g1mn/pqproof/blob/main/guide/allowlist.md) · [Outputs](https://github.com/g1mn/pqproof/blob/main/guide/outputs.md) · [CI](https://github.com/g1mn/pqproof/blob/main/guide/ci.md) · [Implementation check](https://github.com/g1mn/pqproof/blob/main/guide/impl.md) · [Design](https://github.com/g1mn/pqproof/blob/main/DESIGN.md) · [History](https://github.com/g1mn/pqproof/blob/main/HISTORY.md) · [Changelog](https://github.com/g1mn/pqproof/blob/main/CHANGELOG.md) · [Contributing](https://github.com/g1mn/pqproof/blob/main/CONTRIBUTING.md) · [Roadmap](https://github.com/g1mn/pqproof/blob/main/ROADMAP.md) · [Standards mappings](https://github.com/g1mn/pqproof/tree/main/mappings) · [Security](https://github.com/g1mn/pqproof/blob/main/SECURITY.md)
 
+<p align="center"><img src="https://raw.githubusercontent.com/g1mn/pqproof/main/assets/demo.svg" alt="pqproof judging the bundled before and after trees, then re-checking the evidence" width="100%"></p>
+
 ## Contributing
 
 Issues, pull requests and mapping corrections are welcome; start from [good first issues](https://github.com/g1mn/pqproof/contribute). PQC migration experience is enough for a mapping correction, and English is fine everywhere.

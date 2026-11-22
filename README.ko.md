@@ -42,6 +42,8 @@ FAIL_ON_REVIEW=1 pqproof impl judge answers.json   # KpqC 구현 검증
 
 안내 문서(기여 방법 말고는 영어): [빠른 시작](https://github.com/g1mn/pqproof/blob/main/guide/quickstart.md) · [설정](https://github.com/g1mn/pqproof/blob/main/guide/configuration.md) · [허용 목록](https://github.com/g1mn/pqproof/blob/main/guide/allowlist.md) · [출력](https://github.com/g1mn/pqproof/blob/main/guide/outputs.md) · [CI](https://github.com/g1mn/pqproof/blob/main/guide/ci.md) · [구현 검증](https://github.com/g1mn/pqproof/blob/main/guide/impl.md) · [설계](https://github.com/g1mn/pqproof/blob/main/DESIGN.md) · [대회 이야기](https://github.com/g1mn/pqproof/blob/main/HISTORY.md) · [변경 기록](https://github.com/g1mn/pqproof/blob/main/CHANGELOG.md) · [기여 방법](https://github.com/g1mn/pqproof/blob/main/CONTRIBUTING.ko.md) · [로드맵](https://github.com/g1mn/pqproof/blob/main/ROADMAP.md) · [기준 대응표](https://github.com/g1mn/pqproof/tree/main/mappings) · [보안 신고](https://github.com/g1mn/pqproof/blob/main/SECURITY.md)
 
+<p align="center"><img src="https://raw.githubusercontent.com/g1mn/pqproof/main/assets/demo.svg" alt="pqproof judging the bundled before and after trees, then re-checking the evidence" width="100%"></p>
+
 ## 기여
 
 이슈, 풀 리퀘스트, 대응표 정정을 환영합니다. [처음 기여하기 좋은 이슈](https://github.com/g1mn/pqproof/contribute)부터 보세요. 대응표 정정은 PQC 전환 경험만으로 할 수 있고, 어디서든 영어로 써도 됩니다.
