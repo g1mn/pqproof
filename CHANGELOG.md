@@ -10,8 +10,6 @@ Each release has a **Verdict impact (판정 영향)** line. It says whether the 
 
 Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `receipt.json`, so a receipt from years ago still names the rules that judged it. `--verify` keeps reading older evidence formats.
 
-## [Unreleased]
-
 ## [0.6.0] - 2026-11-22
 
 Tool 0.6.0, ruleset 7, evidence format 4 (unchanged), `tls_probe` 0.5.0. This release follows the NIS and NSR drafts of the cryptographic security guideline and the PQC migration guidebook for national and public institutions (posted 2026-11-16): the four gaps of their mappings that a migration check can close.
