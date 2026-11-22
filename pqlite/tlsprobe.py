@@ -25,7 +25,7 @@ import time
 from dataclasses import asdict, dataclass
 
 PROBE_NAME = "tls_probe"
-PROBE_VERSION = "0.4.0"
+PROBE_VERSION = "0.5.0"
 HERE = pathlib.Path(__file__).resolve().parent.parent
 PROBE_SRC = HERE / "probe"
 BIN_DIR = pathlib.Path(os.environ.get("PROBE_BIN_DIR") or HERE / "bin")  # build-probe.sh 와 같은 PROBE_BIN_DIR
@@ -46,6 +46,8 @@ class Handshake:
     cert_sig: str | None = None
     cert_key: str | None = None
     trust: str | None = None
+    cipher: str | None = None  # 0.5.0 탐침부터(옛 출력·openssl 은 None)
+    cert_not_after: str | None = None  # 잎 인증서 만료 시각(RFC 3339 UTC), 국정원 가이드북 초안 G7
 
     @property
     def kind(self):
@@ -72,7 +74,8 @@ def parse(text):
         return Handshake(ok=ok, group=_field(text, "group") if ok else None, protocol=_field(text, "protocol") if ok else None,
                          error=None if ok else (_field(text, "error") or "handshake failed"), client="tls_probe",
                          cert_sig=_field(text, "cert_sig") if ok else None, cert_key=_field(text, "cert_key") if ok else None,
-                         trust=_field(text, "trust"))
+                         trust=_field(text, "trust"), cipher=_field(text, "cipher") if ok else None,
+                         cert_not_after=_field(text, "cert_not_after") if ok else None)
     cipher = re.search(r"^(?:New|Reused), (\S+), Cipher is (\S+)", text, re.M)
     alert = re.search(r"^.*alert.*$", text, re.M | re.I)
     if not cipher or cipher[2] == "(NONE)":
@@ -84,7 +87,7 @@ def parse(text):
     proto = re.search(r"^\s*Protocol\s*:\s*(\S+)", text, re.M)
     sig = re.search(r"^Peer signature type: (\S+)", text, re.M)
     return Handshake(ok=True, group=group[1] if group else None, protocol=proto[1] if proto else cipher[1],
-                     error=None, client="openssl", cert_sig=sig[1] if sig else None)
+                     error=None, client="openssl", cert_sig=sig[1] if sig else None, cipher=cipher[2])
 
 
 def control_problem(results):

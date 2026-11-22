@@ -1032,10 +1032,10 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
                                  ("classical", tlsprobe.OFFER_CLASSICAL, "고전 그룹" if params.classic == "allow" else "거부")):
             h = t[k]
             tls_rows.append([t["target"], params.tls_via, offered, want, h.get("group") or h.get("error") or "",
-                             h.get("protocol") or "", h.get("cert_sig") or "", h.get("cert_key") or "", t["trust"],
-                             "예" if t["ok"] else "아니오"])
-    art.add("tables/tls.csv", csv_text(["대상", "이름공간", "제시 그룹", "기대", "협상 그룹(또는 오류)", "프로토콜", "cert_sig",
-                                        "cert_key", "신뢰 방식", "통과"], tls_rows))
+                             h.get("protocol") or "", h.get("cipher") or "", h.get("cert_sig") or "", h.get("cert_key") or "",
+                             h.get("cert_not_after") or "", t["trust"], "예" if t["ok"] else "아니오"])
+    art.add("tables/tls.csv", csv_text(["대상", "이름공간", "제시 그룹", "기대", "협상 그룹(또는 오류)", "프로토콜", "암호 스위트", "cert_sig",
+                                        "cert_key", "인증서 만료(UTC)", "신뢰 방식", "통과"], tls_rows))
     art.add("tables/summary.csv", csv_text(["검사", "제목", "판정", "기준", "실제"],
                                            [[c["id"], c["title"], STATUS_KO[c["status"]], c["expected"], c["actual"]]
                                             for c in checks]))

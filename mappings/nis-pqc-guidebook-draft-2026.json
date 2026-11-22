@@ -2,8 +2,8 @@
  "schema": "pqproof-mapping 1",
  "id": "nis-pqc-guidebook-draft-2026",
  "published": true,
- "checked": "2026-11-21",
- "applies_from": "0.5.0",
+ "checked": "2026-11-22",
+ "applies_from": "0.6.0",
  "title_en": "PQ-Proof against the NIS PQC migration guidebook for national and public institutions (draft, November 2026)",
  "title_ko": "국가·공공기관 양자내성암호 전환 가이드북(초안)과 PQ-Proof 대응표",
  "source": {
@@ -225,22 +225,30 @@
    "about_en": "TLS and certificate scanners check certificate algorithms, expiry, TLS versions and cipher suites per domain.",
    "about_ko": "TLS·인증서 스캐너로 도메인별 인증서 암호, 만료일, TLS 버전, 암호 스위트를 한 번에 확인한다.",
    "status": "partial",
-   "note_en": "b-tls records, for each live TLS target, the negotiated group and the certificate's key and signature algorithms, from a pinned client.",
-   "note_ko": "b-tls가 고정한 클라이언트로 실측 TLS 대상마다 협상한 그룹과 인증서의 키·서명 알고리즘을 남긴다.",
+   "note_en": "b-tls records, for each live TLS target, the TLS version, the negotiated group and cipher suite, and the certificate's key, signature algorithm and expiry (from 0.6.0), from a pinned client.",
+   "note_ko": "b-tls가 고정한 클라이언트로 실측 TLS 대상마다 TLS 버전, 협상한 그룹과 암호 스위트, 인증서의 키·서명 알고리즘과 만료일(0.6.0부터)을 남긴다.",
    "evidence": [
     {
      "file": "pqlite/tlsprobe.py",
      "symbols": [
       "def target_verdict",
-      "cert_key"
+      "cert_key",
+      "cert_not_after"
+     ]
+    },
+    {
+     "file": "probe/tls_probe.go",
+     "symbols": [
+      "cert_not_after: %s",
+      "tls.CipherSuiteName"
      ]
     }
    ],
    "remaining_en": [
-    "Certificate expiry, TLS versions and the full cipher suite list are not reported. A candidate in ROADMAP.md."
+    "Only the negotiated cipher suite is reported, not every suite a server accepts."
    ],
    "remaining_ko": [
-    "인증서 만료일, TLS 버전, 전체 암호 스위트 목록은 보고하지 않는다. 후보로 ROADMAP.md 에 있다."
+    "협상한 암호 스위트만 보고하고, 서버가 받는 스위트 전체 목록은 보고하지 않는다."
    ]
   },
   {
@@ -292,22 +300,24 @@
    "quote": "장수명 장비, 폐쇄망 내 특수시스템, 산업제어시스템, 일부 중요 기반 시설의 장비, 물리적 교체 주기가 긴 현장 장비 등은 기술적·운영적 제약으로 인해 2035년까지 전환하기 어려운 경우가 있을 수 있다. 이러한 시스템은 단순히 미전환 상태로 남겨두는 것이 아니라 예외 사유와 잔여 위험을 확인하고, 필요한 보완통제와 향후 전환·교체 계획을 수립하여 지속적으로 관리할 필요가 있다.",
    "about_en": "Systems that cannot migrate by 2035 are not just left: record the reason and residual risk, add compensating controls and a plan.",
    "about_ko": "2035년까지 전환하기 어려운 시스템은 그대로 두지 말고 예외 사유와 잔여 위험을 확인하고 보완통제와 향후 계획을 세운다.",
-   "status": "partial",
-   "note_en": "Classical lines kept on purpose pass only through an allowlist entry with a reason, and r-allow asks for a person's review (reviewed_by, reviewed_at).",
-   "note_ko": "일부러 남긴 기존 공개키 줄은 사유가 있는 허용 목록 항목으로만 통과하고, r-allow가 사람 확인(reviewed_by, reviewed_at)을 요구한다.",
+   "status": "covered",
+   "note_en": "Classical lines kept on purpose pass only through an allowlist entry with a reason, and r-allow asks for a person's review. From 0.6.0 an entry can record residual_risk, compensating_control and replacement_plan; an exception entry without all three gets a warning and r-allow counts it. The fields stay in the evidence's copy of the list and join the review digest.",
+   "note_ko": "일부러 남긴 기존 공개키 줄은 사유가 있는 허용 목록 항목으로만 통과하고, r-allow가 사람 확인을 요구한다. 0.6.0부터 항목에 잔여 위험(residual_risk)·보완통제(compensating_control)·교체 계획(replacement_plan)을 적을 수 있고, 셋을 다 적지 않은 예외 항목은 경고하고 r-allow가 센다. 세 칸은 증적의 목록 사본에 남고 사람 확인 해시에 든다.",
    "evidence": [
     {
      "file": "pqlite/allowlist.py",
      "symbols": [
-      "REVIEW_KEYS"
+      "REVIEW_KEYS",
+      "EXCEPTION_FIELDS",
+      "def exception_gaps"
      ]
     }
    ],
    "remaining_en": [
-    "Residual risk, compensating controls and replacement plans are not separate fields. A candidate is optional fields in the allow list (ROADMAP.md)."
+    "The tool records the fields and cannot judge what they say; a person reviews them."
    ],
    "remaining_ko": [
-    "잔여 위험, 보완통제, 교체 계획은 따로 적는 칸이 없다. 후보는 허용 목록 항목에 선택 칸을 두는 것이다(ROADMAP.md)."
+    "도구는 칸을 남길 뿐 내용을 판단하지 못한다. 사람이 확인한다."
    ]
   },
   {

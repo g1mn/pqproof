@@ -232,6 +232,37 @@ CBOM_COMPOSITE = "복합 서명(PQC+고전)"  # cbom-scan.sh verdict() 가 다�
 CBOM_FLAGS = ("주석", "테스트·예제")
 # cbom-scan.sh verdict() 가 NIST 보안레벨 3 미만 PQC(ML-KEM-512·ML-DSA-44·Kyber512·Dilithium2)에 다는 위협(교차 리뷰 X07). 허용하지 않는다
 CBOM_WEAK_PQC = "보안레벨 3 미만(PQC)"
+# 112비트 하한(국정원 암호 안전성 기준 초안 S1, 규칙 묶음 7): 2036년 전까지 한시 허용하는 기존 공개키 암호는 보안 강도 112비트 이상이다.
+# 키 길이가 적힌 고전 행 가운데 그보다 약한 것(RSA·DSA·DH·ElGamal 2048비트 미만, 224비트 미만 곡선)은 허용 규칙·허용 목록·하이브리드
+# 결합으로 빼지 않고 막는다. 길이가 안 적힌 행은 모른다고 보고 그대로 둔다.
+# ponytail: 이름과 숫자를 맞춘다. 길이를 변수로 넘기는 코드는 못 본다(cbom-scan.sh refine 이 이웃 3줄에서 찾은 숫자만 붙는다)
+FLOOR_REASON = "112비트 미만 고전 키(2036년 전 한시 허용 대상 아님)"
+FLOOR_FF = re.compile(r"(?i)(?<![a-z])(?:rsa|dsa|dhe?|diffie[-_ ]?hellman|elgamal)[-_ :]?([0-9]{3,5})(?![0-9])")
+FLOOR_EC = re.compile(r"(?i)(?<![a-z0-9])(?:secp1[0-9]{2}[rk][12]|sect1[0-9]{2}[rk][12]|prime192v[1-3]|p-?192|nistp192|"
+                      r"brainpoolp1(?:60|92)[rt]1|ec-1[0-9]{2})(?![0-9])")
+# PQ/PQ 하이브리드(국정원 기준 초안 S2, 판정 영향 없음): 같은 줄 코드에 같은 종류(KEM끼리, 서명끼리)의 양자내성 계열이 둘 이상이면
+# 인벤토리 행 사유에 적고 a-cbom 결과 글에 센다. 막거나 허용하는 데는 쓰지 않는다
+PQPQ_REASON = "PQ/PQ 하이브리드(같은 줄 양자내성 성분 둘)"
+PQ_KEM = {"ML-KEM": r"ml[-_]?kem|kyber", "SMAUG-T": r"smaug", "NTRU+": r"ntru(?:\+|_?plus)", "HQC": r"(?<![a-z])hqc",
+          "FrodoKEM": r"frodo", "Classic McEliece": r"mceliece"}
+PQ_SIG = {"ML-DSA": r"ml[-_]?dsa|dilithium", "SLH-DSA": r"slh[-_]?dsa|sphincs", "FN-DSA": r"fn[-_]?dsa|falcon",
+          "HAETAE": r"haetae", "AIMer": r"(?<![a-z])aimer(?![a-z])"}
+
+
+def below_floor(alg):
+    """알고리즘·키 길이 글이 112비트 미만 고전 키를 말하는가(FLOOR_REASON)."""
+    a = alg or ""
+    return bool(FLOOR_EC.search(a)) or any(int(m[1]) < 2048 for m in FLOOR_FF.finditer(a))
+
+
+def pqpq_families(code):
+    """코드 글에 함께 나오는 같은 종류의 양자내성 계열 이름(둘 이상일 때만, 아니면 [])."""
+    low = (code or "").lower()
+    for fam in (PQ_KEM, PQ_SIG):
+        got = [name for name, rx in fam.items() if re.search(rx, low)]
+        if len(got) > 1:
+            return got
+    return []
 
 
 def in_comment(lines, path, line, alg, note):
@@ -448,6 +479,8 @@ def merge_cbom(cbom_rows, scan_rows, lines, terminator, scope="all", allow=None)
                 status = "comment"
             elif threat == CBOM_WEAK_PQC:  # 보안레벨 3 미만 PQC 는 허용 규칙을 쓰지 않는다
                 status = "block"
+            elif below_floor(alg):  # 112비트 미만 고전 키도 허용 규칙을 쓰지 않는다(S1)
+                status, reason = "block", FLOOR_REASON
             else:
                 reason = allow_reason(path, lines.get(path, line) if line else None, alg, lines, line)
                 status = "allow" if reason else "block"
@@ -465,6 +498,8 @@ def merge_cbom(cbom_rows, scan_rows, lines, terminator, scope="all", allow=None)
         if r.kind == "base-image" and r.threat in (scanmod.SHOR, scanmod.UNKNOWN):
             status = "block" if terminator else "check"
             reason = "" if terminator else "시스템 OpenSSL로 TLS를 받는 곳(nginx 등)이 없어 참고만"
+        elif r.threat == scanmod.SHOR and below_floor(r.algorithm):
+            status, reason = "block", FLOOR_REASON
         elif r.threat == scanmod.SHOR:
             reason = allow_reason(r.path, lines.get(r.path, r.line), r.algorithm, lines, r.line)
             status = "allow" if reason else "block"
@@ -485,7 +520,8 @@ def merge_cbom(cbom_rows, scan_rows, lines, terminator, scope="all", allow=None)
         # 이름 규칙(legacy)으로 이미 허용된 줄도 허용 목록이 덮으면 그 항목의 사유로 센다(LEGACY_ 로 시작하는 상수 이름 때문에 먼저
         # 허용된 줄이 있으면 그 줄을 가리킨 허용 목록 항목이 '고전 줄 없음'으로 보였다). 쓰기 경로면 검토 필요로 올린다
         legacy = it["status"] == "allow" and it["reason"] in LEGACY_REASONS
-        if not legacy and (it["status"] != "block" or it["threat"] in (scanmod.WEAK_PQC, CBOM_WEAK_PQC)):  # 보안레벨 3 미만 PQC는 허용하지 않는다
+        if not legacy and (it["status"] != "block" or it["threat"] in (scanmod.WEAK_PQC, CBOM_WEAK_PQC)  # 보안레벨 3 미만 PQC는 허용하지 않는다
+                           or it["reason"] == FLOOR_REASON):  # 112비트 미만 고전 키도(S1)
             continue
         path, line = split_loc(it["loc"])
         text = lines.get(path, line) if line else None
@@ -524,6 +560,13 @@ def merge_cbom(cbom_rows, scan_rows, lines, terminator, scope="all", allow=None)
         else:
             it["status"], it["reason"] = "allow", f"{head}: {e['why'][:140]}"
             e["allowed"].append(it["loc"])
+    for it in items:  # PQ/PQ 하이브리드 표시(S2, 판정 영향 없음)
+        if it["status"] == "info" and it["threat"] in (scanmod.PQC, "안전(PQC)") and not it["reason"]:
+            path, line = split_loc(it["loc"])
+            code = (lines.code(path, line) if line else None)
+            fams = pqpq_families(code if code is not None else code_part((lines.get(path, line) if line else None) or ""))
+            if fams:
+                it["reason"] = f"{PQPQ_REASON}: {' + '.join(fams)}"
     by_loc = {}
     for it in items:
         by_loc.setdefault(it["loc"], set()).add(it["tool"])
@@ -807,6 +850,8 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
           f"공통 파일 {int(MIN_COMMON * 100)}% 이상, 원본 막는 위치·공개키 code·TLS 실측 중 하나 이상, "
           "검사 밖을 가리키는 링크, 코드 파일이 든 건너뛴 폴더, 크기 한도를 넘은 코드 파일 없음", in_act)
     block_locs = sorted({it["loc"] for it in cbom_items["fixed"] if it["status"] == "block"})
+    floor_locs = {it["loc"] for it in cbom_items["fixed"] if it["status"] == "block" and it["reason"] == FLOOR_REASON}
+    pqpq_locs = {it["loc"] for it in cbom_items["fixed"] if it["reason"].startswith(PQPQ_REASON)}
     what = "남은 고전 키 교환" if kex else "막는 위치"
     check("a-cbom", "고친 판에 남은 고전 키 교환 0(SCOPE=kex)" if kex else "고친 판 CBOM에 막는 위치 0", a_status,
           f"{what} 0, cbom-scan 정상 종료",
@@ -816,6 +861,8 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
           + f" · 확인 {cf['check']}"
           + (f" · 검토 필요 {cf['review']}(" + review_kinds(cbom_items["fixed"]) + ")" if cf["review"] else "")
           + (f" · 범위 밖 {cf['out_of_scope']}" if kex else "") + ("" if cf["cbom_scan_ok"] else " · cbom-scan 실패")
+          + (f" · 112비트 미만 고전 키 {len(floor_locs)}곳(허용 안 함)" if floor_locs else "")
+          + (f" · PQ/PQ 하이브리드 {len(pqpq_locs)}곳" if pqpq_locs else "")
           + (" · REQUIRE_RESOLVED=1" if cf.get("unresolved") and getattr(params, "require_resolved", False) else ""))
     if single:
         check("b-weakening", "TLS 약화 수정 없음", "na", "deny 0", "단일 트리 점검: 바뀐 파일이 없어 보지 않음")
@@ -950,16 +997,22 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
                 + (" 외" if len(name_only) > 4 else "") if name_only else "")
     exp_txt = (f"만료된 항목 {len(expired)}건: " + ", ".join(f"#{e['n']} {e['expires_at']}" for e in expired[:4])
                + (" 외" if len(expired) > 4 else "") if expired else "")
+    gaps = allow.exception_gaps() if hasattr(allow, "exception_gaps") else []  # 예외 관리 칸이 빈 exception 항목(G9, 판정 영향 없음)
+    for e in gaps:
+        miss = ", ".join(k for k in al.EXCEPTION_FIELDS if k not in (e.get("exception") or {}))
+        allow.warnings.append(f"#{e['n']} kind exception 인데 {miss} 칸이 없다(남겨 둔 곳의 잔여 위험·보완통제·교체 계획, guide/allowlist.md)")
+    n_exc = sum(1 for e in live if e["kind"] == "exception")
+    exc_txt = (f"예외 항목 {n_exc}건 중 잔여 위험·보완통제·교체 계획을 다 적은 것 {n_exc - len(gaps)}건" if n_exc else "")
     if not live and not unused and not name_only:
         check("r-allow", title, "na", need, "줄을 허용한 항목 0" if allow_path else "허용 목록 없음")
     elif not pending and not unused and not name_only and not expired:
-        check("r-allow", title, "pass", need, f"허용 항목 {len(live)}건 모두 사람 확인")
+        check("r-allow", title, "pass", need, " · ".join(x for x in (f"허용 항목 {len(live)}건 모두 사람 확인", exc_txt) if x))
     else:
         head = (f"허용 항목 {len(live)}건 중 사람 확인 전 {len(pending)}건: "
                 + ", ".join(f"#{e['n']} {al.CONTROL.sub(' ', e['where'])[:48]}" for e in pending[:4]) + (" 외" if len(pending) > 4 else "")
                 if pending else (f"허용 항목 {len(live)}건 모두 사람 확인" if live else ""))
         check("r-allow", title, "fail" if params.require_review else "review", need,
-              " · ".join(x for x in (head, unused_txt, exp_txt, name_txt) if x))
+              " · ".join(x for x in (head, unused_txt, exp_txt, name_txt, exc_txt) if x))
     verdict = derive_verdict(checks)
     return checks, verdict, pending, unused, live, name_only
 

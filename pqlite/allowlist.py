@@ -61,7 +61,10 @@ CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f​-‏ -‮⁠-⁩﻿]")
 IN_EFFECT = ("allowed", "review")  # 줄을 실제로 판정에서 뺀 항목(사람 확인 전을 세는 대상)
 OTHER_MAX = 400  # 항목마다 증적에 적는 원본 덮은 줄 목록 길이(수는 따로 다 센다)
 DIGEST_FIELDS = ("where", "what", "why", "kind")  # reviewed_digest 가 덮는 칸(사람이 읽은 글)
-DIGEST_OPTIONAL = ("expires_at", "approval_ref")  # 적혀 있을 때만 digest 에 드는 칸(교차 리뷰 X31, 옛 목록의 digest 는 그대로)
+# 예외 관리 칸(국정원 전환 가이드북 초안 G9, 규칙 묶음 7): 2035년까지 바꾸기 어려운 곳을 남길 때 잔여 위험·보완통제·교체 계획을 적는다.
+# 판정은 바꾸지 않는다. kind exception 인 허용 항목에 셋 중 빈 칸이 있으면 경고하고 r-allow 결과 글에 센다
+EXCEPTION_FIELDS = ("residual_risk", "compensating_control", "replacement_plan")
+DIGEST_OPTIONAL = ("expires_at", "approval_ref") + EXCEPTION_FIELDS  # 적혀 있을 때만 digest 에 드는 칸(교차 리뷰 X31, 옛 목록의 digest 는 그대로)
 ENTRY_FIELDS = DIGEST_FIELDS + DIGEST_OPTIONAL + ("reviewed_by", "reviewed_at", "reviewed_digest")
 TOP_FIELDS = ("unconverted", "items", "entries", "reviewed_by", "reviewed_at", "reviewed_digest")
 # kind 로 쓰는 낱말. false-positive 는 고전 암호가 아닌데 이름이 걸린 줄(오탐), exception 은 위험을 받아들인 예외, vendored 는 받아 둔
@@ -387,9 +390,17 @@ class AllowList:
 
     def _terms(self, n, raw, e, warns):
         """만료·결재 칸과 모르는 칸·kind(교차 리뷰 X31). 칸 꼴이 틀려도 항목은 그대로 두고 경고한다."""
-        e["expires_at"], e["approval_ref"], e["expired"] = None, None, False
+        e["expires_at"], e["approval_ref"], e["expired"], e["exception"] = None, None, False, {}
         if not isinstance(raw, dict):
             return
+        for k in EXCEPTION_FIELDS:
+            v = raw.get(k)
+            if v is None:
+                continue
+            if isinstance(v, str) and v.strip() and not CONTROL.search(v):
+                e["exception"][k] = v.strip()[:500]
+            else:
+                warns.append(f"#{n} {k} 가 비었거나 글이 아니거나 제어 문자가 있다: 읽지 않는다")
         extra = sorted(k for k in raw if k not in ENTRY_FIELDS)
         if extra:
             warns.append(f"#{n} 모르는 칸 {', '.join(map(str, extra))[:120]} 은 읽지 않는다(guide/allowlist.md)")
@@ -558,6 +569,11 @@ class AllowList:
     def expired(self):
         """줄을 판정에서 뺀 항목(허용·검토 필요) 중 expires_at 이 지난 것. finish() 뒤에 부른다."""
         return [e for e in self.entries if e["status"] in IN_EFFECT and e.get("expired")]
+
+    def exception_gaps(self):
+        """줄을 판정에서 뺀 kind exception 항목 가운데 잔여 위험·보완통제·교체 계획 중 빈 칸이 있는 것(G9). finish() 뒤에 부른다."""
+        return [e for e in self.entries if e["status"] in IN_EFFECT and e["kind"] == "exception"
+                and any(k not in (e.get("exception") or {}) for k in EXCEPTION_FIELDS)]
 
     def unreviewed(self):
         """줄을 판정에서 뺀 항목(허용·검토 필요) 중 받아들인 사람 확인 칸이 없는 것. finish() 뒤에 부른다."""

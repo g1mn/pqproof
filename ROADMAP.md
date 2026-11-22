@@ -8,6 +8,15 @@ No dates. This is what comes next and why. Issues labelled `good first issue` ar
 - Standards mappings in [`mappings/`](mappings/): NIST IR 8547 and the 2026 Korean PQC pilot migration call, item by item, with the code that does each check.
 - A first-contribution section in CONTRIBUTING.md and this roadmap.
 
+## 0.6.0
+
+The four gaps in the NIS and NSR draft mappings (posted 2026-11-16) that a migration check can close:
+
+- A 112-bit key floor: a classical key whose stated size is below 112-bit security is never allowed (draft guideline S1).
+- PQ/PQ hybrid lines are marked in the inventory (draft guideline S2).
+- Allowlist entries can record residual risk, compensating control and replacement plan (draft guidebook G9).
+- The TLS report adds the cipher suite and the certificate expiry (draft guidebook G7).
+
 ## When the KISA PQC migration guide is published
 
 KISA's plan to publish a PQC migration guide in 2026 was [reported in January 2026](https://byline.network/2026/01/28-578/). It is not out yet, so nothing here assumes what it will say. The draft PQC migration guidebook for national and public institutions from NIS and NSR (posted 2026-11-16) is already mapped, and that table follows its final version. When it is published:
@@ -21,10 +30,6 @@ KISA's plan to publish a PQC migration guide in 2026 was [reported in January 20
 - A PQC-only profile that does not count a hybrid result as finished (NIST IR 8547, section 3.2).
 - An agility signal: algorithm names fixed in code against names read from configuration (NIST IR 8547, section 1.1).
 - Export the inventory in the CycloneDX CBOM format (EU PQC roadmap, section 6.2).
-- Exception records in the allow list: optional residual risk, compensating control and replacement plan fields for systems that cannot move by 2035 (NIS draft guidebook, G9).
-- A key size floor: flag classical keys below 112-bit security (NIS draft cryptographic security guideline, S1).
-- PQ/PQ hybrids (an ML-KEM pair with a KpqC KEM, for example) as a recognised result (NIS draft guideline, S2).
-- TLS report detail: certificate expiry and the negotiated TLS version next to the group (NIS draft guidebook, G7).
 - LMS and XMSS (NIST SP 800-208) as expected firmware signatures under the cnsa2 profile (CNSA 2.0 FAQ).
 - More mappings as public documents come out, the KISA guide first.
 - FIPS 206 (FN-DSA) and FIPS 207 (HQC) once NIST publishes them.

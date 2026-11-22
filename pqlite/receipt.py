@@ -1562,15 +1562,18 @@ def body_sections(r):
                + (f" · <code>{_e(_few(j['fixed']['tests']['lines'], 8))}</code>" if j["fixed"]["tests"]["lines"] else "") + "</p>"
                if "tests" in j["fixed"] else "") + "</section>")
     t = r["tls"]
+    # 인증서 만료 칸(0.6.0, tls_probe 0.5.0 의 cert_not_after)은 값이 있는 증적에만 그린다(옛 receipt.html 이 그대로 맞게)
+    expiry = any((x.get("hybrid") or {}).get("cert_not_after") for x in t["targets"])
     tls_rows = [[f"<code>{_e(x['target'])}</code>", _e(x.get("trust")), _hs(x.get("hybrid")), _hs(x.get("classical")),
-                 _e((x.get("hybrid") or {}).get("cert_sig")), _e((x.get("hybrid") or {}).get("cert_key")),
-                 _hs(x.get("openssl")), _status("pass" if x.get("ok") else "fail"), _e("; ".join(x.get("why", [])))]
+                 _e((x.get("hybrid") or {}).get("cert_sig")), _e((x.get("hybrid") or {}).get("cert_key"))]
+                + ([_e((x.get("hybrid") or {}).get("cert_not_after"))] if expiry else [])
+                + [_hs(x.get("openssl")), _status("pass" if x.get("ok") else "fail"), _e("; ".join(x.get("why", [])))]
                 for x in t["targets"]]
     parts.append("<h2>(b) TLS</h2><section>" +
                  (f"<p>TLS 서버 신호 {len(t['signals'])}곳" + (": " + ", ".join(f"<code>{_e(s)}</code>" for s in t["signals"][:12]) if t["signals"] else "") +
                   f" · 실행 위치 {_e(t['via'])}" + (f" · 대조 문제: {_e(t['control_problem'])}" if t["control_problem"] else "") + "</p>")
-                 + _table(["대상", "신뢰", "하이브리드 전용 제시", "옛 클라이언트(X25519,P-256)", "cert_sig", "cert_key",
-                           "OpenSSL 3.5 교차", "판정", "이유"], tls_rows) + "</section>")
+                 + _table(["대상", "신뢰", "하이브리드 전용 제시", "옛 클라이언트(X25519,P-256)", "cert_sig", "cert_key"]
+                          + (["인증서 만료(UTC)"] if expiry else []) + ["OpenSSL 3.5 교차", "판정", "이유"], tls_rows) + "</section>")
     w = r["weakening"]
     parts.append("<h2>TLS 약화 수정</h2><section>" + _table(["거부(deny)"], [[_e(d)] for d in w["deny"]]) +
                  _table(["검토(review)", "규칙", "전", "후", "근거", "사유"],

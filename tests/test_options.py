@@ -214,6 +214,31 @@ class Runs(unittest.TestCase):
     OLD = ("package demo.sealer;\n\nfinal class Old {\n    static Object kf() throws Exception {\n"
            "        return java.security.KeyFactory.getInstance(\"RSA\");\n    }\n}\n")
 
+    def exc_entry(self, **more):
+        today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+        return dict({"where": self.LEGACY_LINE + ":5", "why": "a partner reads only RSA until its 2029 upgrade", "kind": "exception",
+                     "reviewed_by": "j.kim", "reviewed_at": today}, **more)
+
+    def test_exception_fields_are_kept_counted_and_do_not_change_the_verdict(self):
+        """국정원 전환 가이드북 초안 G9(0.6.0): 예외 항목의 잔여 위험·보완통제·교체 계획."""
+        fx = self.tree("exc", {self.LEGACY_LINE: self.OLD})
+        r, _, _ = self.run_("exc", fx, ALLOW=self.allow("exc", [self.exc_entry(residual_risk="harvest now, decrypt later on one link",
+                                                                               replacement_plan=7)]))
+        ra = next(c for c in r["checks"] if c["id"] == "r-allow")
+        self.assertEqual((r["verdict"], ra["status"], r["allowlist"]["entries"][0]["status"]), ("pass", "pass", "allowed"))
+        self.assertIn("예외 항목 1건 중 잔여 위험·보완통제·교체 계획을 다 적은 것 0건", ra["actual"])
+        w = r["allowlist"]["warnings"]
+        self.assertTrue(any("compensating_control, replacement_plan 칸이 없다" in x for x in w), w)
+        self.assertTrue(any("replacement_plan 가 비었거나 글이 아니거나" in x for x in w), w)
+        full = self.exc_entry(residual_risk="harvest now, decrypt later on one link", compensating_control="link inside the VPN only",
+                              replacement_plan="ML-KEM hybrid when the partner upgrades, 2029-06")
+        r, _, _ = self.run_("exc-full", fx, ALLOW=self.allow("exc-full", [full]))
+        ra = next(c for c in r["checks"] if c["id"] == "r-allow")
+        self.assertIn("다 적은 것 1건", ra["actual"])
+        self.assertFalse(any("칸이 없다" in x for x in r["allowlist"]["warnings"]))
+        kept = json.loads(pathlib.Path(self.tmp, "out-exc-full", "artifacts", "allow-list.json").read_text(encoding="utf-8"))
+        self.assertEqual(kept["unconverted"][0]["replacement_plan"], full["replacement_plan"])  # 증적의 목록 사본에 남는다
+
     def test_expired_entry_needs_review_and_fails_under_require_review(self):
         fx = self.tree("expired", {self.LEGACY_LINE: self.OLD})
         today = datetime.datetime.now(datetime.timezone.utc).date()

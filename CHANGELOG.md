@@ -12,10 +12,19 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 ## [Unreleased]
 
-**Verdict impact (판정 영향): none.**
+## [0.6.0] - 2026-11-22
+
+Tool 0.6.0, ruleset 7, evidence format 4 (unchanged), `tls_probe` 0.5.0. This release follows the NIS and NSR drafts of the cryptographic security guideline and the PQC migration guidebook for national and public institutions (posted 2026-11-16): the four gaps of their mappings that a migration check can close.
+
+**Verdict impact (판정 영향): yes, in one narrow case.** A classical key whose stated size is below 112-bit security now blocks even where an allow rule, a hybrid or an allowlist entry took it out of the blocking count before: RSA, DSA, DH or ElGamal under 2048 bits, or a curve under 224 bits. The 41 golden tree cases keep every verdict, check status and count (only the ruleset name in the golden file moved). Everything else in this release adds records and text, not verdicts.
 
 ### Added
 
+- 112-bit key floor (ruleset 7, NIS guideline draft S1: classical public-key cryptography stays allowed until 2036 only at 112-bit strength). `below_floor` in `pqlite/rules.py` reads the size from the algorithm text, which `cbom-scan.sh` fills from the line and the three below it. Such a row blocks with the reason `112비트 미만 고전 키`, and `a-cbom` counts the locations. A row without a size is left as it was.
+- PQ/PQ hybrids (NIS guideline draft S2: recommended from 2036). A post-quantum row whose code line names two post-quantum families of the same kind (ML-KEM with SMAUG-T, NTRU+ or HQC; ML-DSA with SLH-DSA, FN-DSA, HAETAE or AIMer) gets the reason `PQ/PQ 하이브리드` in `tables/cbom-*.csv`, and `a-cbom` counts them. No verdict effect.
+- Exception records in the allowlist (NIS guidebook draft G9): optional `residual_risk`, `compensating_control` and `replacement_plan` per entry. They join the review digest when set and stay in the evidence's copy of the list (`artifacts/allow-list.json`). An `exception` entry in use with any of them missing gets a warning, and `r-allow` says how many exception entries have all three. No verdict effect. `schemas/unconverted.schema.json` lists them.
+- TLS report detail (NIS guidebook draft G7): `tls_probe` 0.5.0 prints the negotiated cipher suite (`cipher`) and the leaf certificate's expiry (`cert_not_after`, RFC 3339 UTC). Both go to `tls.targets[]` and `tables/tls.csv`, and the expiry gets a column in the TLS table of `receipt.html` when a run has it. `b-tls` judges as before. The OpenSSL cross-check records the cipher suite too.
+- The two NIS mappings follow: G9, S1 and S2 are now covered, G7 stays partial (only the negotiated suite, not every suite a server accepts).
 - OpenSSF Scorecard (`.github/workflows/scorecard.yml`, actions pinned by commit, write permissions only in its one job) with a README badge, and CodeQL code scanning (`.github/workflows/codeql.yml`: Python, Go for `probe/`, and the workflows; test fixtures, examples and the site are left out in `.github/codeql/codeql-config.yml`).
 - ClusterFuzzLite (`.clusterfuzzlite/`, `.github/workflows/cflite.yml`) fuzzes the two parsers that read files from other people: the `impl judge` answer file (`tests/fuzz/answer_fuzzer.py`: never raises, reports a problem instead) and `receipt.json` under `--verify` (`tests/fuzz/evidence_json_fuzzer.py`: raises only ValueError). Pull requests that touch them get a short run, and a weekly run fuzzes longer.
 - Fuzz tests for `tls_probe` (`probe/fuzz_test.go`: the `-groups` list parser and the filter for names printed from peers). CI runs their seeds with `go test`; the release binaries are unchanged, since `go build` leaves test files out.

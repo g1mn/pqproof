@@ -87,6 +87,9 @@ ENTRY = {
                         "description": "ISO 8601 date or date and time"},
         "reviewed_digest": {"type": ["string", "null"], "pattern": "^[0-9a-f]{16}$",
                             "description": "first 16 hex digits printed by the run; optional on an entry"},
+        "residual_risk": {"type": "string", "minLength": 1, "description": "risk that remains while the place stays (0.6.0)"},
+        "compensating_control": {"type": "string", "minLength": 1, "description": "what limits that risk meanwhile (0.6.0)"},
+        "replacement_plan": {"type": "string", "minLength": 1, "description": "when and how the place gets replaced (0.6.0)"},
     },
 }
 

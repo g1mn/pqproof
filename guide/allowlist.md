@@ -21,9 +21,10 @@ A migration often keeps a few classical lines on purpose: a reader for data seal
 - `what`: free text.
 - `expires_at` (optional, `YYYY-MM-DD`): after this date the entry still allows its lines, but `r-allow` needs review, or fails under `REQUIRE_REVIEW=1`, and the verdict line counts it. Thirty days before, the run warns. A value that is not a `YYYY-MM-DD` date gets a warning and is ignored, so the entry never expires; check the warnings, even under `REQUIRE_REVIEW=1`.
 - `approval_ref` (optional): a ticket or approval number, copied to the evidence.
+- `residual_risk`, `compensating_control`, `replacement_plan` (optional, from 0.6.0): for a place that cannot move yet, the risk that remains, what limits it meanwhile, and when and how it gets replaced. They stay in the copy of the list in the evidence (`artifacts/allow-list.json`). An `exception` entry in use with any of the three missing gets a warning, and `r-allow` counts how many exception entries have all three. The verdict does not change.
 - Any other field gets a warning, because the tool does not read it.
 
-Some lines never need an entry and some never get one. An X25519 or ECDH line in the same function as ML-KEM code counts as the classical half of a hybrid. A line in a `Legacy*.java` file, or one with `legacy` in its code (not in a comment), is allowed when neither it nor the three lines below it writes (no key generation, signing, token or certificate signing, or encryption). ML-KEM-512 and ML-DSA-44 are never allowed.
+Some lines never need an entry and some never get one. An X25519 or ECDH line in the same function as ML-KEM code counts as the classical half of a hybrid. A line in a `Legacy*.java` file, or one with `legacy` in its code (not in a comment), is allowed when neither it nor the three lines below it writes (no key generation, signing, token or certificate signing, or encryption). ML-KEM-512 and ML-DSA-44 are never allowed, and from 0.6.0 neither is a classical key whose stated size is below 112-bit security: RSA, DSA, DH or ElGamal under 2048 bits, or a curve under 224 bits (P-192, secp160, sect163).
 
 ## Review it
 
@@ -38,7 +39,7 @@ A person who read an entry adds `reviewed_by` (a name or account) and `reviewed_
  "unconverted": [ ... ]}
 ```
 
-Adding or editing an entry changes the digest, and every entry under the top pair then counts as not reviewed again. `expires_at` and `approval_ref` are part of the digest when they are set, so moving a date needs a new review. With `REVIEW_MAX_AGE_DAYS=N`, a review older than N days counts as missing.
+Adding or editing an entry changes the digest, and every entry under the top pair then counts as not reviewed again. `expires_at`, `approval_ref` and the three exception fields are part of the digest when they are set, so moving a date or rewriting a plan needs a new review. With `REVIEW_MAX_AGE_DAYS=N`, a review older than N days counts as missing.
 
 Without `REQUIRE_REVIEW=1`, unreviewed entries keep the pass and show on the verdict line (`VERDICT=PASS (2 allowed entries not yet reviewed by a person)`). With `REQUIRE_REVIEW=1` they fail `r-allow`. Use `1` for real reviews.
 

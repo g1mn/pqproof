@@ -1,6 +1,6 @@
 // from g1mn/pq-proof 7b7803f (MIT)
 // 수정: connect에 -tofu(CA 파일 없을 때 첫 인증서를 믿고 다시 검증), cert_sig·cert_key·cert_chain·trust 줄,
-//       cert에 -alg=mldsa65, 버전 0.4.0, 머리 주석 한국어.
+//       cert에 -alg=mldsa65, 0.5.0에서 cipher·cert_not_after 줄, 머리 주석 한국어.
 //
 // tls_probe: 버전을 고정한 TLS 클라이언트(와 참조 서버). Go 표준 라이브러리만 쓰고 CGO 없이 정적으로 빌드한다
 // (build-probe.sh). 같은 바이너리를 맥·리눅스 컨테이너 어디서나 쓰므로, 실패가 나오면 옛 클라이언트가
@@ -12,8 +12,8 @@
 //	tls_probe connect -groups=X25519MLKEM768 (-ca=PATH | -tofu=PATH) -servername=NAME [-wait=10s] HOST:PORT
 //	tls_probe listeners -ports=8443,9443 [-wait=10s]
 //
-// connect는 "key: value" 줄(probe, target, offered, trust, result, protocol, group, cert_sig, cert_key,
-// cert_chain, error)을 찍고, 핸드셰이크가 되면 0, 안 되면 1, 사용법 오류면 2로 끝난다.
+// connect는 "key: value" 줄(probe, target, offered, trust, result, protocol, group, cipher, cert_sig, cert_key,
+// cert_chain, cert_not_after(RFC 3339 UTC), error)을 찍고, 핸드셰이크가 되면 0, 안 되면 1, 사용법 오류면 2로 끝난다.
 //
 // -tofu=PATH: CA 파일을 구할 수 없을 때(서비스가 실행 중에 자기 CA를 만드는 경우) 쓴다. 먼저 인증서 사슬만 읽는
 // 접속을 한 번 하고(이 접속은 판정에 쓰지 않는다), 사슬의 마지막 인증서를 PATH에 PEM으로 쓴 뒤, 그 인증서를 신뢰
@@ -51,7 +51,7 @@ import (
 	"time"
 )
 
-const version = "0.4.0"
+const version = "0.5.0"
 
 var groupNames = map[string]tls.CurveID{
 	"X25519MLKEM768":     tls.X25519MLKEM768,
@@ -333,10 +333,12 @@ func connect(args []string) int {
 		return fail(err)
 	}
 	st := conn.ConnectionState()
-	fmt.Printf("result: connected\nprotocol: %s\ngroup: %s\n", tls.VersionName(st.Version), groupName(st.CurveID))
+	fmt.Printf("result: connected\nprotocol: %s\ngroup: %s\ncipher: %s\n", tls.VersionName(st.Version), groupName(st.CurveID),
+		tls.CipherSuiteName(st.CipherSuite))
 	if len(st.PeerCertificates) > 0 {
 		leaf := st.PeerCertificates[0]
-		fmt.Printf("cert_sig: %s\ncert_key: %s\ncert_chain: %d\n", leaf.SignatureAlgorithm, keyName(leaf), len(st.PeerCertificates))
+		fmt.Printf("cert_sig: %s\ncert_key: %s\ncert_chain: %d\ncert_not_after: %s\n", leaf.SignatureAlgorithm, keyName(leaf),
+			len(st.PeerCertificates), leaf.NotAfter.UTC().Format(time.RFC3339))
 	}
 	return 0
 }
