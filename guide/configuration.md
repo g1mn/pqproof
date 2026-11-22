@@ -26,7 +26,7 @@ Settings are environment variables, the same for `pqproof` and `bash prove.sh`. 
 | `RESIDUE` | `scan/residue.sh` | a service-specific copy with site rules; the run is then named `<ruleset>+modified` |
 | `CBOM_SCAN` | `scan/cbom-scan.sh` | another CBOM scanner (also `+modified`) |
 | `EXTRA_EV` | none | other files to store with the evidence, such as a test log |
-| `EV_NAME` | `<output folder>.txt` | file name recorded as `ev` in `deck.json` |
+| `EV_NAME` | `<output folder>.txt` | name of the file where you save the console output yourself (PQ-Proof does not write it); recorded as `ev` in `deck.json` and, when set, in `tables/report.md` |
 
 Tool settings: `PYTHON` (the interpreter `prove.sh` uses), `STRICT=1` (tests fail on any skipped case), `PQPROOF_HOME` (another checkout of the tool files).
 

@@ -219,6 +219,7 @@ class CliTest(unittest.TestCase):
                                env={"PATH": "", "PQPROOF_HOME": cli.tool_root()}, timeout=120)
         self.assertEqual(alone.returncode, 0, alone.stdout + alone.stderr)
         self.assertIn("all checks pass", alone.stdout)
+        self.assertIn("evidence intact; the verdict it records: pass", alone.stdout)  # 0.7.0: 종료 0 은 판정 통과가 아니다
         if shutil.which("bash"):
             via_bash = subprocess.run(["bash", os.path.join(cli.tool_root(), "prove.sh"), "--verify", gold],
                                       capture_output=True, text=True, env=dict(os.environ, PYTHON=sys.executable), timeout=120)
@@ -263,6 +264,14 @@ class CliTest(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             self.assertEqual(json.loads(pathlib.Path(p).read_text(encoding="utf-8"))["params"], ["haetae/mode2"])
 
+    def test_examples_prints_the_bundled_folder(self):
+        # 0.7.0: python3 -c 'import pqproof ...' 줄은 venv 를 켜지 않으면 다른 파이썬을 불러 빈 경로를 냈다
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            self.assertEqual(cli.main(["examples"]), 0)
+        ex = buf.getvalue().strip()
+        self.assertTrue(os.path.isdir(os.path.join(ex, "classic")) and os.path.isdir(os.path.join(ex, "pqc")), ex)
+
     def test_doctor_reports_the_kat_list(self):
         ok, line = cli.kat_status(cli.tool_root())
         self.assertTrue(ok, line)
@@ -297,9 +306,12 @@ class CliTest(unittest.TestCase):
         with contextlib.redirect_stdout(out):
             self.assertEqual(cli.main(["--env"]), 0)
         text = out.getvalue()
-        self.assertTrue(text.startswith("# prove.sh"), text[:80])
-        for name in ("OUT=", "ALLOW=", "REQUIRE_REVIEW=", "TLS_TARGETS="):
+        # 0.7.0: 영어 설정 목록(guide/configuration.md 의 표)이 먼저, prove.sh 머리 주석(한국어)이 뒤에 나온다
+        self.assertTrue(text.startswith("PQ-Proof settings"), text[:80])
+        self.assertIn("# prove.sh", text)
+        for name in ("OUT=", "ALLOW=", "REQUIRE_REVIEW=", "TLS_TARGETS=", "FAIL_ON_REVIEW="):
             self.assertIn(name, text)
+        self.assertIn("REQUIRE_REVIEW=0  # 1: an allowlist entry without a person's review", text)
 
     def test_sarif_subcommand_refuses_missing_folder(self):
         missing = os.path.join(tempfile.gettempdir(), "no-such-pqproof-out-" + hashlib.sha256(b"x").hexdigest()[:8])

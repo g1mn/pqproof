@@ -77,6 +77,23 @@ RULES = {
                "검사가 있거나 검사 범위 전체를 검증하지 못했다"),
 }
 NO_LOCATION = ("a-input", "b-tls", "c-expect", "i-kpqc", "i-nist")
+# GitHub code scanning 이 경고를 심각도로 거르게 하는 값(0.7.0, properties.security-severity, 0~10 문자열)
+SEVERITY = {"a-cbom": "8.0", "c-classic": "8.0", "b-weakening": "7.5", "r-review": "7.0", "b-tls": "6.0", "i-kpqc": "6.0",
+            "i-nist": "6.0", "r-allow": "5.0", "c-expect": "4.0", "a-input": "3.0"}
+# --lang en 에서 CBOM 용도 칸(한국어)을 영어로(0.7.0). 다 바꾸지 못한 글은 메시지에서 뺀다(한국어를 섞지 않는다)
+USE_EN = (("키교환", "key exchange"), ("키 교환", "key exchange"), ("암호화", "encryption"), ("복호", "decryption"), ("서명", "signature"),
+          ("인증서", "certificate"), ("개인키", "private key"), ("공개키", "public key"), ("키생성", "key generation"),
+          ("키 생성", "key generation"), ("프로토콜", "protocol"), ("라이브러리", "library"), ("협상", "negotiation"),
+          ("스위트", "suite"), ("엔드포인트", "endpoint"), ("파일", "file"), ("짝", "pair"), ("설정", "configuration"),
+          ("키스토어", "keystore"), ("토큰", "token"), ("해시", "hash"), ("검증", "verification"), ("·", "/"))
+HANGUL = re.compile("[\u1100-\u11ff\u3130-\u318f\uac00-\ud7a3]")
+
+
+def en_terms(text):
+    """CBOM 용도 글을 영어로. 한국어가 남으면 빈 글(메시지에서 뺀다)."""
+    for ko, en in USE_EN:
+        text = text.replace(ko, en)
+    return "" if HANGUL.search(text) else text
 # c-classic 이 세는 residue 규칙: 공개키 9계열, 보안레벨 3 미만 PQC, 레거시 쓰기(LWRITE), 서비스별 SITE.
 # G-AES128 같은 다른 GEN 규칙은 표에만 나오고 판정에 안 들어가므로 결과로 내지 않는다
 COUNTED_GEN = {"G-RSA", "G-EC", "G-CURVE", "G-OAEP-PKCS1", "G-CLASSIC-SIG", "G-JWT-ALG", "G-EDDSA", "G-X25519", "G-DH-DSA", "G-WEAK-PQC"}
@@ -319,11 +336,12 @@ class Builder:
             path, line, _ = split_loc(loc)
             algs = sorted({(r.get("알고리즘") or r.get("algorithm") or "").strip() for r in rs} - {""})
             uses = sorted({(r.get("용도·종류") or r.get("use") or "").strip() for r in rs} - {""})
+            uses_en = sorted({en_terms(u) for u in uses} - {""}) if self.lang != "ko" else uses
             snippet = next((m[1] for r in rs for m in [re.search(r"`(.+)`", r.get("비고") or "")] if m), None)
             why = next(((r.get("허용·참고 사유") or "").strip() for r in rs if (r.get("허용·참고 사유") or "").strip()), "")
             if kind == "block":
-                text = self.t(f"Classical public key still used here: {', '.join(algs) or 'unknown algorithm'} ({', '.join(uses)}). "
-                              "Quantum computers break it (Shor).",
+                text = self.t(f"Classical public key still used here: {', '.join(algs) or 'unknown algorithm'}"
+                              + (f" ({', '.join(uses_en)})" if uses_en else "") + ". Quantum computers break it (Shor).",
                               f"고전 공개키가 남았다: {', '.join(algs) or '알고리즘 미상'} ({', '.join(uses)}). 쇼어 알고리즘으로 깨진다.")
                 self.add("a-cbom", lv, text, path, line, snippet=snippet, key=",".join(algs) + "|" + (snippet or ""))
             elif why.startswith("복합 서명"):  # 규칙 묶음 2(교차 리뷰 X26)
@@ -469,7 +487,10 @@ class Builder:
             rules.append({"id": rid, "name": name, "shortDescription": {"text": self.t(en, ko)},
                           "fullDescription": {"text": en if self.lang != "ko" else ko},
                           "helpUri": HELP_URI, "defaultConfiguration": {"level": "error" if rid in ("a-cbom", "b-weakening", "c-classic", "i-kpqc", "i-nist") else "warning"},
-                          "properties": {"tags": ["security", "cryptography", "post-quantum"]}})
+                          "help": {"text": self.t(en, ko) + f" See {HELP_URI}",
+                                   "markdown": f"**{rid}**: {self.t(en, ko)}. [What each check means]({HELP_URI})"},
+                          "properties": {"tags": ["security", "cryptography", "post-quantum"],
+                                         **({"security-severity": SEVERITY[rid]} if rid in SEVERITY else {})}})
         counts = {}
         for st in self.status.values():
             counts[st] = counts.get(st, 0) + 1

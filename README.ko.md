@@ -33,7 +33,9 @@
 ```bash
 pip install pqproof
 pqproof doctor                       # 찾은 것과 빠진 것을 보여 줌
-pqproof <original> <converted>       # 두 트리를 판정하고 검증 증적 폴더를 씀
+ex=$(pqproof examples)               # 번들 예제(전환 전·후 트리)
+pqproof "$ex/classic" "$ex/pqc"       # 해 보기: RSA·ECDSA를 ML-KEM-768·ML-DSA-65로 바꾼 판, 통과
+pqproof <original> <converted>       # 내 두 트리를 판정하고 검증 증적 폴더를 씀
 pqproof --verify <output folder>     # 증적 해시와 모든 파일 해시를 다시 계산
 FAIL_ON_REVIEW=1 pqproof impl judge answers.json   # KpqC 구현 검증
 ```

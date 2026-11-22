@@ -21,7 +21,7 @@ Judging needs Python 3.9 or later (standard library only), bash 3.2 or later and
 The wheel carries the example trees. `examples/classic` is a small Java and Python "sealer" that wraps a data key with RSA-OAEP and signs with ECDSA P-256; `examples/pqc` is the same code moved to ML-KEM-768 (with AES-256-GCM) and ML-DSA-65.
 
 ```bash
-ex=$(python3 -c 'import os, pqproof; print(os.path.join(os.path.dirname(pqproof.__file__), "_tool", "examples"))')
+ex=$(pqproof examples)                 # the bundled example folder (from 0.7.0; `pqproof doctor` prints it too)
 pqproof "$ex/classic" "$ex/pqc"        # pass, exit 0
 pqproof "$ex/classic" "$ex/classic"    # nothing migrated: fail, exit 1
 ```
@@ -31,18 +31,18 @@ From a clone, `bash prove.sh examples/classic examples/pqc` runs the same files.
 While it runs, stderr shows the applied settings and one line per step. The console then prints one line per check, in Korean, and the verdict:
 
 ```
-[a-input] 통과  공통 파일 5/5 · 원본 막는 위치 13 · 원본 공개키 code 17 · TLS 실측 대상 0
+[a-input] 통과  공통 파일 6/6 · 원본 막는 위치 13 · 원본 공개키 code 17 · TLS 실측 대상 0
 [a-cbom] 통과  막는 위치 0곳(원본 13) · 허용 0 · 주석·테스트 0 · 확인 0
-[b-weakening] 통과  deny 0 · 본 파일 4
+[b-weakening] 통과  deny 0 · 본 파일 5
 [b-tls] 해당 없음  TLS 서버·클라이언트 신호 0
 [c-classic] 통과  공개키 code 0(원본 17) · 보안레벨 3 미만 0 · 레거시 쓰기 0
 [c-expect] 통과  E-MLKEM768 2 + E-MLKEM1024 0 = 2 · E-MLDSA65 2 + E-MLDSA87 0 + E-SLHDSA 0 = 2
 [r-review] 통과  0건
 [r-allow] 해당 없음  허용 목록 없음
-VERDICT=PASS  receipt_id=b17355b74d9f…
+VERDICT=PASS  receipt_id=bbe7de154351…
 ```
 
-통과 is pass, 실패 fail, 해당 없음 not applicable, 검토 필요 needs review, 미판정 undecided. Only pass counts as passed: a check that could not run stays visible as not applicable or undecided.
+The check lines are in Korean (the tool was built for a Korean contest); the verdict line, `--verify` and SARIF (`--lang en`) are in English. 통과 is pass, 실패 fail, 해당 없음 not applicable, 검토 필요 needs review, 미판정 undecided. What each check means: a-input (the two trees are the same service before and after), a-cbom (no blocking classical location left in the converted tree's CBOM), b-weakening (no TLS setting weakened by the change), b-tls (a live server negotiates the hybrid group, only with `TLS_TARGETS`), c-classic (no classical public-key code left without a reason), c-expect (the expected ML-KEM and ML-DSA use is there), r-review (no verification call removed), r-allow (allowlist entries reviewed by a person). Only pass counts as passed: a check that could not run stays visible as not applicable or undecided.
 
 ## Look at the result
 

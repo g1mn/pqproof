@@ -1230,12 +1230,35 @@ def verify(root):
     return out
 
 
+def _tool_at_least(r, want):
+    """증적을 쓴 도구 판이 want(정수 튜플) 이상인가. '0.7.0'·'0.7.0+local' 꼴만 읽고 못 읽으면 아니라고 본다."""
+    m = re.match(r"([0-9]+)\.([0-9]+)\.([0-9]+)", str(r.get("tool_version") or ""))
+    return bool(m) and tuple(int(x) for x in m.groups()) >= want
+
+
+# 검사마다 한 줄 영어 설명(0.7.0 README.txt). 콘솔·표의 검사 줄은 한국어라 영어 독자가 폴더만 받고도 뜻을 알게 한다
+CHECK_MEANING = (
+    ("a-input", "the two trees look like the same service before and after, and the original has something to migrate"),
+    ("a-cbom", "the converted tree's CBOM has no blocking classical location"),
+    ("b-weakening", "the change did not weaken a TLS setting"),
+    ("b-tls", "a live server negotiates the hybrid group (only with TLS_TARGETS)"),
+    ("c-classic", "no classical public-key code left without a reason, no weak PQC, no legacy write"),
+    ("c-expect", "the expected ML-KEM and ML-DSA (or profile) use is present"),
+    ("r-review", "no signature or certificate verification call was removed"),
+    ("r-allow", "every allowlist entry in use was reviewed by a person"),
+)
+
+
 def render_readme(r):
-    """결과 폴더 안내(README.txt, 형식 3). 먼저 볼 파일, 다시 확인하는 법, 폴더를 넘기기 전에 볼 것. receipt.json 에서만 만든다."""
+    """결과 폴더 안내(README.txt, 형식 3). 먼저 볼 파일, 다시 확인하는 법, 폴더를 넘기기 전에 볼 것. receipt.json 에서만 만든다.
+    0.7.0 부터 쓴 증적은 스키마 이름(receipt-v<형식>)·안내 문서 주소를 바로잡고 검사 설명을 더한다. 그 전 판이 쓴 폴더는 --verify 가
+    바이트로 다시 맞추므로 예전 글 그대로 그린다(0.3.0~0.6.0 은 형식 4 인데 v3 라고 적었다)."""
     meta = r.get("deck_meta") or {}
     verify_cmd = meta.get("verify_cmd") or "pqproof --verify <this folder>"
     if is_impl(r):
         return _impl_readme(r, verify_cmd)
+    if _tool_at_least(r, (0, 7, 0)):
+        return _readme_070(r, verify_cmd)
     lines = [
         f"PQ-Proof {r.get('tool_version', '')} result folder. Verdict: {verdict_text(r, en=True)}",
         f"판정: {verdict_text(r)} · 증적 해시(receipt_id): {r['receipt_id']}",
@@ -1255,6 +1278,45 @@ def render_readme(r):
         "  artifacts/ holds the raw scanner output with source lines, and in/ holds unpacked zip inputs.",
         "  Paths on this machine are recorded in receipt.json. Read guide/outputs.md before handing the folder over.",
         "  artifacts/ 에는 소스 줄이 든 스캐너 원문이, in/ 에는 푼 zip 입력이 있다. 넘기기 전에 확인한다.",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def _readme_070(r, verify_cmd):
+    ver = r.get("tool_version", "")
+    tag = re.match(r"[0-9]+\.[0-9]+\.[0-9]+", str(ver))
+    base = f"https://github.com/g1mn/pqproof/blob/{'v' + tag[0] if tag else 'main'}"
+    fmt = format_version(r)
+    checks = {c["id"]: c["status"] for c in r.get("checks") or []}
+    lines = [
+        f"PQ-Proof {ver} result folder. Verdict: {verdict_text(r, en=True)}",
+        f"판정: {verdict_text(r)} · 증적 해시(receipt_id): {r['receipt_id']}",
+        "",
+        "Open first / 먼저 볼 것",
+        "  receipt.html          the verification evidence as one page (사람이 볼 것)",
+        f"  receipt.json          the verification evidence for programs (기계가 읽을 것, schema: {base}/schemas/receipt-v{fmt}.schema.json)",
+        "  tables/report.md      a summary to paste into a document (문서에 붙일 표)",
+        "  tables/cbom-fixed.csv every cryptographic location in the fixed tree with its status",
+        "  tables/cbom-*.cdx.json the same CBOM rows as CycloneDX 1.6, for tools that read that format",
+        "",
+        "Checks / 검사 (status: " + ", ".join(f"{k} {v}" for k, v in checks.items()) + ")",
+    ]
+    lines += [f"  {cid:<12} {text}" for cid, text in CHECK_MEANING if cid in checks]
+    lines += [
+        "  Only 'pass' counts as passed. Not applicable and undecided are not passes; 'review' keeps the verdict and is listed for a person.",
+        "  검사 줄은 한국어다: 통과 pass, 실패 fail, 해당 없음 not applicable, 검토 필요 review, 미판정 undecided.",
+        "",
+        "Check again / 다시 확인",
+        f"  {verify_cmd}",
+        "  Adding, removing or editing any file in this folder makes the check fail (README.txt included).",
+        "  폴더 안 파일을 더하거나 지우거나 고치면 다시 확인이 실패한다.",
+        "",
+        "Before sharing / 넘기기 전에",
+        "  artifacts/ holds the raw scanner output with source lines, and in/ holds unpacked zip inputs.",
+        f"  Paths on this machine are recorded in receipt.json. See {base}/guide/outputs.md before handing the folder over.",
+        "  artifacts/ 에는 소스 줄이 든 스캐너 원문이, in/ 에는 푼 zip 입력이 있다. 넘기기 전에 확인한다.",
+        f"  What PQ-Proof does not check: {base}/DESIGN.md#limits",
         "",
     ]
     return "\n".join(lines)
@@ -1594,6 +1656,36 @@ def _words(r):
     return LEGACY_WORDS.get(LEGACY_NOTES.get(r["note"]) or ("v2" if r["note"] == NOTE_V2 else None), WORDS)
 
 
+def _strict_params(r):
+    """0.7.0 부터 쓴 증적: 판정 엄격도를 정하는 설정(옛 receipt.html 은 바이트로 다시 맞추므로 그 전 판에는 그리지 않는다)."""
+    if not _tool_at_least(r, (0, 7, 0)):
+        return ""
+    p = r["params"]
+    return "<br>" + " · ".join(f"{k}={_e(v)}" for k, v in (
+        ("MODE", p.get("mode", "pair")), ("PROFILE", p.get("profile", "")), ("REQUIRE_REVIEW", int(bool(p.get("require_review")))),
+        ("FAIL_ON_REVIEW", int(bool(p.get("fail_on_review")))), ("REQUIRE_RESOLVED", int(bool(p.get("require_resolved"))))))
+
+
+def _how_to_read(r):
+    """0.7.0 부터 쓴 증적: 영어로 읽는 법(검사 뜻, 상태 낱말, 검토 필요가 남은 통과의 뜻). 그 전 판에는 그리지 않는다."""
+    if not _tool_at_least(r, (0, 7, 0)):
+        return ""
+    st = {c["id"]: c["status"] for c in r.get("checks") or []}
+    rev = [k for k, v in st.items() if v == "review"]
+    lead = ("The verdict is pass, and " + ", ".join(rev) + " need a person's review: review keeps the verdict, so look at those rows "
+            "below before relying on the pass (with FAIL_ON_REVIEW=1 the run exits 5)." if r["verdict"] == "pass" and rev else
+            f"The verdict is {verdict_text(r, en=True)}.")
+    rows = "".join(f"<tr><td><b>{_e(cid)}</b></td><td>{_e(STATUS_EN.get(st[cid], st[cid]))}</td><td>{_e(text)}</td></tr>"
+                   for cid, text in CHECK_MEANING if cid in st)
+    return (f'<details lang="en"><summary>How to read this page (English)</summary><p>{_e(lead)} The check lines below are in Korean: '
+            "통과 pass, 실패 fail, 해당 없음 not applicable, 검토 필요 needs review, 미판정 undecided. Only pass counts as passed.</p>"
+            f'<table><thead><tr><th>Check</th><th>Status</th><th>What it means</th></tr></thead><tbody>{rows}</tbody></table>'
+            '<p class="muted">What PQ-Proof does not check: DESIGN.md, Limits.</p></details>')
+
+
+STATUS_EN = {"pass": "pass", "fail": "fail", "na": "not applicable", "review": "needs review", "undecided": "undecided"}
+
+
 def render_html(r):
     """receipt.html. 증적에서 온 값은 모두 이스케이프한다. 아무것도 불러오지 않고 자기 산출물에만 링크한다."""
     if is_impl(r):
@@ -1615,8 +1707,8 @@ def render_html(r):
 <header><h1>{w['h1']} {verdict}</h1><button id="theme" type="button">라이트</button></header>
 <section><div class="grid">{inputs}
 <div><div class="muted">시작, 끝(UTC)</div><span class="nowrap">{_e(r['started_at'])}</span><br><span class="nowrap">{_e(r['finished_at'])}</span></div>
-<div><div class="muted">매개변수</div>CLASSIC={_e(r['params']['classic'])} · EXPECT={_e(','.join(r['params']['expect']) or '없음')} · SCOPE={_e(r['params'].get('scope', 'all'))} · TLS={_e(r['params']['tls_via'])}</div>
-{basis}</div><p><span class="muted">receipt_id</span><br>{_short(r['receipt_id'])}</p>
+<div><div class="muted">매개변수</div>CLASSIC={_e(r['params']['classic'])} · EXPECT={_e(','.join(r['params']['expect']) or '없음')} · SCOPE={_e(r['params'].get('scope', 'all'))} · TLS={_e(r['params']['tls_via'])}{_strict_params(r)}</div>
+{basis}</div>{_how_to_read(r)}<p><span class="muted">receipt_id</span><br>{_short(r['receipt_id'])}</p>
 <p class="muted">{_e(r['note'])}</p><pre>{w['verify']}</pre>
 <p class="muted">판정은 아래 도구 출력과 종료 코드에서만 나온다. {w['app']}</p></section>"""]
     parts += body_sections(r)
@@ -1909,6 +2001,14 @@ def main(argv):
         print(f"{'ok  ' if ok else 'FAIL'} {what}")
     bad = sum(1 for ok, _ in results if not ok)
     print(f"{'all checks pass' if not bad else f'{bad} check(s) failed'} ({len(results)} checks)")
+    if not bad:  # 0.7.0: 종료 0 은 증적이 그대로라는 뜻이지 전환이 통과했다는 뜻이 아니다. 기록된 판정을 한 줄 더 적는다
+        try:
+            with open(os.path.join(argv[1], "receipt.json"), encoding="utf-8") as f:
+                rec = json.load(f)
+            print(f"evidence intact; the verdict it records: {verdict_text(rec, en=True)} "
+                  "(exit 0 here means the folder is unchanged, not that the migration passed)")
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
     return 0 if not bad else 1
 
 

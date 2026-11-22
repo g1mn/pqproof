@@ -2,8 +2,8 @@
  "schema": "pqproof-mapping 1",
  "id": "eu-pqc-roadmap-2025",
  "published": true,
- "checked": "2026-11-21",
- "applies_from": "0.5.0",
+ "checked": "2026-11-22",
+ "applies_from": "0.7.0",
  "title_en": "PQ-Proof against the EU coordinated implementation roadmap for the transition to PQC",
  "title_ko": "EU 양자내성암호 전환 공동 이행 로드맵과 PQ-Proof 대응표",
  "source": {
@@ -136,9 +136,9 @@
    "quote": "Generating and maintaining cryptographic inventories can be aided by tools (discovery and asset management tools). Using a standardised format for a cryptographic inventory, like CBOM (Cryptographic Bill of Materials, an extension of the SBOM standard), is recommended.",
    "about_en": "Discovery tools help build inventories, and a standard format such as CBOM is recommended.",
    "about_ko": "발견 도구가 목록 작성을 돕고, CBOM 같은 표준 형식을 권한다.",
-   "status": "partial",
-   "note_en": "PQ-Proof is a discovery tool for code, configuration and key files and writes CBOM rows for both trees. The rows are its own table format.",
-   "note_ko": "PQ-Proof는 코드·설정·키 파일을 훑는 발견 도구이고 두 트리의 CBOM 행을 쓴다. 행은 자체 표 형식이다.",
+   "status": "covered",
+   "note_en": "PQ-Proof is a discovery tool for code, configuration and key files and writes CBOM rows for both trees. From 0.7.0 each run also writes them as a CycloneDX 1.6 CBOM (tables/cbom-orig.cdx.json and tables/cbom-fixed.cdx.json, or tables/cbom.cdx.json for an inventory run), one component per algorithm with one occurrence per row; CI validates the files against the official schema.",
+   "note_ko": "PQ-Proof는 코드·설정·키 파일을 훑는 발견 도구이고 두 트리의 CBOM 행을 쓴다. 0.7.0부터는 실행마다 같은 행을 CycloneDX 1.6 CBOM으로도 쓴다(tables/cbom-orig.cdx.json·tables/cbom-fixed.cdx.json, inventory는 tables/cbom.cdx.json). 알고리즘마다 컴포넌트 하나, 행마다 occurrence 하나이고, CI가 공식 스키마로 검증한다.",
    "evidence": [
     {
      "file": "scan/cbom-scan.sh",
@@ -152,14 +152,17 @@
      "symbols": [
       "def _classify"
      ]
+    },
+    {
+     "file": "pqlite/cdx.py",
+     "symbols": [
+      "def build",
+      "SCHEMA = "
+     ]
     }
    ],
-   "remaining_en": [
-    "No export to the CycloneDX CBOM format yet (ROADMAP.md)."
-   ],
-   "remaining_ko": [
-    "CycloneDX CBOM 형식으로 내보내기는 아직 없다(ROADMAP.md)."
-   ]
+   "remaining_en": [],
+   "remaining_ko": []
   },
   {
    "id": "R5",

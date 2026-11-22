@@ -17,6 +17,11 @@ The four gaps in the NIS and NSR draft mappings (posted 2026-11-16) that a migra
 - Allowlist entries can record residual risk, compensating control and replacement plan (draft guidebook G9).
 - The TLS report adds the cipher suite and the certificate expiry (draft guidebook G7).
 
+## 0.7.0
+
+- The inventory is also written as a CycloneDX 1.6 CBOM (EU PQC roadmap, section 6.2), validated in CI against the official schema.
+- First-run and CI fixes from a new-user review: `pqproof examples`, English reading notes in the evidence, input errors, and CI examples that keep the base tree outside the converted tree.
+
 ## When the KISA PQC migration guide is published
 
 KISA's plan to publish a PQC migration guide in 2026 was [reported in January 2026](https://byline.network/2026/01/28-578/). It is not out yet, so nothing here assumes what it will say. The draft PQC migration guidebook for national and public institutions from NIS and NSR (posted 2026-11-16) is already mapped, and that table follows its final version. When it is published:
@@ -29,7 +34,6 @@ KISA's plan to publish a PQC migration guide in 2026 was [reported in January 20
 - KpqC reference KATs: add new versions to `scan/kat-kpqc.json` when a KS standard or a new reference release comes out.
 - A PQC-only profile that does not count a hybrid result as finished (NIST IR 8547, section 3.2).
 - An agility signal: algorithm names fixed in code against names read from configuration (NIST IR 8547, section 1.1).
-- Export the inventory in the CycloneDX CBOM format (EU PQC roadmap, section 6.2).
 - LMS and XMSS (NIST SP 800-208) as expected firmware signatures under the cnsa2 profile (CNSA 2.0 FAQ).
 - More mappings as public documents come out, the KISA guide first.
 - FIPS 206 (FN-DSA) and FIPS 207 (HQC) once NIST publishes them.

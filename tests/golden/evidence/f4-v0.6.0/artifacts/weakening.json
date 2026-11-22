@@ -1,0 +1,11 @@
+{
+  "deny": [],
+  "files": [
+    "README.md",
+    "osv-scanner.toml",
+    "requirements.txt",
+    "src/main/java/demo/sealer/Sealer.java",
+    "tools/sign_manifest.py"
+  ],
+  "review": []
+}

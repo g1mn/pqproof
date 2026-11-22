@@ -10,6 +10,29 @@ Each release has a **Verdict impact (판정 영향)** line. It says whether the 
 
 Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `receipt.json`, so a receipt from years ago still names the rules that judged it. `--verify` keeps reading older evidence formats.
 
+## [0.7.0] - 2026-11-22
+
+Tool 0.7.0, ruleset 7 (unchanged), evidence format 4 (unchanged).
+
+**Verdict impact (판정 영향): none.** No rule file changed, so the same trees get the same verdict, check statuses and counts (golden: 0 of 41 cases moved). `--verify` lists two more artifacts per two-tree or one-tree run (the CycloneDX files), and evidence from every earlier release still verifies; a 0.6.0 two-tree folder joins the golden evidence to keep it so.
+
+### Added
+
+- CycloneDX 1.6 CBOM export (`pqlite/cdx.py`): every run also writes its CBOM rows as `tables/cbom-orig.cdx.json` and `tables/cbom-fixed.cdx.json` (`tables/cbom.cdx.json` for `pqproof inventory`), for tools that read that format. One component per asset type and name, one occurrence per CSV row with its status, tool, use, threat, reason and masked note; `nistQuantumSecurityLevel` from FIPS 203, 204 and 205, OIDs for ML-KEM and ML-DSA, the three IANA hybrid TLS groups as combiners, and KpqC and unknown names kept as written. No timestamp and a content-derived `serialNumber`, so the same trees give the same bytes. CI validates the output against the official 1.6.2 schemas, pinned by SHA-256 (`CDX_SCHEMA_DIR`). The EU PQC roadmap mapping item R4 (a standard CBOM format) is now covered.
+- `pqproof examples` prints the folder of the bundled example trees, and `pqproof doctor` prints it with a ready command. The README quick start now runs the bundled pair (`pqproof "$ex/classic" "$ex/pqc"`) before your own trees.
+- English for readers who do not read Korean, where it cost no change to old evidence: `README.txt` in a 0.7.0 folder explains each check and the status words, links the format 4 schema and the limits by URL; `receipt.html` gets a "How to read this page (English)" section and shows `MODE`, `PROFILE`, `REQUIRE_REVIEW`, `FAIL_ON_REVIEW` and `REQUIRE_RESOLVED`; `pqproof --env` starts with an English list of the settings (from `guide/configuration.md`, now in the wheel); SARIF with `--lang en` no longer carries Korean use labels. Pages written by earlier releases are drawn as before, because `--verify` compares them byte for byte.
+- SARIF rules carry `security-severity` and a `help` text, so code scanning can sort and explain the alerts.
+
+### Changed
+
+- CI examples: the GitLab and Jenkins jobs wrote the base tree, the evidence folder and (Jenkins) a virtual environment inside the converted checkout, so a finished migration failed on its own copies; all of them now live in a temporary folder and the report is copied in afterwards. All three examples build the base tree with `git read-tree` and `git checkout-index` instead of `git archive`, which dropped `export-ignore` paths and made unchanged files look added. `guide/ci.md` explains both and adds a pinning section.
+- The Action writes its SARIF file to `$RUNNER_TEMP/pqproof.sarif` by default (a later run in the same workspace scanned `pqproof.sarif` as code), and warns when `sarif-anchor` is not in the converted tree.
+- Input errors say what is wrong in Korean and English (no such path, or a file that is not a folder or a .zip), start with `pqproof:` when run as `pqproof`, and come before the output folder is created, so no empty folder is left.
+- Console: a one-tree `check` shows one tree; a pass with checks that need review lists where to look; a run whose original has nothing to migrate while the converted tree has classical code suggests the trees may be swapped; a tree with no cryptography suggests `EXPECT=none`; both zip hashes are shortened alike.
+- `--verify` adds a line with the verdict the evidence records, because exit 0 there means the folder is unchanged, not that the migration passed.
+- `tables/report.md` names a run log only when `EV_NAME` is set (PQ-Proof never writes that file).
+- `guide/quickstart.md` shows the 0.6.0 example output and what each check means.
+
 ## [0.6.0] - 2026-11-22
 
 Tool 0.6.0, ruleset 7, evidence format 4 (unchanged), `tls_probe` 0.5.0. This release follows the NIS and NSR drafts of the cryptographic security guideline and the PQC migration guidebook for national and public institutions (posted 2026-11-16): the four gaps of their mappings that a migration check can close.

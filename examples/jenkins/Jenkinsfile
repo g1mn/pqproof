@@ -2,6 +2,9 @@
 // Warnings Next Generation plugin (recordIssues ... sarif), and archive the evidence folder.
 // The agent needs bash, OpenSSL (3.5 or later for the TLS cross-check), git and Python 3.9 or later.
 // BASE_COMMIT is the commit to compare with, for example the target branch of a pull request.
+// The converted tree is the workspace (.), and anything inside it is judged as part of it. So the venv, the original
+// tree, the evidence folder and the SARIF file live in WORKSPACE_TMP (outside the workspace) while PQ-Proof runs, and
+// the report is copied into pqproof-report/ afterwards; the next build deletes that folder before it judges.
 pipeline {
   agent any
   parameters {
@@ -14,27 +17,32 @@ pipeline {
     stage('PQ-Proof') {
       steps {
         sh '''
-          python3 -m venv .pqproof-venv
-          .pqproof-venv/bin/pip install --quiet "pqproof==0.6.0"
-          rm -rf original && mkdir original
-          git archive "$BASE_COMMIT" | tar -x -C original
+          rm -rf pqproof-report
+          T="${WORKSPACE_TMP:-$(mktemp -d)}/pqproof"
+          rm -rf "$T" && mkdir -p "$T"
+          python3 -m venv "$T/venv"
+          "$T/venv/bin/pip" install --quiet "pqproof==0.6.0"
+          # Not git archive: it drops export-ignore paths, and unchanged files would look added.
+          GIT_INDEX_FILE="$T/base.idx" git read-tree "$BASE_COMMIT"
+          GIT_INDEX_FILE="$T/base.idx" git checkout-index -a --prefix="$T/original/"
           if git cat-file -e "$BASE_COMMIT:notes/unconverted.json" 2>/dev/null; then
-            git show "$BASE_COMMIT:notes/unconverted.json" > base-unconverted.json
-            export ALLOW="$PWD/base-unconverted.json"
+            git show "$BASE_COMMIT:notes/unconverted.json" > "$T/base-unconverted.json"
+            export ALLOW="$T/base-unconverted.json"
           else
             export ALLOW=none
           fi
           code=0
-          OUT="$PWD/pqproof-evidence-$BUILD_NUMBER" .pqproof-venv/bin/pqproof original . || code=$?
-          .pqproof-venv/bin/pqproof --verify "pqproof-evidence-$BUILD_NUMBER"
-          .pqproof-venv/bin/pqproof sarif "pqproof-evidence-$BUILD_NUMBER" -o pqproof.sarif
+          OUT="$T/evidence" "$T/venv/bin/pqproof" "$T/original" . || code=$?
+          "$T/venv/bin/pqproof" --verify "$T/evidence"
+          "$T/venv/bin/pqproof" sarif "$T/evidence" -o "$T/pqproof.sarif"
+          mkdir pqproof-report && cp -R "$T/evidence" pqproof-report/evidence && cp "$T/pqproof.sarif" pqproof-report/
           exit $code
         '''
       }
       post {
         always {
-          recordIssues(tools: [sarif(pattern: 'pqproof.sarif', id: 'pqproof', name: 'PQ-Proof')])
-          archiveArtifacts artifacts: "pqproof-evidence-${env.BUILD_NUMBER}/**, pqproof.sarif", allowEmptyArchive: true
+          recordIssues(tools: [sarif(pattern: 'pqproof-report/pqproof.sarif', id: 'pqproof', name: 'PQ-Proof')])
+          archiveArtifacts artifacts: 'pqproof-report/**', allowEmptyArchive: true
         }
       }
     }

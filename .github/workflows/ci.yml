@@ -39,6 +39,11 @@ env:
   # OASIS SARIF 2.1.0 errata01 OS 스키마. 내려받은 뒤 SHA-256 을 맞춰야 쓴다
   SARIF_SCHEMA_URL: https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json
   SARIF_SCHEMA_SHA256: c3b4bb2d6093897483348925aaa73af03b3e3f4bd4ca38cef26dcb4212a2682e
+  # CycloneDX 1.6.2 스키마 셋(tests/test_cdx.py 의 CBOM 내보내기 검증, 0.7.0). 내려받은 뒤 SHA-256 을 맞춰야 쓴다
+  CDX_SCHEMA_BASE: https://raw.githubusercontent.com/CycloneDX/specification/1.6.2/schema
+  CDX_BOM_SHA256: 18f57f7482593bad9f21b4feed09084640cbeff419d62ad5090c5ceccca5b37d
+  CDX_SPDX_SHA256: c41917196639055e9f9670811bac23ef777732144f3ff5a2f39686f61580dbe6
+  CDX_JSF_SHA256: 8bae002c25e723db7ee1f26afde680ae1a2b1a8f6b4b4b0fd65dc3becb090aae
 
 jobs:
   test:
@@ -104,6 +109,11 @@ jobs:
           curl -sSfL -o "$RUNNER_TEMP/sarif-schema.json" "$SARIF_SCHEMA_URL"
           echo "$SARIF_SCHEMA_SHA256  $RUNNER_TEMP/sarif-schema.json" | shasum -a 256 -c -
           echo "SARIF_SCHEMA=$RUNNER_TEMP/sarif-schema.json" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/cdx-1.6"
+          for f in bom-1.6.schema.json spdx.schema.json jsf-0.82.schema.json; do curl -sSfL -o "$RUNNER_TEMP/cdx-1.6/$f" "$CDX_SCHEMA_BASE/$f"; done
+          printf '%s  %s\n' "$CDX_BOM_SHA256" "$RUNNER_TEMP/cdx-1.6/bom-1.6.schema.json" "$CDX_SPDX_SHA256" "$RUNNER_TEMP/cdx-1.6/spdx.schema.json" \
+            "$CDX_JSF_SHA256" "$RUNNER_TEMP/cdx-1.6/jsf-0.82.schema.json" | shasum -a 256 -c -
+          echo "CDX_SCHEMA_DIR=$RUNNER_TEMP/cdx-1.6" >> "$GITHUB_ENV"
 
       - name: pq-verify (hash-pinned, no extras) and two ML-KEM-768 libraries for the live i-nist test
         # tests/test_pqverify.py Live 가 쓴다(PQ-Proof 런타임 의존이 아니다). 라이브러리는 mlkem-native 고정 커밋을 SHA-256 으로 맞춰 빌드한다

@@ -224,6 +224,33 @@
     "count": 1,
     "why": "em dash (U+2014) in pq-verify output replaced with a hyphen"
    }
+  },
+  {
+   "name": "f4-v0.6.0",
+   "label": "pqproof 0.6.0 (PyPI), bundled examples classic -> pqc, two trees, format 4 with the README.txt text 0.3.0-0.6.0 wrote",
+   "format_version": 4,
+   "verdict": "pass",
+   "checks": {
+    "a-input": "pass",
+    "a-cbom": "pass",
+    "b-weakening": "pass",
+    "b-tls": "na",
+    "c-classic": "pass",
+    "c-expect": "pass",
+    "r-review": "pass",
+    "r-allow": "na"
+   },
+   "receipt_id": "c60d511b0bb49a33793da88bae2e0cfefa6af0e37e264bf5ff4a718d759afde5",
+   "source_receipt_id": "72075a1abe1896a46a1cc05a451e0ed67041d7accbc81e506d4bd5270f0cc465",
+   "source_receipt_html_sha256": "cc17c461c7721447c68db5ee83d83f7f1114ec1afa5208566ba384e94530de52",
+   "source_verified_by_this_tool": true,
+   "paths_replaced": [
+    "/opt/pqproof-0.6.0",
+    "/opt/pqproof-0.6.0/venv/bin/python3",
+    "/work/proof-out",
+    "/usr/bin/openssl"
+   ],
+   "report_section_removed": null
   }
  ]
 }

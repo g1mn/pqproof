@@ -2,7 +2,8 @@
 #   pqproof <원본 폴더|zip> <고친 폴더|zip>     환경 변수(OUT, ALLOW, REQUIRE_REVIEW, TLS_TARGETS ...)는 prove.sh 와 같다
 #   pqproof --verify <결과 폴더> · pqproof --unit [이름] · pqproof --selftest
 #   pqproof sarif <결과 폴더> [-o 파일] [--uri-prefix P] [--anchor 파일]
-#   pqproof doctor          바깥 도구 점검표(bash, openssl, keytool, tls_probe, go)
+#   pqproof doctor          바깥 도구 점검표(bash, openssl, keytool, tls_probe, go)와 번들 예제 폴더
+#   pqproof examples        번들 예제 폴더 경로 한 줄(0.7.0, ex=$(pqproof examples) 로 쓴다)
 #   pqproof build-probe     tls_probe 를 사용자 캐시 폴더에 빌드(Go 1.27+, 인터넷 없음)
 #   pqproof mutations [--strict]   심어 둔 결함 시험 묶음
 #   pqproof impl prompt|judge ...  구현 검증(KpqC KAT 대조). 파이썬만 쓴다(bash 없이, Windows 에서도). 구현은 실행하지 않는다.
@@ -13,6 +14,7 @@
 # 있어야 해서 Windows 에서는 WSL 안내 뒤 2로 끝낸다.
 """Console entry point: `pqproof` behaves like `bash prove.sh`, plus sarif, doctor, build-probe and mutations."""
 import os
+import re
 import subprocess
 import sys
 
@@ -34,6 +36,7 @@ USAGE = """usage:
   pqproof --selftest                               offline self-test on the bundled examples
   pqproof sarif <out dir> [-o file] [--uri-prefix path/] [--anchor file] [--lang en|ko]
   pqproof doctor                                   list the external programs PQ-Proof uses and what is missing
+  pqproof examples                                 print the folder of the bundled example trees (classic, pqc, ...)
   pqproof build-probe                              build tls_probe into the user cache (Go 1.27+, offline)
   pqproof mutations [--strict] [--only ids]        planted-defect suite
   pqproof --version | --help | --env               (--env prints the environment variables prove.sh reads)
@@ -50,8 +53,28 @@ def is_windows():
     return os.name == "nt"
 
 
+def env_settings(root):
+    """guide/configuration.md 의 설정 표(| `이름` | 기본값 | 뜻 |)를 영어 줄로(0.7.0). 표가 없으면 빈 목록."""
+    path = os.path.join(root, "guide", "configuration.md")
+    if not os.path.isfile(path):
+        return []
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+
+    def plain(cell):
+        return re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", cell).replace("`", "").strip()
+    return [(name, plain(default), plain(meaning)) for name, default, meaning
+            in re.findall(r"^\| `([A-Z][A-Z0-9_]*)` \| (.*?) \| (.*?) \|$", text, re.M)]
+
+
 def env_help(root):
-    """prove.sh 머리 주석(둘째 줄부터 첫 비주석 줄 앞까지). bash 없이 읽는다."""
+    """설정 변수 영어 목록(guide/configuration.md)과 prove.sh 머리 주석(한국어, 둘째 줄부터 첫 비주석 줄 앞까지). bash 없이 읽는다."""
+    rows = env_settings(root)
+    head = []
+    if rows:
+        head = ["PQ-Proof settings (environment variables; details: guide/configuration.md)"]
+        head += [f"  {n}={d if d not in ('none', '') else ''}  # {m}" for n, d, m in rows]
+        head += ["", "Notes from prove.sh (Korean):"]
     lines = []
     with open(os.path.join(root, "prove.sh"), encoding="utf-8") as f:
         for i, line in enumerate(f):
@@ -60,7 +83,7 @@ def env_help(root):
             if not line.startswith("#"):
                 break
             lines.append(line.rstrip("\n"))
-    return "\n".join(lines)
+    return "\n".join(head + lines)
 
 
 def version_line():
@@ -150,6 +173,10 @@ def doctor(root):
     print(f"  {'ok   ' if ok else 'info '} go: {line} {'(can build tls_probe)' if ok else '(only needed for pqproof build-probe)'}")
     ok, line = kat_status(root)
     print(f"  {'ok   ' if ok else 'warn '} impl: {line}")
+    ex = os.path.join(root, "examples")
+    if os.path.isdir(ex):
+        print(f"examples: {ex}")
+        print(f'  try: pqproof "{os.path.join(ex, "classic")}" "{os.path.join(ex, "pqc")}"   # bundled before and after trees, a pass')
     return 0 if rep.ok() else 2
 
 
@@ -201,6 +228,13 @@ def main(argv=None):
         print("pqproof: the tool files (prove.sh, prove.py, pqlite/, scan/) are missing from this install. "
               "Reinstall the package or set PQPROOF_HOME to a PQ-Proof checkout.", file=sys.stderr)
         return 2
+    if first == "examples":  # 번들 예제 폴더(python3 -c 'import pqproof ...' 줄은 venv 를 켜지 않으면 다른 파이썬을 불렀다)
+        ex = os.path.join(root, "examples")
+        if not os.path.isdir(ex):
+            print("pqproof: the bundled examples are missing from this install", file=sys.stderr)
+            return 2
+        print(ex)
+        return 0
     if first == "--env":
         print(env_help(root))
         return 0

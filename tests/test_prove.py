@@ -124,6 +124,26 @@ class Inputs(unittest.TestCase):
             with mock.patch.object(prove, "MAX_ZIP_ENTRIES", 2):
                 self.assertIn("상한", prove.zip_names_problem(["a", "b", "c"]))
 
+    def test_input_problems_are_named_before_any_output(self):
+        # 0.7.0: 없는 경로·zip 이 아닌 파일·.tgz 가 한 문장(한국어만)이었고, 빈 출력 폴더가 남았다
+        with tempfile.TemporaryDirectory() as d:
+            text = os.path.join(d, "bad.zip")
+            pathlib.Path(text).write_text("not a zip", encoding="utf-8")
+            tgz = os.path.join(d, "x.tgz")
+            pathlib.Path(tgz).write_bytes(b"\x1f\x8b\x08\x00")
+            self.assertIn("no such file or folder", prove.input_problem(os.path.join(d, "nope")))
+            self.assertIn("not a folder or a .zip file", prove.input_problem(text))
+            self.assertIn("not a folder or a .zip file", prove.input_problem(tgz))
+            self.assertIsNone(prove.input_problem(d))
+            for orig, fixed in ((os.path.join(d, "nope"), d), (d, tgz)):
+                out = os.path.join(d, "out")
+                with self.assertRaises(prove.UsageError):
+                    prove.run(orig, fixed, prove.Params({}), out, quiet=True)
+                self.assertFalse(os.path.exists(out))
+            with self.assertRaises(prove.UsageError):
+                prove.inventory(text, prove.Params({}), os.path.join(d, "inv"), quiet=True)
+            self.assertFalse(os.path.exists(os.path.join(d, "inv")))
+
     def test_params(self):
         with self.assertRaises(prove.UsageError):
             params(CLASSIC="maybe")

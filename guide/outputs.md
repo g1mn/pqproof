@@ -15,6 +15,7 @@ Each run writes a new folder: `OUT=...`, or `./proof-out-YYYYMMDD-HHMMSS` (with 
 
 - `deck.json`: a short summary for slides or a dashboard. `evidence-fragment.json`: the main numbers in a flat form for another record.
 - `tables/cbom-orig.csv`, `tables/cbom-fixed.csv`: the CBOM of both trees, one row per location, with its verdict and reason. `tables/fragment.html`: the report as an HTML fragment.
+- `tables/cbom-orig.cdx.json`, `tables/cbom-fixed.cdx.json` (from 0.7.0; `tables/cbom.cdx.json` for `pqproof inventory`): the same rows as a CycloneDX 1.6 CBOM, for tools that read that format. One component per algorithm, one occurrence per CSV row; the status, threat and reason of each row are copied into `additionalContext` and `pqproof:*` properties, and the verdict of record stays in `receipt.json` and the CSV. The file has no timestamp and its `serialNumber` comes from its content, so the same trees give the same bytes.
 - `tables/summary.csv` (the checks), `tables/java.csv` and `tables/java-usage.csv` (classical lines per rule and per location), `tables/tls.csv` (TLS results).
 - `artifacts/`: raw scanner output, the copies of `residue.sh` and `scan/test-paths.ere` that ran, TLS probe transcripts, the weakening result, the list of changed files and a copy of the allowlist.
 - `in/`: zip inputs, unpacked.

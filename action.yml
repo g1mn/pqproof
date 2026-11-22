@@ -61,11 +61,11 @@ inputs:
     required: false
     default: ""
   sarif-file:
-    description: "SARIF file to write"
+    description: "SARIF file to write (default: pqproof.sarif under runner.temp, so a later run in the same workspace does not scan it)"
     required: false
-    default: "pqproof.sarif"
+    default: ""
   sarif-anchor:
-    description: "Repository file to attach checks that have no file position (c-expect, b-tls). Empty: they go to SARIF notifications"
+    description: "Repository file to attach checks that have no file position (c-expect, b-tls). Empty or missing in the converted tree: they go to SARIF notifications"
     required: false
     default: ""
   fail-on:
@@ -179,8 +179,15 @@ runs:
         if [ ! -f "$OUT_DIR/receipt.json" ]; then echo "sarif-file=" >> "$GITHUB_OUTPUT"; exit 0; fi
         # 고친 판이 작업 공간 안 폴더면 그 경로를 SARIF 위치 앞에 붙인다(저장소 기준 경로가 되게)
         prefix=$("$IN_PYTHON" -I -c 'import os,sys; c,w=os.path.realpath(sys.argv[1]),os.path.realpath(sys.argv[2]); r=os.path.relpath(c,w); print("" if (not os.path.isdir(c)) or r.startswith("..") or r=="." else r)' "$IN_CONVERTED" "$GITHUB_WORKSPACE")
+        [ -n "$IN_SARIF" ] || IN_SARIF="$RUNNER_TEMP/pqproof.sarif"  # 0.7.0: 작업 공간에 두면 같은 작업 공간의 다음 실행이 SARIF 를 코드로 읽었다
         args=("$OUT_DIR" -o "$IN_SARIF" --uri-prefix "$prefix")
-        [ -n "$IN_ANCHOR" ] && args+=(--anchor "$IN_ANCHOR")
+        if [ -n "$IN_ANCHOR" ]; then  # 0.7.0: 없는 파일을 앵커로 주면 위치 없는 검사가 없는 파일에 붙었다
+          if [ -f "$IN_CONVERTED/$IN_ANCHOR" ]; then
+            args+=(--anchor "$IN_ANCHOR")
+          else
+            echo "::warning::sarif-anchor $IN_ANCHOR is not in the converted tree; checks without a file position stay as SARIF notifications"
+          fi
+        fi
         if "$IN_PYTHON" -I -B "$GITHUB_ACTION_PATH/src/pqproof/sarif.py" "${args[@]}"; then
           echo "sarif-file=$IN_SARIF" >> "$GITHUB_OUTPUT"
         else

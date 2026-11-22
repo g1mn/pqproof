@@ -33,7 +33,9 @@
 ```bash
 pip install pqproof
 pqproof doctor                       # what it found and what is missing
-pqproof <original> <converted>       # judge the two trees, write the evidence folder
+ex=$(pqproof examples)               # the bundled before and after trees
+pqproof "$ex/classic" "$ex/pqc"       # try it: RSA and ECDSA moved to ML-KEM-768 and ML-DSA-65, a pass
+pqproof <original> <converted>       # judge your two trees, write the evidence folder
 pqproof --verify <output folder>     # recompute the evidence hash and every file hash
 FAIL_ON_REVIEW=1 pqproof impl judge answers.json   # KpqC implementation check
 ```

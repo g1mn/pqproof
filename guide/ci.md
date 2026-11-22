@@ -6,9 +6,22 @@ PQ-Proof fits a pipeline as one step: judge the change against its base commit, 
 |---|---|---|
 | A migration pull request | `pqproof <base tree> <pull request tree>`, or the Action with `original` and `converted` | `examples/github-actions/pqproof-sarif.yml` |
 | After the migration: stop classical code from coming back, catch expired allowlist entries | `pqproof check .`, or the Action with `mode: check` | `examples/github-actions/pqproof-check.yml` |
-| A first survey or an audit, no verdict | `pqproof inventory <tree>` writes `inventory.json` and `tables/cbom.csv` | |
+| A first survey or an audit, no verdict | `pqproof inventory <tree>` writes `inventory.json`, `tables/cbom.csv` and `tables/cbom.cdx.json` (CycloneDX 1.6) | |
 
 `check` judges one tree with the same rules. The checks that compare two trees (`a-input`'s common files, `b-weakening`, `r-review`) are "not applicable" and never count as passed; `receipt.json` records `params.mode: check`. So check mode does not catch TLS weakening (a trust-all `TrustManager`, `InsecureSkipVerify`, a lower minimum version) or a removed verification call: run the two-tree judgment on every pull request and use `check` on `main` as an extra guard for classical algorithms, allowlist expiry and review age. `a-input` still reports counted folders, oversize files and links; a code link outside the tree leaves it undecided, and fails it under `REQUIRE_REVIEW=1`. Before 0.2.0 the only way was to pass the same tree twice, which ended undecided because the original showed nothing to migrate.
+
+## Keep the base tree outside the converted tree
+
+The converted tree is usually the checkout (`.`), and everything inside it is judged as part of it. Before 0.7.0 the GitLab and Jenkins examples unpacked the base commit into `original/` and wrote the evidence folder (and, for Jenkins, a virtual environment) inside the checkout, so a finished migration failed on its own copies. Write the base tree, the evidence folder, the SARIF file and any tool environment to a temporary folder (`$RUNNER_TEMP`, `mktemp -d`, Jenkins `WORKSPACE_TMP`) and copy the report into the workspace only after the run. The examples do this.
+
+Build the base tree with `git read-tree` and `git checkout-index` into a temporary index, not with `git archive`: `git archive` leaves out paths marked `export-ignore` in `.gitattributes`, and those unchanged files then look added in the converted tree (a weakening there fails `b-weakening`).
+
+```bash
+T=$(mktemp -d)
+GIT_INDEX_FILE="$T/base.idx" git read-tree "$BASE"
+GIT_INDEX_FILE="$T/base.idx" git checkout-index -a --prefix="$T/original/"
+OUT="$T/evidence" pqproof "$T/original" .
+```
 
 ## GitHub Action
 
@@ -24,6 +37,18 @@ Inputs reach the scripts only through environment variables. The Action runs `--
 - It reads the allowlist from the base commit and warns when the pull request changes it. An author cannot add entries and fill in their review fields in the same pull request; the new entries apply after they are merged.
 - `CODEOWNERS.example` puts `notes/unconverted.json` behind a security owner's approval.
 - The Action is pinned to a commit SHA, not a tag, because a tag can move. Release assets carry build provenance: `gh attestation verify <file> --repo g1mn/pqproof`.
+- From 0.7.0 the SARIF file goes to `$RUNNER_TEMP/pqproof.sarif` unless `sarif-file` names another path, so a second run in the same workspace does not scan it, and a `sarif-anchor` that is not in the converted tree gives a warning instead of an alert on a missing file.
+
+## Pinning
+
+The Action does not install from PyPI: it runs `prove.sh` and `src/pqproof/sarif.py` from its own checkout, so its version is the commit SHA on the `uses:` line, and the runner needs only bash, Python 3.9 or later and OpenSSL. The CLI path (GitLab, Jenkins, `pqproof-check.yml`) installs the wheel, which has no dependencies, so one hash pins it:
+
+```bash
+pip download --no-deps --only-binary=:all: pqproof==X.Y.Z -d wheel && pip hash wheel/*.whl   # once, into pqproof.txt
+pip install --no-deps --only-binary=:all: --require-hashes -r pqproof.txt
+```
+
+When you move to a new release, change the Action SHA and the pip pin together.
 
 ## SARIF
 

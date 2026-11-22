@@ -40,6 +40,7 @@ if HERE not in sys.path:
     sys.path.insert(0, HERE)  # python3 -I는 스크립트 폴더를 넣지 않는다
 
 from pqlite import allowlist as al  # noqa: E402
+from pqlite import cdx  # noqa: E402
 from pqlite import impl  # noqa: E402
 from pqlite import receipt as rc  # noqa: E402
 from pqlite import rules  # noqa: E402
@@ -72,7 +73,7 @@ SETTINGS = ("OUT", "TLS_TARGETS", "TLS_TARGETS_ORIG", "TLS_VIA", "CLASSIC", "EXP
 EXIT_TOOL_ERROR = 4  # 예상 못 한 예외(도구 오류, 교차 리뷰 X62). 판정 실패(1)·입력 오류(2)와 가른다
 EXIT_REVIEW = 5  # FAIL_ON_REVIEW=1 이고 판정은 통과인데 검토 필요인 검사가 있다(교차 리뷰 X30)
 OTHER_ENV = ("PYTHON", "STRICT", "SELFTEST_DIR", "KEEP", "ORDERS_EDGE", "TEST_PATHS", "SARIF_SCHEMA", "PQPROOF_HOME",
-             "PQPROOF_ENTRY", "PQPROOF_PQV_LIB", "PQPROOF_PQV_BAD_LIB")  # PQPROOF_PQV_*: tests/test_pqverify.py 실측 시험의 ML-KEM 라이브러리
+             "PQPROOF_ENTRY", "PQPROOF_PQV_LIB", "PQPROOF_PQV_BAD_LIB", "CDX_SCHEMA_DIR")  # PQPROOF_PQV_*: tests/test_pqverify.py 실측 시험의 ML-KEM 라이브러리
 DOCS = "https://github.com/g1mn/pqproof/blob/v{v}/{page}"
 
 
@@ -334,6 +335,15 @@ def count_files(top):
     return n, c
 
 
+def input_problem(path):
+    """입력 경로가 폴더나 zip 이 아니면 까닭 한 줄(한국어와 영어), 맞으면 None. 출력 폴더를 만들기 전에 본다(0.7.0, 빈 폴더를 남기지 않게)."""
+    if os.path.isdir(path) or (os.path.isfile(path) and zipfile.is_zipfile(path)):
+        return None
+    if not os.path.exists(path):
+        return f"입력이 없다(no such file or folder): {path}"
+    return f"폴더도 zip 파일도 아니다(not a folder or a .zip file; .tar.gz and other archives are not read): {path}"
+
+
 MAX_SKIPPED = 100  # inputs.*.skipped 에 하나씩 적는 건너뛴 폴더·링크 수(넘으면 '외 n곳')
 
 
@@ -357,7 +367,7 @@ def prepare_input(path, out, side, skip_rules=None, max_bytes=rules.MAX_TEXT):
     elif os.path.isdir(path):
         root, rel, kind, zsha = path, path, "dir", None
     else:
-        raise UsageError(f"폴더나 zip이 아님: {path}")
+        raise UsageError(input_problem(path) or f"폴더나 zip이 아님(not a folder or a zip): {path}")
     skips = []
     files = rc.tree_files(root, skip_rules, skips)
     odd = next((r for r, _, _ in files if ZIP_CONTROL.search(r)), None)
@@ -485,6 +495,11 @@ def cbom_csv(items):
         masked += max(n, pre)
         rows.append([i["loc"], i["source"], i["use"], i["alg"], i["threat"], STATUS_LABEL[i["status"]], i["reason"], note])
     return csv_text(["위치", "출처", "용도·종류", "알고리즘", "양자 위협", "판정", "허용·참고 사유", "비고"], rows), masked
+
+
+def write_cdx(art, path, items, meta):
+    """CBOM 항목을 CycloneDX 1.6 JSON 으로도 쓴다(0.7.0, pqlite/cdx.py). 비고 칸은 cbom_csv 와 같이 redact() 를 거친다."""
+    return art.add_json(path, cdx.build([dict(i, note=redact(i["note"])[0]) for i in items], meta))
 
 
 # ---------------------------------------------------------------------------------------------
@@ -667,7 +682,7 @@ def report_md(r, fixed_items, ev):
     fx = r["inputs"]["fixed"]
     out = [f"<!-- prove.sh가 만든 표. 고친 판 트리 sha256 {fx['tree_sha256']}"
            + (f", zip sha256 {fx['zip_sha256']}" if fx["zip_sha256"] else "") + ". receipt_id는 같은 폴더 receipt.json. -->", "",
-           f"명령: `{md_cell(cmd, html=False)}` · 판정 **{rc.verdict_text(r)}** · 실행 기록 {ev}", ""]
+           f"명령: `{md_cell(cmd, html=False)}` · 판정 **{rc.verdict_text(r)}**" + (f" · 실행 기록 {ev}" if ev else ""), ""]
     if r.get("format_version"):
         out += [f"판정 근거: pqproof {r['tool_version']} · 규칙 묶음 {r['ruleset_version']} "
                 f"(sha256 `{r['ruleset_sha256'][:16]}`) · 증적 형식 {r['format_version']}", ""]
@@ -769,9 +784,13 @@ def settings_line(params, out):
 
 def run(orig, fixed, params, out=None, cache=None, quiet=False):
     """한 번 돌린다. 반환: (receipt dict, 종료 코드, 출력 줄 목록). quiet 가 아니면 단계마다 stderr 에 진행 줄을 찍는다."""
+    for p in dict.fromkeys((orig, fixed)):
+        problem = input_problem(os.path.abspath(p))
+        if problem:
+            raise UsageError(problem)
     out = os.path.abspath(out or params.out or default_out(orig))
     if os.path.exists(out):
-        raise UsageError(f"출력 폴더가 이미 있다(덮어쓰지 않음): {out}")
+        raise UsageError(f"출력 폴더가 이미 있다(덮어쓰지 않음, the output folder exists and is not overwritten): {out}")
     started = now()
 
     def say(msg):
@@ -1074,7 +1093,7 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
              tool("test-paths.ere", scanmod.TEST_PATHS_FILE), tool("skip-dirs", skipdirs.SKIP_FILE),
              tool("profiles", rules.PROFILES_FILE), tool("kat-kpqc", impl.KAT_FILE), tool("kat-excerpts", os.path.join(HERE, "scan", "kat"))]
     pyfiles = ["prove.py", "prove.sh", "pqlite/scan.py", "pqlite/verify.py", "pqlite/tlsprobe.py", "pqlite/receipt.py",
-               "pqlite/allowlist.py", "pqlite/version.py", "pqlite/rules.py", "pqlite/skipdirs.py", "pqlite/impl.py"]
+               "pqlite/allowlist.py", "pqlite/version.py", "pqlite/rules.py", "pqlite/skipdirs.py", "pqlite/impl.py", "pqlite/cdx.py"]
     tools += [tool(p, os.path.join(HERE, p)) for p in pyfiles]
     if probe:
         tools.append(probe)
@@ -1126,7 +1145,11 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
     t0 = now()
     say(f"[6/{len(steps)}] (d) 표·검증 증적")
     art.add("tables/fragment.html", rc.render_fragment(r))  # 다른 HTML에 붙일 조각(md 문서에는 report.md)
-    art.add("tables/report.md", report_md(r, cbom_items["fixed"], ev_name))
+    art.add("tables/report.md", report_md(r, cbom_items["fixed"], params.ev))  # 실행 기록은 EV_NAME 을 줬을 때만 적는다(도구가 쓰지 않는 파일)
+    for side in ("orig", "fixed"):
+        write_cdx(art, f"tables/cbom-{side}.cdx.json", cbom_items[side],
+                  {"mode": params.mode, "tree": side, "tree_sha256": r["inputs"][side]["tree_sha256"], "tool_version": r["tool_version"],
+                   "ruleset_version": r["ruleset_version"], "ruleset_sha256": r["ruleset_sha256"], "scope": params.scope})
     r["artifacts"] = art.manifest()
     phase("(d) 표·검증 증적", t0)
     r["finished_at"] = rc.iso(now())
@@ -1142,12 +1165,14 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
     vres = rc.verify(out)
     bad = [w for ok, w in vres if not ok]
 
-    lines = [f"== PQ-Proof {ver.tool_version()}  ({time.strftime('%Y-%m-%d %H:%M:%S %Z')})  [{platform.machine()}]",
-             f"원본   : {in_o['path']} ({in_o['kind']}, 파일 {in_o['files']}, 트리 {in_o['tree_sha256'][:16]}"
-             + (f", zip {in_o['zip_sha256'][:16]}" if in_o["zip_sha256"] else "") + ")",
-             f"고친 판: {in_f['path']} ({in_f['kind']}, 파일 {in_f['files']}, 트리 {in_f['tree_sha256'][:16]}"
-             + (f", zip {in_f['zip_sha256']}" if in_f["zip_sha256"] else "") + ")",
-             f"바뀐 파일: 추가 {len(added)} · 삭제 {len(removed)} · 수정 {len(modified)}"]
+    def tree_line(label, i):
+        return (f"{label}: {i['path']} ({i['kind']}, 파일 {i['files']}, 트리 {i['tree_sha256'][:16]}"
+                + (f", zip {i['zip_sha256'][:16]}" if i["zip_sha256"] else "") + ")")
+    lines = [f"== PQ-Proof {ver.tool_version()}  ({time.strftime('%Y-%m-%d %H:%M:%S %Z')})  [{platform.machine()}]"]
+    if params.mode == "check":  # 한 트리 점검: 원본을 준 적이 없으니 트리 한 줄만(0.7.0)
+        lines.append(tree_line("트리   ", in_f))
+    else:
+        lines += [tree_line("원본   ", in_o), tree_line("고친 판", in_f), f"바뀐 파일: 추가 {len(added)} · 삭제 {len(removed)} · 수정 {len(modified)}"]
     if excl.items or ex_notes:
         lines.append(f"실행 데이터 제외: {' '.join(excl.patterns) or '없음'} (원본 {len(ex_o)}·고친 판 {len(ex_f)}개 파일)"
                      + ("".join(f"\n  제외 메모 {n}" for n in ex_notes)))
@@ -1204,10 +1229,13 @@ def run(orig, fixed, params, out=None, cache=None, quiet=False):
 # ---------------------------------------------------------------------------------------------
 # 한 트리 인벤토리(--inventory, 교차 리뷰 X13): 판정 없이 CBOM 과 계열별 고전 줄, PQC 이름 줄을 센다. 정기 감사·첫 현황 조사용
 def inventory(tree, params, out=None, quiet=False):
-    """한 트리를 두 스캐너와 residue.sh 로 훑어 out 에 inventory.json·tables/cbom.csv·artifacts/ 를 쓴다. 반환 (요약 dict, 종료 코드 0)."""
+    """한 트리를 두 스캐너와 residue.sh 로 훑어 out 에 inventory.json·tables/cbom.csv·tables/cbom.cdx.json·artifacts/ 를 쓴다. 반환 (요약 dict, 종료 코드 0)."""
+    problem = input_problem(os.path.abspath(tree))
+    if problem:
+        raise UsageError(problem)
     out = os.path.abspath(out or params.out or default_out(tree, "inventory"))
     if os.path.exists(out):
-        raise UsageError(f"출력 폴더가 이미 있다(덮어쓰지 않음): {out}")
+        raise UsageError(f"출력 폴더가 이미 있다(덮어쓰지 않음, the output folder exists and is not overwritten): {out}")
     started = now()
     os.makedirs(out)
     art = rc.Artifacts(out)
@@ -1231,6 +1259,9 @@ def inventory(tree, params, out=None, quiet=False):
     parsed = parse_residue(text)
     fams = parsed["families"] if parsed else None
     rs_sha = ver.ruleset_from_tools(rule_tools())
+    write_cdx(art, "tables/cbom.cdx.json", items, {"mode": "inventory", "tree": "tree", "tree_sha256": info["tree_sha256"],
+                                                   "tool_version": ver.tool_version(), "ruleset_version": ver.ruleset_label(rs_sha),
+                                                   "ruleset_sha256": rs_sha, "scope": params.scope})
     summary = {
         "format": "pqproof inventory 1", "tool_version": ver.tool_version(), "ruleset_version": ver.ruleset_label(rs_sha),
         "ruleset_sha256": rs_sha, "started_at": rc.iso(started), "input": info, "profile": params.profile, "scope": params.scope,
@@ -1256,7 +1287,7 @@ def inventory(tree, params, out=None, quiet=False):
                   + f" (합 {summary['classic_code_lines']}) · 보안레벨 3 미만 PQC {summary['weak_pqc']}")
             print("PQC 이름 줄: " + " · ".join(f"{k} {v}" for k, v in (summary["expect"] or {}).items()))
         print(f"TLS 서버 신호 {len(sig[0])} · 클라이언트 신호 {len(sig[1])} · 규칙 묶음 {summary['ruleset_version']}")
-        print(f"출력: {out} (inventory.json, tables/cbom.csv)")
+        print(f"출력: {out} (inventory.json, tables/cbom.csv, tables/cbom.cdx.json)")
     return summary, 0
 
 
@@ -1732,8 +1763,12 @@ def next_steps(r, fixed_items, out):
         if st.get("c-expect") == "fail":
             prof = r["params"].get("profile") or rules.DEFAULT_PROFILE
             names = " · ".join(f"{k} {'/'.join(rules.PROFILES[prof][k])}" for k in ("kem", "sig") if k in r["params"]["expect"])
-            lines.append(f"  c-expect: EXPECT 로 요구한 PQC 가 고친 판 코드에 없다(프로필 {prof}" + (f": {names}" if names else "")
-                         + "). 다른 크기를 쓰면 PROFILE 을 맞춘다")
+            if not (r["cbom"]["fixed"]["rows"] or r["cbom"]["orig"]["rows"]):  # 0.7.0: 암호를 아예 안 쓰는 트리
+                lines.append("  c-expect: 이 트리에는 암호 코드가 하나도 없다. PQC 를 요구하지 않을 트리면 EXPECT=none 으로 돌린다"
+                             " (no cryptography found; run with EXPECT=none if this tree is not expected to use PQC)")
+            else:
+                lines.append(f"  c-expect: EXPECT 로 요구한 PQC 가 고친 판 코드에 없다(프로필 {prof}" + (f": {names}" if names else "")
+                             + "). 다른 크기를 쓰면 PROFILE 을 맞춘다")
         if st.get("r-allow") == "fail":
             lines.append("  r-allow: 허용 항목마다 사람이 읽고 reviewed_by·reviewed_at 을 적거나, 안 쓰인 항목을 지운다")
         if st.get("a-cbom") == "fail" or st.get("c-classic") == "fail":
@@ -1742,6 +1777,20 @@ def next_steps(r, fixed_items, out):
     elif r["verdict"] == "undecided":
         lines.append("다음 할 일: 미판정 까닭은 위 [검사] 줄에 있다(예: TLS 서버 신호가 있으면 TLS_TARGETS 로 주소를 준다). "
                      "미판정은 통과로 세지 않는다")
+    elif any(v == "review" for v in st.values()):  # 0.7.0: 통과지만 사람이 볼 것이 남았을 때도 어디를 볼지 적는다
+        rev = [k for k, v in st.items() if v == "review"]
+        lines.append(f"사람이 볼 것(판정은 통과, FAIL_ON_REVIEW=1 이면 종료 5): {', '.join(rev)}")
+        if "r-allow" in rev:
+            lines.append("  r-allow: 허용 항목마다 사람이 읽고 reviewed_by·reviewed_at 을 적는다(목록 맨 위면 reviewed_digest 도). "
+                         "안 쓰인 항목은 지운다. 설명 " + doc_url("guide/allowlist.md"))
+        if "a-cbom" in rev or "c-classic" in rev:
+            lines.append("  a-cbom·c-classic: tables/cbom-fixed.csv 에서 '판정'이 검토 필요인 행(허용 범위 쓰기 경로, 복합 서명 등)")
+        if "r-review" in rev:
+            lines.append("  r-review: 지워진 검증 호출은 위 [r-review] 줄과 artifacts/weakening.json 의 review")
+    st_o, st_f = r["cbom"]["orig"]["blocking"], r["cbom"]["fixed"]["blocking"]
+    if st.get("a-input") == "undecided" and r["params"].get("mode") != "check" and st_o == 0 and st_f > 0:
+        lines.append(f"  두 폴더를 바꿔 준 것일 수 있다: 원본에는 막는 위치가 0곳, 고친 판에는 {st_f}곳이다(사용법: {entry_cmd()} <원본> <고친 판>)"
+                     " (the trees may be swapped: the original has no classical location and the converted tree has some)")
     return lines
 
 
@@ -2070,6 +2119,11 @@ def selftest(base=None, keep=False):
     return 0 if not bad and not (strict and skipped) else 1
 
 
+def entry_name():
+    """오류 줄 머리: pqproof 명령으로 돌면 pqproof, prove.sh 로 돌면 prove.sh(pip 사용자는 prove.sh 를 부른 적이 없다)."""
+    return "pqproof" if os.environ.get("PQPROOF_ENTRY") else "prove.sh"
+
+
 def main(argv):
     if argv[:1] == ["--selftest"]:
         return selftest(base=os.environ.get("SELFTEST_DIR") or None, keep=os.environ.get("KEEP") == "1")
@@ -2079,7 +2133,7 @@ def main(argv):
         try:
             return impl_main(argv[1:])
         except UsageError as e:
-            print(f"prove.sh: {e}", file=sys.stderr)
+            print(f"{entry_name()}: {e}", file=sys.stderr)
             return 2
         except KeyboardInterrupt:
             return 130
@@ -2108,7 +2162,7 @@ def main(argv):
         _, code, _ = run(argv[0], argv[1], params)
         return code
     except UsageError as e:
-        print(f"prove.sh: {e}", file=sys.stderr)
+        print(f"{entry_name()}: {e}", file=sys.stderr)
         return 2
     except KeyboardInterrupt:
         return 130

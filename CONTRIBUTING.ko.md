@@ -24,7 +24,7 @@ bash prove.sh --unit
 python3 -I tests/test_mappings.py   # after a mapping change
 ```
 
-CI는 모든 시험을 `STRICT=1`로 돌리고, 건너뛴 시험이 하나라도 있으면 실패합니다. 로컬에서 그렇게 하려면 세 가지가 더 필요합니다: `tls_probe`(`bash build-probe.sh`, Go 1.27 이상), `jsonschema`와 `SARIF_SCHEMA`에 둔 SARIF 스키마 파일, 시험 라이브러리 둘을 갖춘 pq-verify(`bash tests/pqverify_targets.sh <new folder>`가 만들고 `PQPROOF_PQV_LIB=`와 `PQPROOF_PQV_BAD_LIB=` 줄을 찍습니다. 나머지는 `.github/workflows/ci.yml` 참고). 이것들이 없으면 `STRICT=1`은 건너뜀 때문에 exit 1로 끝나는데, 그게 정상입니다. 규칙을 바꾸기 전에는 전부 돌립니다.
+CI는 모든 시험을 `STRICT=1`로 돌리고, 건너뛴 시험이 하나라도 있으면 실패합니다. 로컬에서 그렇게 하려면 네 가지가 더 필요합니다: `tls_probe`(`bash build-probe.sh`, Go 1.27 이상), `jsonschema`와 `SARIF_SCHEMA`에 둔 SARIF 스키마 파일과 `CDX_SCHEMA_DIR` 폴더에 둔 CycloneDX 1.6 스키마 파일 셋, 시험 라이브러리 둘을 갖춘 pq-verify(`bash tests/pqverify_targets.sh <new folder>`가 만들고 `PQPROOF_PQV_LIB=`와 `PQPROOF_PQV_BAD_LIB=` 줄을 찍습니다. 나머지는 `.github/workflows/ci.yml` 참고). 이것들이 없으면 `STRICT=1`은 건너뜀 때문에 exit 1로 끝나는데, 그게 정상입니다. 규칙을 바꾸기 전에는 전부 돌립니다.
 
 ```bash
 STRICT=1 bash prove.sh --unit && STRICT=1 bash prove.sh --selftest \

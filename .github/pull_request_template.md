@@ -7,7 +7,7 @@
 
 ## Checked
 
-- [ ] `bash prove.sh --unit` (CI runs it with `STRICT=1`; skips for missing `tls_probe`, `jsonschema` or pq-verify are fine locally)
+- [ ] `bash prove.sh --unit` (CI runs it with `STRICT=1`; skips for missing `tls_probe`, `jsonschema`, the CycloneDX schemas or pq-verify are fine locally)
 - [ ] For a rule change: `bash prove.sh --selftest` and `python3 -I tests/mutations/run_mutations.py --strict --golden tests/golden/verdicts.json`
 - [ ] For a mapping change: `python3 -I tests/test_mappings.py`
 - [ ] Commit subjects end with `Verdict impact: none` or `Verdict impact: yes`

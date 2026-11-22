@@ -69,6 +69,7 @@ packages = ["src/pqproof"]
 "probe" = "pqproof/_tool/probe"
 "LICENSE" = "pqproof/_tool/LICENSE"
 "CHANGELOG.md" = "pqproof/_tool/CHANGELOG.md"
+"guide" = "pqproof/_tool/guide"
 
 [tool.hatch.build.targets.sdist]
 include = [

@@ -24,7 +24,7 @@ bash prove.sh --unit
 python3 -I tests/test_mappings.py   # after a mapping change
 ```
 
-CI runs everything with `STRICT=1`, where any skipped test fails. Locally that needs three extras: `tls_probe` (`bash build-probe.sh`, Go 1.27 or later), `jsonschema` with the SARIF schema file in `SARIF_SCHEMA`, and pq-verify with two test libraries (`bash tests/pqverify_targets.sh <new folder>` builds them and prints the `PQPROOF_PQV_LIB=` and `PQPROOF_PQV_BAD_LIB=` lines; `.github/workflows/ci.yml` shows the rest). Without them `STRICT=1` exits 1 on the skips, which is expected. Before a rule change, run the full set:
+CI runs everything with `STRICT=1`, where any skipped test fails. Locally that needs four extras: `tls_probe` (`bash build-probe.sh`, Go 1.27 or later), `jsonschema` with the SARIF schema file in `SARIF_SCHEMA` and the three CycloneDX 1.6 schema files in a folder named by `CDX_SCHEMA_DIR`, and pq-verify with two test libraries (`bash tests/pqverify_targets.sh <new folder>` builds them and prints the `PQPROOF_PQV_LIB=` and `PQPROOF_PQV_BAD_LIB=` lines; `.github/workflows/ci.yml` shows the rest). Without them `STRICT=1` exits 1 on the skips, which is expected. Before a rule change, run the full set:
 
 ```bash
 STRICT=1 bash prove.sh --unit && STRICT=1 bash prove.sh --selftest \

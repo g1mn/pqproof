@@ -1,0 +1,6 @@
+$ bash /opt/pqproof-0.6.0/scan/cbom-scan.sh /opt/pqproof-0.6.0/examples/classic
+# exit=0
+CBOM 14건 → /work/proof-out/artifacts/cbom-orig/cbom-20261122-211242.md, /work/proof-out/artifacts/cbom-orig/cbom-20261122-211242.csv
+  13 쇼어로 깨짐
+   1 간접(라이브러리)
+

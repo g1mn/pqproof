@@ -3,6 +3,9 @@
 # Copy the job into .gitlab-ci.yml. It needs bash, OpenSSL (3.5 or later for the TLS cross-check) and git; the image
 # below is Debian 13, whose OpenSSL is 3.5. An offline runner can install the wheel from an internal mirror instead of PyPI.
 # Merge request pipelines only: CI_MERGE_REQUEST_DIFF_BASE_SHA is the base commit.
+# The original tree, the evidence folder and the SARIF file are written outside the checkout while PQ-Proof runs: the
+# converted tree is the checkout (.), and anything inside it is judged as part of it. They are copied in afterwards
+# for the artifacts.
 pqproof:
   image: python:3.13-slim-trixie
   stage: test
@@ -15,21 +18,24 @@ pqproof:
     - apt-get update -qq && apt-get install -y -qq --no-install-recommends git openssl > /dev/null
     - python3 -m pip install --quiet "pqproof==${PQ_PROOF_VERSION}"
   script:
-    - mkdir -p original
-    - git archive "$CI_MERGE_REQUEST_DIFF_BASE_SHA" | tar -x -C original
+    - T=$(mktemp -d)
+    # Not git archive: it drops export-ignore paths, and unchanged files would look added.
+    - GIT_INDEX_FILE="$T/base.idx" git read-tree "$CI_MERGE_REQUEST_DIFF_BASE_SHA"
+    - GIT_INDEX_FILE="$T/base.idx" git checkout-index -a --prefix="$T/original/"
     # Allowlist from the base commit, so a merge request cannot add entries and review fields to pass itself.
     - |
       if git cat-file -e "$CI_MERGE_REQUEST_DIFF_BASE_SHA:notes/unconverted.json" 2>/dev/null; then
-        git show "$CI_MERGE_REQUEST_DIFF_BASE_SHA:notes/unconverted.json" > base-unconverted.json
-        export ALLOW="$PWD/base-unconverted.json"
+        git show "$CI_MERGE_REQUEST_DIFF_BASE_SHA:notes/unconverted.json" > "$T/base-unconverted.json"
+        export ALLOW="$T/base-unconverted.json"
       else
         export ALLOW=none
       fi
-    - code=0; OUT="$PWD/pqproof-evidence" REQUIRE_REVIEW=1 pqproof original . || code=$?
-    - pqproof --verify pqproof-evidence
-    - pqproof sarif pqproof-evidence -o pqproof.sarif
+    - code=0; OUT="$T/evidence" REQUIRE_REVIEW=1 pqproof "$T/original" . || code=$?
+    - pqproof --verify "$T/evidence"
+    - pqproof sarif "$T/evidence" -o "$T/pqproof.sarif"
     - tool=$(python3 -c 'import os, pqproof; print(os.path.join(os.path.dirname(pqproof.__file__), "_tool"))')
-    - python3 -I "$tool/examples/gitlab/sarif_to_codequality.py" pqproof.sarif gl-code-quality-report.json
+    - python3 -I "$tool/examples/gitlab/sarif_to_codequality.py" "$T/pqproof.sarif" gl-code-quality-report.json
+    - cp -R "$T/evidence" pqproof-evidence && cp "$T/pqproof.sarif" pqproof.sarif
     - exit "$code"   # 0 pass, 1 fail, 2 usage or input error, 3 undecided, 4 tool error, 5 pass that needs review (FAIL_ON_REVIEW=1)
   artifacts:
     when: always

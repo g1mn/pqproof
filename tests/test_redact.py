@@ -145,6 +145,7 @@ class EndToEnd(unittest.TestCase):
         tables += "".join(pathlib.Path(self.out, n).read_text(encoding="utf-8") for n in ("receipt.json", "receipt.html", "deck.json",
                                                                                          "evidence-fragment.json"))
         self.assertIn("make-keys.sh", tables)
+        self.assertTrue(pathlib.Path(self.out, "tables", "cbom-fixed.cdx.json").is_file())  # the CycloneDX copy is in the scan above
         for s in secrets:
             self.assertNotIn(s, tables)
         doc = sarif.convert(self.out)
