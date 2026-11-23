@@ -775,6 +775,41 @@ def review_kinds(items):
                                   (f"열지 못한 키 자료·못 읽은 공개키 API {len(unres)}곳: " + ", ".join(unres[:4]) if unres else "")) if x)
 
 
+def tls_status(t_results, problem, sig_f, tls):
+    """b-tls 의 (판정, 실제 칸): TLS_TARGETS 를 잰 경우. 우선순위는 탐침 문제(판 불일치·대조 실패·도구 오류) → 잰 실패 → 인증서 검증 실패만(재지 못함)
+    → OpenSSL 교차 확인 불일치 → 통과. sig_f: (서버 신호, 클라이언트 신호), tls: 증적 tls 칸(via·probe_build)."""
+    disagree = [f"{t['addr']}@{t['servername']}" + (" (OpenSSL 인증서 검증 실패)" if tlsprobe.verify_failed(t["openssl"]) else "")
+                for t in t_results if t.get("openssl") is not None and not t.get("openssl_agrees")]
+    # 실제로 잰 실패가 하나라도 있으면 그 대상은 실패다. 이유가 모두 인증서 검증 실패인 대상만 재지 못한 것으로 센다
+    failed = [t for t in t_results if not t["ok"] and not tlsprobe.only_unverified(t)]
+    unmeasured = [t for t in t_results if tlsprobe.only_unverified(t)]
+    if problem:
+        st, act = "undecided", f"TLS 실측을 믿을 수 없음: {problem.splitlines()[0]}"
+    elif failed:
+        st = "fail"
+        act = "; ".join(f"{t['addr']}@{t['servername']}: {', '.join(t['why'])}" for t in failed + unmeasured)
+    elif unmeasured:  # 인증서 검증 실패는 재지 못한 것이다: 통과도 실패도 아니다(DESIGN.md 'skipped is not passed')
+        st = "undecided"
+        act = ("; ".join(f"{t['addr']}@{t['servername']} trust={t.get('trust')}: {', '.join(t['why'])}" for t in unmeasured)
+               + " · 서버 인증서를 믿을 CA 를 '#/절대경로/ca.pem' 으로 주거나, 더 약한 처음 본 인증서 믿기를 '#tofu' 로 명시")
+    elif disagree:
+        st, act = "undecided", f"OpenSSL 3.5 교차 확인이 다름: {', '.join(disagree)}"
+    else:
+        st = "pass"
+        act = "; ".join(f"{t['addr']}@{t['servername']} {t['hybrid']['group']} / 옛 클라이언트 "
+                        f"{t['classical']['group'] or '거부'}" for t in t_results)
+        act += f" · 잰 대상 {len(t_results)}개, 고친 판 TLS 서버 신호 {len(sig_f[0])}곳(신호마다 대상이 있는지 사람이 확인)"
+        if sig_f[1]:
+            act += f" · 클라이언트 TLS 신호 {len(sig_f[1])}곳은 재지 않음"
+        if any(t.get("openssl_note") for t in t_results):
+            act += " · OpenSSL 교차 확인 불가(3.5 미만이거나 컨테이너 모드, tls_probe 결과만)"
+    if tls.get("via", "host") != "host" and any(t.get("trust") == tlsprobe.TRUST_SYSTEM for t in t_results):
+        act += " · 컨테이너 모드의 system 신뢰는 대상 이미지의 신뢰 저장소(대상이 고를 수 있다, CA 파일을 주면 그 CA 만 믿는다)"
+    if tls.get("probe_build"):  # 탐침 바이너리 출처(교차 리뷰 X47)
+        act += f" · tls_probe {tlsprobe.PROVENANCE_KO.get(tls['probe_build'], tls['probe_build'])}"
+    return st, act
+
+
 # ---------------------------------------------------------------------------------------------
 # 검사 판정식: 단계마다 모은 결과로 검사 여덟 줄과 판정을 낸다. prove.run 이 부른다.
 def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o, sig_f, tls, problem, deny, changed, review,
@@ -883,32 +918,7 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
         check("b-tls", "TLS 하이브리드 협상·옛 클라이언트", "undecided", "TLS_TARGETS로 실측",
               f"TLS 서버 신호 {len(sig_f[0])}곳인데 TLS_TARGETS 없음")
     else:
-        disagree = [f"{t['addr']}@{t['servername']}" + (" (OpenSSL 인증서 검증 실패)" if tlsprobe.verify_failed(t["openssl"]) else "")
-                    for t in t_results if t.get("openssl") is not None and not t.get("openssl_agrees")]
-        failed = [t for t in t_results if not t["ok"] and not tlsprobe.unverified(t)]
-        unmeasured = [t for t in t_results if not t["ok"] and tlsprobe.unverified(t)]
-        if problem:
-            st, act = "undecided", f"대조 실패: {problem.splitlines()[0]}"
-        elif failed:
-            st = "fail"
-            act = "; ".join(f"{t['addr']}@{t['servername']}: {', '.join(t['why'])}" for t in failed + unmeasured)
-        elif unmeasured:  # 인증서 검증 실패는 재지 못한 것이다: 통과도 실패도 아니다(DESIGN.md 'skipped is not passed')
-            st = "undecided"
-            act = ("; ".join(f"{t['addr']}@{t['servername']} trust={t.get('trust')}: {', '.join(t['why'])}" for t in unmeasured)
-                   + " · 서버 인증서를 믿을 CA 를 '#/절대경로/ca.pem' 으로 주거나, 더 약한 처음 본 인증서 믿기를 '#tofu' 로 명시")
-        elif disagree:
-            st, act = "undecided", f"OpenSSL 3.5 교차 확인이 다름: {', '.join(disagree)}"
-        else:
-            st = "pass"
-            act = "; ".join(f"{t['addr']}@{t['servername']} {t['hybrid']['group']} / 옛 클라이언트 "
-                            f"{t['classical']['group'] or '거부'}" for t in t_results)
-            act += f" · 잰 대상 {len(t_results)}개, 고친 판 TLS 서버 신호 {len(sig_f[0])}곳(신호마다 대상이 있는지 사람이 확인)"
-            if sig_f[1]:
-                act += f" · 클라이언트 TLS 신호 {len(sig_f[1])}곳은 재지 않음"
-            if any(t.get("openssl_note") for t in t_results):
-                act += " · OpenSSL 교차 확인 불가(3.5 미만이거나 컨테이너 모드, tls_probe 결과만)"
-        if tls.get("probe_build"):  # 탐침 바이너리 출처(교차 리뷰 X47)
-            act += f" · tls_probe {tlsprobe.PROVENANCE_KO.get(tls['probe_build'], tls['probe_build'])}"
+        st, act = tls_status(t_results, problem, sig_f, tls)
         check("b-tls", "TLS 하이브리드 협상·옛 클라이언트", st,
               f"대조 성립, 하이브리드 전용 제시 → {prof['tls_group']}(TLS 1.3), 옛 클라이언트 {'접속' if params.classic == 'allow' else '거부'}",
               act)

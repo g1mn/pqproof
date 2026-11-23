@@ -544,6 +544,10 @@ def tls_runs(params, tls_dir, art_log, targets, baseline, expect):
     prof = rules.PROFILES[params.profile]
     group, cert_keys = prof["tls_group"], prof["cert_keys"]
     try:
+        # 재기 전에 탐침이 스스로 찍는 판을 본다(대상을 재는 바로 그 바이너리, 컨테이너 모드면 리눅스 바이너리)
+        problem = tlsprobe.version_problem(tlsprobe.reported_version(runner.run(["version"])[1]))
+        if problem:
+            return None, problem, [], []
         results, problem, addrs = tlsprobe.references(runner, cert_runner)
         if results:
             controls = {k: dict(h.to_json(), addr=addrs["positive"] if k == "positive" else addrs["negative"])
@@ -559,8 +563,13 @@ def tls_runs(params, tls_dir, art_log, targets, baseline, expect):
                 res = tlsprobe.probe_target(runner, addr, servername=name, ca=ca_in, label=tag, hybrid_group=group,
                                             tofu=trust == tlsprobe.TRUST_TOFU)
                 hyb, cls = res["hybrid"][0], res["classical"][0]
+                # exit 0·1 만 핸드셰이크 결과다. 2(사용법 오류)·시간 초과의 빈 출력을 parse 하면 'no cipher negotiated' 실패로 읽힌다
+                broken = [f"{tag} {k}: exit={rc}" for k, (_, _, rc) in res.items() if rc not in (0, 1)]
+                if broken and not problem:
+                    problem = f"tls_probe 도구 오류({', '.join(broken)}), 핸드셰이크 결과로 읽지 않음"
                 ok, why = tlsprobe.target_verdict(hyb, cls, params.classic, group)
-                if "cert" in expect and not any((hyb.cert_key or "").startswith(k) for k in cert_keys):
+                # 검증 실패면 인증서를 재지 못했으니 공개키 이유를 더하지 않는다(더하면 잰 실패로 세어진다)
+                if "cert" in expect and not tlsprobe.verify_failed(hyb) and not any((hyb.cert_key or "").startswith(k) for k in cert_keys):
                     ok, why = False, why + [f"인증서 공개키가 {'·'.join(cert_keys)}가 아님({hyb.cert_key})"]
                 # openssl·openssl_agrees 칸은 늘 둔다. 교차 확인을 못 하면 둘 다 null 이고 openssl_note 에 '교차 확인 불가'와 까닭을 적는다
                 # (OpenSSL 3.5 미만 러너에서 칸이 없어 읽는 쪽이 KeyError 로 죽던 것을 원인 쪽에서 막는다)
@@ -606,7 +615,8 @@ def probe_tool():
         return None
     if not (os.path.isfile(path) and os.access(path, os.X_OK)):
         return None
-    t = tool("tls_probe", str(path), tlsprobe.PROBE_VERSION)
+    # 판은 바이너리가 스스로 찍은 것(파이썬 상수를 적으면 옛 바이너리로 잰 증적도 새 판처럼 보인다)
+    t = tool("tls_probe", str(path), tlsprobe.binary_version(path) or "unknown")
     t["version"] += f" ({tlsprobe.provenance(path, t['sha256'])})"  # 릴리스 해시와 대조(교차 리뷰 X47): release · local · unchecked
     return t
 

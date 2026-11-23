@@ -1,5 +1,5 @@
 {
- "about": "Ruleset versions: a name for each hash of the rule files (pqlite/version.py RULESET_FILES). A run records ruleset_version and ruleset_sha256 in receipt.json. Each version lists sha256, since (the first tool version that shipped it), verdict_impact (yes when the same trees can get a different verdict, check status or count than under the previous ruleset; no when only comments, wording or code layout changed) and files (path and sha256 of each rule file). The file list can differ between versions: ruleset 1 hashed six files, ruleset 2 hashes eleven: it adds scan/skip-dirs, scan/profiles.json, pqlite/rules.py, pqlite/skipdirs.py and pqlite/tlsprobe.py. Ruleset 3 hashes fourteen: it adds pqlite/impl.py, scan/kat-kpqc.json and scan/kat (the reference KAT excerpts, one digest over the *.json files of the folder, pqlite/version.py path_sha256). Ruleset 4 hashes the same fourteen and counts SLH-DSA 192 and 256 (FIPS 205) as an expected signature (E-SLHDSA) and blocks SLH-DSA 128 as below category 3. --verify recomputes a receipt's ruleset_sha256 from the files of the ruleset it names. Changing a rule file needs a new name here, a new current, and a CHANGELOG entry with its verdict impact. A ruleset with verdict_impact yes first ships in a MINOR release (MAJOR from 1.0), never a PATCH release (tests/version_policy.py). pqlite/version.py --ruleset-json prints sha256 and files for the rule files on disk. Ruleset 5 hashes the same fourteen files with the same rules as ruleset 4; only comments changed. From ruleset 5 a record also keeps comment_free (the hash of the rule files without comments) and aliases: a later edit that changes only comments is recorded as an alias of the same name (pqlite/version.py --alias), so comments no longer rename a ruleset. --verify accepts the recorded hash or an alias. Ruleset 6 hashes the same fourteen files: one awk mask (MASKFN, the same text in scan/cbom-scan.sh and scan/residue.sh) hides the same values as prove.py REDACT, residue.sh masks its excerpts too, and both add ssh-keygen -N. Verdict impact yes only for a file over MAX_FILE_MIB, where prove falls back to the residue.sh excerpt and a masked secret value could hold a rule word. Ruleset 7 hashes the same fourteen files: a classical row whose stated size is below 112-bit security (RSA, DSA, DH or ElGamal under 2048 bits, a curve under 224 bits) is never allowed (NIS draft cryptographic security guideline, November 2026); PQ/PQ hybrid lines are marked; allowlist entries read residual_risk, compensating_control and replacement_plan; tls_probe 0.5.0 reports the cipher suite and the certificate expiry. Verdict impact yes only for such a weak classical key that an allow rule, a hybrid or an allowlist entry used to take out of the blocking count. Ruleset 8 hashes the same fourteen files: a TLS target without a CA is verified against the system trust store and its host name (tls_probe 0.6.0), trust on first use needs an explicit #tofu, and a handshake that fails certificate verification leaves b-tls undecided instead of counting as a hybrid result or a refusal. Verdict impact yes only for TLS targets: one given without a CA whose certificate the system trust store does not accept (a self-signed or private CA) moves from pass to undecided, and one whose certificate does not verify against its CA file moves from fail to undecided.",
+ "about": "Ruleset versions: a name for each hash of the rule files (pqlite/version.py RULESET_FILES). A run records ruleset_version and ruleset_sha256 in receipt.json. Each version lists sha256, since (the first tool version that shipped it), verdict_impact (yes when the same trees can get a different verdict, check status or count than under the previous ruleset; no when only comments, wording or code layout changed) and files (path and sha256 of each rule file). The file list can differ between versions: ruleset 1 hashed six files, ruleset 2 hashes eleven: it adds scan/skip-dirs, scan/profiles.json, pqlite/rules.py, pqlite/skipdirs.py and pqlite/tlsprobe.py. Ruleset 3 hashes fourteen: it adds pqlite/impl.py, scan/kat-kpqc.json and scan/kat (the reference KAT excerpts, one digest over the *.json files of the folder, pqlite/version.py path_sha256). Ruleset 4 hashes the same fourteen and counts SLH-DSA 192 and 256 (FIPS 205) as an expected signature (E-SLHDSA) and blocks SLH-DSA 128 as below category 3. --verify recomputes a receipt's ruleset_sha256 from the files of the ruleset it names. Changing a rule file needs a new name here, a new current, and a CHANGELOG entry with its verdict impact. A ruleset with verdict_impact yes first ships in a MINOR release (MAJOR from 1.0), never a PATCH release (tests/version_policy.py). pqlite/version.py --ruleset-json prints sha256 and files for the rule files on disk. Ruleset 5 hashes the same fourteen files with the same rules as ruleset 4; only comments changed. From ruleset 5 a record also keeps comment_free (the hash of the rule files without comments) and aliases: a later edit that changes only comments is recorded as an alias of the same name (pqlite/version.py --alias), so comments no longer rename a ruleset. --verify accepts the recorded hash or an alias. Ruleset 6 hashes the same fourteen files: one awk mask (MASKFN, the same text in scan/cbom-scan.sh and scan/residue.sh) hides the same values as prove.py REDACT, residue.sh masks its excerpts too, and both add ssh-keygen -N. Verdict impact yes only for a file over MAX_FILE_MIB, where prove falls back to the residue.sh excerpt and a masked secret value could hold a rule word. Ruleset 7 hashes the same fourteen files: a classical row whose stated size is below 112-bit security (RSA, DSA, DH or ElGamal under 2048 bits, a curve under 224 bits) is never allowed (NIS draft cryptographic security guideline, November 2026); PQ/PQ hybrid lines are marked; allowlist entries read residual_risk, compensating_control and replacement_plan; tls_probe 0.5.0 reports the cipher suite and the certificate expiry. Verdict impact yes only for such a weak classical key that an allow rule, a hybrid or an allowlist entry used to take out of the blocking count. Ruleset 8 hashes the same fourteen files: a TLS target without a CA is verified against the system trust store and its host name (tls_probe 0.6.0), trust on first use needs an explicit #tofu, and a handshake that fails certificate verification counts as not measured, never as a hybrid result or a refusal; each handshake is judged on its own, so a failure measured before the certificate is checked still fails. A tls_probe binary that is not version 0.6.0, or a connect that ends with a usage error, leaves b-tls undecided. Verdict impact yes only for TLS targets: one given without a CA whose certificate the system trust store does not accept (a self-signed or private CA) moves from pass to undecided, and from fail to undecided when every failing handshake now fails verification (for example the old client accepted under CLASSIC=deny); one whose certificate does not verify against its CA file moves from fail to undecided in the same way. Either stays fail when the hybrid-only offer is refused (an X25519-only server).",
  "current": "8",
  "versions": {
   "1": {
@@ -586,7 +586,7 @@
    "aliases": []
   },
   "8": {
-   "sha256": "46d39e04769630b12b3dbfb574cc9e7f83b83d11abc83596f109e8b2dd4929c0",
+   "sha256": "4daffff53181918a702231ceff96de36e62e35dfb4855952d4682b1c6039756a",
    "since": "0.8.0",
    "verdict_impact": "yes",
    "files": [
@@ -600,7 +600,7 @@
     },
     {
      "path": "pqlite/rules.py",
-     "sha256": "9200446ea5521aa4b0f1e255efeff0e53eea154c2610857bde70e091ebbbf871"
+     "sha256": "b1e808f253d7ac8ad6f754615b1fe0f545b10066c55fde6406f65248f821f959"
     },
     {
      "path": "pqlite/scan.py",
@@ -612,7 +612,7 @@
     },
     {
      "path": "pqlite/tlsprobe.py",
-     "sha256": "38ae144aa203617df1f5cce192e5ff796e72924714108bca2564b23f1e3bc00a"
+     "sha256": "34ee6d1a70980c0d6bb0e6bb79a184033d081e002e1ebdeb757191e9ceda8d56"
     },
     {
      "path": "pqlite/verify.py",
@@ -648,7 +648,7 @@
     }
    ],
    "comment_free": {
-    "sha256": "e65d3b89f18d175bbc5d41dd745e3cad0941a7862705da3cf363948a352c083a",
+    "sha256": "92bc290b095d88695e1e20103983e540c99dd5115b2257d448549d9ef2b91df7",
     "files": [
      {
       "path": "pqlite/allowlist.py",
@@ -660,7 +660,7 @@
      },
      {
       "path": "pqlite/rules.py",
-      "sha256": "b568e4c96de5574146bdfbb519982f0892a24d8eb6aeb0dbc92bf735733d1b5b"
+      "sha256": "3fa859cca60559243f5bec0f09f6cf6dd1206e56e1e0522726767db0ab540db1"
      },
      {
       "path": "pqlite/scan.py",
@@ -672,7 +672,7 @@
      },
      {
       "path": "pqlite/tlsprobe.py",
-      "sha256": "db45e263be8547d462afc277c24b35e62c12dc5db636f39a1ae7562280cd271f"
+      "sha256": "a86b39a22e8498b53ca859fec5664fae3d54eb5f0478d25a1a7e9d7e13fcf8a9"
      },
      {
       "path": "pqlite/verify.py",

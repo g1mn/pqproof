@@ -25,6 +25,7 @@ The four gaps in the NIS and NSR draft mappings (posted 2026-11-16) that a migra
 ## 0.8.0
 
 - TLS targets are verified by default (OpenSSF Best Practices silver, `crypto_certificate_verification`): a target without a CA is checked against the system trust store and its host name, and trust on first use needs an explicit `#tofu`. A certificate that does not verify leaves `b-tls` undecided instead of passing.
+- The tool checks that the `tls_probe` binary on disk is the version it needs (0.6.0) before a TLS run, and `pqproof doctor` warns about an old one left in the cache or `PROBE_BIN_DIR`.
 
 ## When the KISA PQC migration guide is published
 

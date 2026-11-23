@@ -41,6 +41,7 @@ TRUST_SYSTEM, TRUST_CA, TRUST_TOFU = "system", "ca-file", "tofu"
 # tls_probe 가 검증 실패 error 줄 앞에 붙이는 말. 옛 탐침은 Go 의 기본 낱말을 그대로 찍었다
 VERIFY_FAILED = "certificate verification failed: "
 _VERIFY_FAILED_RE = re.compile(r"^(?:certificate verification failed: |tls: failed to verify certificate: )")
+UNVERIFIED_WHY = "인증서 검증 실패로 재지 못함"
 
 
 @dataclass(frozen=True)
@@ -73,11 +74,6 @@ def verify_failed(h):
         return False
     ok, err = (h.get("ok"), h.get("error")) if isinstance(h, dict) else (h.ok, h.error)
     return not ok and bool(_VERIFY_FAILED_RE.match(err or ""))
-
-
-def unverified(item):
-    """대상 결과(prove.py tls_runs 의 한 칸)에서 인증서 검증 실패로 재지 못한 핸드셰이크가 있나."""
-    return verify_failed(item.get("hybrid")) or verify_failed(item.get("classical"))
 
 
 def _field(text, name):
@@ -130,20 +126,32 @@ def control_problem(results):
 
 def target_verdict(hybrid, classical, classic="allow", group=OFFER_HYBRID):
     """대상 하나의 판정: (통과 여부, 이유 목록). hybrid·classical은 Handshake. group: 홀로 제시한 하이브리드 그룹(PROFILE 이 정한다,
-    기본 X25519MLKEM768, cnsa2 는 SecP384r1MLKEM1024. 교차 리뷰 X11)."""
-    unmeasured = [(name, h) for name, h in (("하이브리드 전용 제시", hybrid), ("옛 클라이언트", classical)) if verify_failed(h)]
-    if unmeasured:  # 검증 실패는 서버가 거부한 것도 고전으로 붙은 것도 아니다: 재지 못했다
-        return False, [f"인증서 검증 실패로 재지 못함({name}, trust={h.trust or '?'}): {h.error}" for name, h in unmeasured]
+    기본 X25519MLKEM768, cnsa2 는 SecP384r1MLKEM1024. 교차 리뷰 X11).
+    핸드셰이크마다 따로 본다. 검증 실패한 쪽은 재지 못한 것이라 규칙에 대 보지 않고 UNVERIFIED_WHY 이유만 남긴다. 다른 쪽에서 실제로
+    잰 실패(하이브리드 전용 제시 거부 등)는 버리지 않는다: 그것만으로 대상이 실패다(only_unverified 가 거짓)."""
     why = []
-    if hybrid.group != group:
+    if verify_failed(hybrid):
+        pass
+    elif hybrid.group != group:
         why.append(f"하이브리드 전용 제시에 {group}가 아님({hybrid.group or hybrid.error})")
     elif (hybrid.protocol or "").replace(" ", "").replace("v", "") != "TLS1.3":  # "TLS 1.3"(Go), "TLSv1.3"(OpenSSL)
         why.append(f"프로토콜이 TLS 1.3이 아님({hybrid.protocol})")
-    if classic == "allow" and classical.kind != "classical":
+    if verify_failed(classical):
+        pass
+    elif classic == "allow" and classical.kind != "classical":
         why.append(f"옛 클라이언트(X25519,P-256) 접속이 고전 그룹이 아님({classical.group or classical.error})")
-    if classic == "deny" and classical.kind != "failed":
+    elif classic == "deny" and classical.kind != "failed":
         why.append(f"옛 클라이언트(X25519,P-256)가 붙었다({classical.group}), CLASSIC=deny")
+    # 검증 실패는 서버가 거부한 것도 고전으로 붙은 것도 아니다: 재지 못했다
+    why += [f"{UNVERIFIED_WHY}({name}, trust={h.trust or '?'}): {h.error}"
+            for name, h in (("하이브리드 전용 제시", hybrid), ("옛 클라이언트", classical)) if verify_failed(h)]
     return not why, why
+
+
+def only_unverified(item):
+    """대상 결과(prove.py tls_runs 의 한 칸)가 통과하지 못한 까닭이 모두 인증서 검증 실패(재지 못함)인가.
+    실제로 잰 실패가 하나라도 섞이면 거짓이다(그 대상은 실패)."""
+    return not item["ok"] and bool(item["why"]) and all(w.startswith(UNVERIFIED_WHY) for w in item["why"])
 
 
 def source_sha256(src=PROBE_SRC):
@@ -192,6 +200,31 @@ def host_binary():
     if not system or not arch:
         raise RuntimeError(f"tls_probe 바이너리가 없는 플랫폼: {platform.system()} {platform.machine()}")
     return BIN_DIR / f"{PROBE_NAME}-{system}-{arch}"
+
+
+def reported_version(text):
+    """'tls_probe 0.6.0 (go1.27.4)'(tls_probe version 출력)에서 판. 못 읽으면 None."""
+    m = re.search(r"^tls_probe (\S+)", text or "", re.M)
+    return m[1] if m else None
+
+
+def binary_version(binary, timeout=10):
+    """바이너리가 스스로 찍는 판. 실행하지 못하면 None."""
+    try:
+        r = subprocess.run([str(binary), "version"], capture_output=True, text=True, timeout=timeout, stdin=subprocess.DEVNULL)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return reported_version(r.stdout)
+
+
+def version_problem(got):
+    """탐침 판이 PROBE_VERSION 이 아니면 그 까닭(아니면 None). 0.5.0 탐침은 -ca·-tofu 없는 connect(시스템 신뢰 저장소)를
+    사용법 오류로 끝내고, 그 출력을 협상 실패로 읽으면 미판정이어야 할 것이 실패가 된다. PROBE_BIN_DIR·캐시의 바이너리는
+    도구를 올려도 그대로 남는다."""
+    if got == PROBE_VERSION:
+        return None
+    return (f"tls_probe 바이너리 판이 {got or '알 수 없음'}인데 이 도구는 {PROBE_VERSION} 이 필요하다. 다시 빌드하거나"
+            f"(pqproof build-probe, 소스에서는 bash build-probe.sh) 같은 판 릴리스 바이너리로 PROBE_BIN_DIR 을 바꾼다")
 
 
 def free_port():
@@ -282,9 +315,11 @@ class ContainerRunner(HostRunner):
         return "/t/" + "/".join(parts)
 
     def _docker(self, extra, args):
-        # --pull=never: 이미지가 맥에 없으면 내려받지 말고 실패한다(오프라인 보장)
+        # --pull=never: 이미지가 맥에 없으면 내려받지 말고 실패한다(오프라인 보장).
+        # SSL_CERT_FILE·SSL_CERT_DIR 을 비운다: 리눅스의 Go crypto/x509 는 이 둘을 읽고(빈 값이면 기본 경로), 이미지는 검사받는
+        # 고친 트리로 만들어지므로 ENV 로 자기 CA 를 '시스템' 신뢰로 고를 수 있다. 이미지 안의 기본 경로 파일은 막지 못한다(DESIGN.md)
         return [self.docker, "run", *extra, "--network", f"container:{self.container}", "--user", "0:0", "--pull=never",
-                "-v", f"{BIN_DIR}:/b:ro", "-v", f"{self.tls_dir}:/t",
+                "-e", "SSL_CERT_FILE=", "-e", "SSL_CERT_DIR=", "-v", f"{BIN_DIR}:/b:ro", "-v", f"{self.tls_dir}:/t",
                 "--entrypoint", f"/b/{PROBE_NAME}-linux-{self.arch}", self.image, *args]
 
     def argv(self, args):
