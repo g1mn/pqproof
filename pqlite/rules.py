@@ -883,12 +883,19 @@ def judge(params, cbom, cbom_items, java_rec, files_o, files_f, t_results, sig_o
         check("b-tls", "TLS 하이브리드 협상·옛 클라이언트", "undecided", "TLS_TARGETS로 실측",
               f"TLS 서버 신호 {len(sig_f[0])}곳인데 TLS_TARGETS 없음")
     else:
-        disagree = [f"{t['addr']}@{t['servername']}" for t in t_results if t.get("openssl") is not None and not t.get("openssl_agrees")]
+        disagree = [f"{t['addr']}@{t['servername']}" + (" (OpenSSL 인증서 검증 실패)" if tlsprobe.verify_failed(t["openssl"]) else "")
+                    for t in t_results if t.get("openssl") is not None and not t.get("openssl_agrees")]
+        failed = [t for t in t_results if not t["ok"] and not tlsprobe.unverified(t)]
+        unmeasured = [t for t in t_results if not t["ok"] and tlsprobe.unverified(t)]
         if problem:
             st, act = "undecided", f"대조 실패: {problem.splitlines()[0]}"
-        elif not all(t["ok"] for t in t_results):
+        elif failed:
             st = "fail"
-            act = "; ".join(f"{t['addr']}@{t['servername']}: {', '.join(t['why'])}" for t in t_results if not t["ok"])
+            act = "; ".join(f"{t['addr']}@{t['servername']}: {', '.join(t['why'])}" for t in failed + unmeasured)
+        elif unmeasured:  # 인증서 검증 실패는 재지 못한 것이다: 통과도 실패도 아니다(DESIGN.md 'skipped is not passed')
+            st = "undecided"
+            act = ("; ".join(f"{t['addr']}@{t['servername']} trust={t.get('trust')}: {', '.join(t['why'])}" for t in unmeasured)
+                   + " · 서버 인증서를 믿을 CA 를 '#/절대경로/ca.pem' 으로 주거나, 더 약한 처음 본 인증서 믿기를 '#tofu' 로 명시")
         elif disagree:
             st, act = "undecided", f"OpenSSL 3.5 교차 확인이 다름: {', '.join(disagree)}"
         else:

@@ -235,17 +235,22 @@ def number(env, name, default, lo, hi):
     return int(v)
 
 
-TARGET = re.compile(r"(?P<addr>[A-Za-z0-9_.\[\]:-]+:[0-9]{1,5})(?:@(?P<name>[A-Za-z0-9_.-]{1,253}))?(?:#(?P<ca>/.+))?")
+TARGET = re.compile(r"(?P<addr>(?P<host>[A-Za-z0-9_.\[\]:-]+):[0-9]{1,5})(?:@(?P<name>[A-Za-z0-9_.-]{1,253}))?"
+                    r"(?:#(?P<ca>/.+)|#(?P<tofu>tofu))?")
 
 
 def parse_target(spec):
-    """'127.0.0.1:8443@localhost#/path/ca.pem' → (주소, 서버 이름, CA 경로 또는 None)."""
+    """'127.0.0.1:8443@localhost#/path/ca.pem' → (주소, 서버 이름, CA 경로 또는 None, 신뢰 방식).
+    신뢰 방식: CA 를 주면 ca-file, '#tofu' 면 tofu(명시적으로 고를 때만, 더 약함), 둘 다 없으면 system(시스템 신뢰 저장소).
+    서버 이름을 안 주면 ca-file·tofu 는 예전처럼 localhost, system 은 주소의 호스트(공인 인증서는 localhost 로 나오지 않는다)."""
     m = TARGET.fullmatch(spec)
     if not m:
-        raise UsageError(f"TLS 대상 꼴이 틀림: {spec!r} (host:port[@서버이름][#/CA.pem 절대 경로])")
+        raise UsageError(f"TLS 대상 꼴이 틀림: {spec!r} (host:port[@서버이름][#/CA.pem 절대 경로 | #tofu])")
     if m["ca"] and not os.path.isfile(m["ca"]):
         raise UsageError(f"CA 파일 없음: {m['ca']}")
-    return m["addr"], m["name"] or "localhost", m["ca"]
+    trust = tlsprobe.TRUST_CA if m["ca"] else tlsprobe.TRUST_TOFU if m["tofu"] else tlsprobe.TRUST_SYSTEM
+    name = m["name"] or (m["host"].strip("[]") if trust == tlsprobe.TRUST_SYSTEM else "localhost")
+    return m["addr"], name, m["ca"], trust
 
 
 # ---------------------------------------------------------------------------------------------
@@ -545,29 +550,32 @@ def tls_runs(params, tls_dir, art_log, targets, baseline, expect):
                         for k, (h, raw) in results.items()}
         for label, specs, out in (("t", targets, results_t), ("b", baseline, results_b)):
             for i, spec in enumerate(specs, 1):
-                addr, name, ca = parse_target(spec)
+                addr, name, ca, trust = parse_target(spec)
                 tag = f"{label}{i}"
                 ca_in = None
                 if ca:
                     shutil.copyfile(ca, os.path.join(tls_dir, f"{tag}-ca.pem"))
                     ca_in = runner.path(f"{tag}-ca.pem")
-                res = tlsprobe.probe_target(runner, addr, servername=name, ca=ca_in, label=tag, hybrid_group=group)
+                res = tlsprobe.probe_target(runner, addr, servername=name, ca=ca_in, label=tag, hybrid_group=group,
+                                            tofu=trust == tlsprobe.TRUST_TOFU)
                 hyb, cls = res["hybrid"][0], res["classical"][0]
                 ok, why = tlsprobe.target_verdict(hyb, cls, params.classic, group)
                 if "cert" in expect and not any((hyb.cert_key or "").startswith(k) for k in cert_keys):
                     ok, why = False, why + [f"인증서 공개키가 {'·'.join(cert_keys)}가 아님({hyb.cert_key})"]
                 # openssl·openssl_agrees 칸은 늘 둔다. 교차 확인을 못 하면 둘 다 null 이고 openssl_note 에 '교차 확인 불가'와 까닭을 적는다
                 # (OpenSSL 3.5 미만 러너에서 칸이 없어 읽는 쪽이 KeyError 로 죽던 것을 원인 쪽에서 막는다)
-                item = {"target": spec, "addr": addr, "servername": name, "trust": "ca-file" if ca else "tofu",
+                item = {"target": spec, "addr": addr, "servername": name, "trust": trust,
                         "hybrid": hyb.to_json(), "classical": cls.to_json(), "ok": ok, "why": why, "openssl": None,
                         "openssl_agrees": None}
                 if not xcheck:
                     item["openssl_note"] = (f"교차 확인 불가: OpenSSL 3.5 이상 아님({openssl_version(params.openssl) or '없음'})"
                                             if params.tls_via == "host" else f"교차 확인 불가: TLS_VIA={params.tls_via}(컨테이너 안에서 잼)")
                 if xcheck:
-                    ca_path = os.path.join(tls_dir, f"{tag}-ca.pem" if ca else f"{tag}-hybrid-tofu-ca.pem")
+                    # system 은 OpenSSL 기본 신뢰 경로. tofu 인데 사슬을 못 받았으면(탐침도 실패) 기본 경로로 검증해 같이 실패한다
+                    ca_path = {tlsprobe.TRUST_CA: os.path.join(tls_dir, f"{tag}-ca.pem"),
+                               tlsprobe.TRUST_TOFU: os.path.join(tls_dir, f"{tag}-hybrid-tofu-ca.pem")}.get(trust)
                     oh, argv, raw = tlsprobe.openssl_cross_check(xcheck, addr, name,
-                                                                 ca_path if os.path.isfile(ca_path) else None, group=group)
+                                                                 ca_path if ca_path and os.path.isfile(ca_path) else None, group=group)
                     art_log.append({"argv": argv, "exit_code": None, "stdout": raw, "stderr": "", "t": now()})
                     item["openssl"] = oh.to_json()
                     item["openssl_agrees"] = (oh.group == hyb.group) if hyb.ok else (not oh.ok)
@@ -1948,7 +1956,7 @@ def selftest(base=None, keep=False):
     except RuntimeError:
         has_probe = False
     if not has_probe:
-        skip("S6 TLS 참조 서버(S6a~S6e)", "tls_probe 바이너리 없음(build-probe.sh로 만든다, PROBE_BIN_DIR)")
+        skip("S6 TLS 참조 서버(S6a~S6f)", "tls_probe 바이너리 없음(build-probe.sh로 만든다, PROBE_BIN_DIR)")
     else:
         tiny_o, tiny_f = os.path.join(tmp, "s6-orig"), os.path.join(tmp, "s6-fixed")
         for d in (tiny_o, tiny_f):
@@ -1978,9 +1986,9 @@ def selftest(base=None, keep=False):
             r, code, _ = run(tiny_o, tiny_f, P(EXPECT="tls", TLS_TARGETS=f"{addrs['classic']}@localhost#{ca}"), os.path.join(tmp, "s6b"),
                              cache, quiet=True)
             ok("S6b X25519 전용 서버 → 실패", r["verdict"] == "fail", json.dumps(r["checks"], ensure_ascii=False)[:400])
-            r, code, _ = run(tiny_o, tiny_f, P(EXPECT="tls", CLASSIC="deny", TLS_TARGETS=addrs["pqonly"]), os.path.join(tmp, "s6c"),
-                             cache, quiet=True)
-            ok("S6c 하이브리드 전용 서버, CLASSIC=deny, CA 없이 -tofu → 통과", r["verdict"] == "pass"
+            r, code, _ = run(tiny_o, tiny_f, P(EXPECT="tls", CLASSIC="deny", TLS_TARGETS=f"{addrs['pqonly']}#tofu"),
+                             os.path.join(tmp, "s6c"), cache, quiet=True)
+            ok("S6c 하이브리드 전용 서버, CLASSIC=deny, '#tofu' 를 명시해 -tofu → 통과", r["verdict"] == "pass"
                and r["tls"]["targets"][0]["trust"] == "tofu", json.dumps(r["tls"]["targets"], ensure_ascii=False)[:600])
             r, code, _ = run(tiny_o, tiny_f, P(EXPECT="tls", CLASSIC="deny", TLS_TARGETS=f"{addrs['both']}@localhost#{ca}"),
                              os.path.join(tmp, "s6d"), cache, quiet=True)
@@ -1990,6 +1998,15 @@ def selftest(base=None, keep=False):
             ok("S6e ML-DSA-65 인증서 서버, EXPECT=cert → 통과, cert_key ML-DSA-65",
                r["verdict"] == "pass" and r["tls"]["targets"][0]["hybrid"]["cert_key"] == "ML-DSA-65",
                json.dumps(r["tls"]["targets"][0]["hybrid"], ensure_ascii=False))
+            # 시험 CA 는 시스템 신뢰 저장소에 없으므로 기본(system) 검증은 실패해야 하고, 그것은 통과도 '거부'도 아니다
+            r, code, _ = run(tiny_o, tiny_f, P(EXPECT="tls", CLASSIC="deny", TLS_TARGETS=f"{addrs['pqonly']}@localhost"),
+                             os.path.join(tmp, "s6f"), cache, quiet=True)
+            bt = next(c for c in r["checks"] if c["id"] == "b-tls")
+            t0 = r["tls"]["targets"][0]
+            ok("S6f CA·#tofu 없이 자체 서명 서버 → 시스템 신뢰 저장소 검증 실패, b-tls 미판정, 통과 아님",
+               r["verdict"] != "pass" and bt["status"] == "undecided" and t0["trust"] == "system"
+               and tlsprobe.verify_failed(t0["hybrid"]),
+               json.dumps(t0, ensure_ascii=False)[:600])
         finally:
             host.stop()
     # S7 검증 증적 변조

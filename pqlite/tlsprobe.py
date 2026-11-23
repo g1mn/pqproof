@@ -12,9 +12,12 @@
 - 하이브리드: "Negotiated TLS1.3 group: X25519MLKEM768"
 - 고전: "Negotiated TLS1.3 group" 줄 없이 "Peer Temp Key: X25519, 253 bits"
 - 실패: 경고(alert)와 "Cipher is (NONE)". 그때의 "Negotiated TLS1.3 group NID: 0"은 그룹이 아니다.
+신뢰: CA를 주지 않으면 시스템 신뢰 저장소로 검증한다(trust=system). CA 파일(ca-file)이나 명시적 TOFU(tofu, 더 약함)를 고를 수 있다.
+인증서 검증이 실패한 핸드셰이크는 협상을 재지 못한 것이라 거부·고전 협상으로 읽지 않는다(verify_failed).
 """
 from __future__ import annotations  # 맥 기본 python3 3.9에서 str | None 주석이 돌게
 import hashlib
+import ipaddress
 import os
 import pathlib
 import platform
@@ -25,7 +28,7 @@ import time
 from dataclasses import asdict, dataclass
 
 PROBE_NAME = "tls_probe"
-PROBE_VERSION = "0.5.0"
+PROBE_VERSION = "0.6.0"
 HERE = pathlib.Path(__file__).resolve().parent.parent
 PROBE_SRC = HERE / "probe"
 BIN_DIR = pathlib.Path(os.environ.get("PROBE_BIN_DIR") or HERE / "bin")  # build-probe.sh 와 같은 PROBE_BIN_DIR
@@ -34,6 +37,10 @@ OFFER_HYBRID = "X25519MLKEM768"  # 하이브리드만 아는 클라이언트: �
 OFFER_CLASSICAL = "X25519,P-256"  # ML-KEM 이전 클라이언트
 NEGATIVE_GROUPS = "X25519"
 REFERENCE_POSITIVE = f"{OFFER_HYBRID},X25519"
+TRUST_SYSTEM, TRUST_CA, TRUST_TOFU = "system", "ca-file", "tofu"
+# tls_probe 가 검증 실패 error 줄 앞에 붙이는 말. 옛 탐침은 Go 의 기본 낱말을 그대로 찍었다
+VERIFY_FAILED = "certificate verification failed: "
+_VERIFY_FAILED_RE = re.compile(r"^(?:certificate verification failed: |tls: failed to verify certificate: )")
 
 
 @dataclass(frozen=True)
@@ -60,6 +67,19 @@ class Handshake:
         return dict(asdict(self), kind=self.kind)
 
 
+def verify_failed(h):
+    """인증서 검증이 실패해 협상을 재지 못한 핸드셰이크인가. h: Handshake 또는 그 to_json() 사전."""
+    if h is None:
+        return False
+    ok, err = (h.get("ok"), h.get("error")) if isinstance(h, dict) else (h.ok, h.error)
+    return not ok and bool(_VERIFY_FAILED_RE.match(err or ""))
+
+
+def unverified(item):
+    """대상 결과(prove.py tls_runs 의 한 칸)에서 인증서 검증 실패로 재지 못한 핸드셰이크가 있나."""
+    return verify_failed(item.get("hybrid")) or verify_failed(item.get("classical"))
+
+
 def _field(text, name):
     m = re.search(rf"^{name}:[ \t]*(.*?)[ \t]*$", text, re.M)
     return m[1] if m else None
@@ -78,6 +98,12 @@ def parse(text):
                          cert_not_after=_field(text, "cert_not_after") if ok else None)
     cipher = re.search(r"^(?:New|Reused), (\S+), Cipher is (\S+)", text, re.M)
     alert = re.search(r"^.*alert.*$", text, re.M | re.I)
+    # -verify_return_error 로 끊겨도 s_client 는 ServerHello 에서 고른 "Cipher is ..." 와 그룹을 찍는다. 그래서 검증 실패를 먼저 본다
+    verr = re.search(r"^verify error:num=[0-9]+:(.*?)[ \t]*$", text, re.M)
+    vcode = re.search(r"^\s*Verify return code: ([1-9][0-9]*) \((.*)\)", text, re.M)
+    if verr or vcode or re.search(r"certificate verify failed", text):
+        why = verr[1] if verr else vcode[2] if vcode else "certificate verify failed"
+        return Handshake(ok=False, group=None, protocol=None, error=VERIFY_FAILED + why, client="openssl")
     if not cipher or cipher[2] == "(NONE)":
         err = alert[0].strip() if alert else "no cipher negotiated"
         return Handshake(ok=False, group=None, protocol=None, error=err, client="openssl")
@@ -105,6 +131,9 @@ def control_problem(results):
 def target_verdict(hybrid, classical, classic="allow", group=OFFER_HYBRID):
     """대상 하나의 판정: (통과 여부, 이유 목록). hybrid·classical은 Handshake. group: 홀로 제시한 하이브리드 그룹(PROFILE 이 정한다,
     기본 X25519MLKEM768, cnsa2 는 SecP384r1MLKEM1024. 교차 리뷰 X11)."""
+    unmeasured = [(name, h) for name, h in (("하이브리드 전용 제시", hybrid), ("옛 클라이언트", classical)) if verify_failed(h)]
+    if unmeasured:  # 검증 실패는 서버가 거부한 것도 고전으로 붙은 것도 아니다: 재지 못했다
+        return False, [f"인증서 검증 실패로 재지 못함({name}, trust={h.trust or '?'}): {h.error}" for name, h in unmeasured]
     why = []
     if hybrid.group != group:
         why.append(f"하이브리드 전용 제시에 {group}가 아님({hybrid.group or hybrid.error})")
@@ -172,8 +201,9 @@ def free_port():
 
 
 def connect_args(target, groups, ca=None, tofu=None, servername="localhost", wait="10s"):
-    trust = f"-ca={ca}" if ca else f"-tofu={tofu}"
-    return ["connect", f"-groups={groups}", trust, f"-servername={servername}", f"-wait={wait}", target]
+    """ca·tofu 둘 다 없으면 시스템 신뢰 저장소로 검증한다."""
+    trust = [f"-ca={ca}"] if ca else [f"-tofu={tofu}"] if tofu else []
+    return ["connect", f"-groups={groups}", *trust, f"-servername={servername}", f"-wait={wait}", target]
 
 
 def serve_args(addr, groups, cert, key):
@@ -302,24 +332,36 @@ def references(runner, cert_runner):
     return results, control_problem(results), {"positive": pos, "negative": neg}
 
 
-def probe_target(runner, target, servername="localhost", ca=None, label="t", hybrid_group=OFFER_HYBRID):
-    """대상 하나에 하이브리드 전용·옛 클라이언트 두 번 접속. ca가 없으면 -tofu(처음 받은 사슬의 마지막 인증서를 믿고 다시 검증)."""
+def probe_target(runner, target, servername="localhost", ca=None, label="t", hybrid_group=OFFER_HYBRID, tofu=False):
+    """대상 하나에 하이브리드 전용·옛 클라이언트 두 번 접속. ca가 있으면 그 CA로, tofu(명시적으로 고를 때만)면 처음 받은 사슬의
+    마지막 인증서를 믿고 다시 검증, 둘 다 아니면 시스템 신뢰 저장소로 검증한다."""
     out = {}
     for name, groups in (("hybrid", hybrid_group), ("classical", OFFER_CLASSICAL)):
-        tofu = None if ca else runner.path(f"{label}-{name}-tofu-ca.pem")
-        rc, so, se = runner.run(connect_args(target, groups, ca=ca, tofu=tofu, servername=servername))
+        tofu_path = runner.path(f"{label}-{name}-tofu-ca.pem") if tofu and not ca else None
+        rc, so, se = runner.run(connect_args(target, groups, ca=ca, tofu=tofu_path, servername=servername))
         out[name] = (parse(so), so + se, rc)
     return out
 
 
 def openssl_cross_check(openssl, target, servername, ca, group=OFFER_HYBRID, timeout=20):
-    """OpenSSL 3.5 s_client로 같은 대상에 하이브리드만 제시(맥 모드에서만). 반환: (Handshake, argv, 원문)"""
+    """OpenSSL 3.5 s_client로 같은 대상에 하이브리드만 제시(맥 모드에서만). ca가 없으면 OpenSSL 기본 신뢰 경로로 검증한다.
+    s_client 는 검증이 실패해도 기본으로 핸드셰이크를 이어 가고 이름도 보지 않으므로 -verify_return_error 와 이름 검사를 늘 붙인다.
+    반환: (Handshake, argv, 원문)"""
     argv = [openssl, "s_client", "-connect", target, "-servername", servername, "-groups", group, "-tls1_3"]
-    if ca:
-        argv += ["-CAfile", ca, "-verify_return_error"]
+    if ca:  # -partial_chain: Go 는 RootCAs 의 어느 인증서든 신뢰 앵커로 본다(#tofu 앵커는 대개 자체 서명이 아닌 잎 인증서다)
+        argv += ["-CAfile", ca, "-partial_chain"]
+    argv += ["-verify_return_error", "-verify_ip" if _is_ip(servername) else "-verify_hostname", servername]
     try:
         r = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, stdin=subprocess.DEVNULL)
         raw = r.stdout + r.stderr
     except subprocess.TimeoutExpired:
         raw = "timeout"
     return parse(raw), argv, raw
+
+
+def _is_ip(name):
+    try:
+        ipaddress.ip_address(name)
+        return True
+    except ValueError:
+        return False

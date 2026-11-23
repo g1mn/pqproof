@@ -48,6 +48,14 @@ pqproof build-probe      # or, from a clone: bash build-probe.sh
 EXPECT=kem,sig,tls TLS_TARGETS="127.0.0.1:8443@localhost#/abs/path/ca.pem" pqproof orig/ fixed/
 ```
 
-A target is `host:port`, then optionally `@servername` and `#/absolute/path/ca.pem`; without a CA the probe trusts the first certificate it sees. Before it measures your server, the probe tests itself against two local reference servers, one hybrid and one X25519-only. If either control comes out wrong, the run is undecided. On the host with OpenSSL 3.5 or later, the tool repeats the hybrid-only handshake with `openssl s_client` and compares the group.
+A target is `host:port`, then optionally `@servername`, then optionally `#/absolute/path/ca.pem` or `#tofu`. The probe always verifies the server certificate, and the target says what it trusts:
+
+| Target | Trust (`trust` in the evidence) | Server name checked when `@servername` is left out |
+|---|---|---|
+| `host:port` | the system trust store (`system`), the default from 0.8.0 | the host of the address |
+| `host:port#/abs/ca.pem` | only that CA (`ca-file`) | `localhost` |
+| `host:port#tofu` | the last certificate the server sends, taken on first use (`tofu`) | `localhost` |
+
+Trust on first use is weaker: the probe first reads the chain without checking it and then verifies against the last certificate it got, so it shows what the server negotiates but not that the server is the one you meant. Use it only when you cannot get the CA, for example a service that makes its own CA at start-up, and keep `#tofu` out of a pipeline that should prove who answered. Before 0.8.0 a target without a CA was always trusted on first use. A certificate that does not verify (unknown CA, wrong name, expired) is not a pass and not a refusal: the probe could not measure the handshake, so `b-tls` is undecided and names the target and the verification error. Give the CA, fix the server name with `@servername`, or opt in to `#tofu`. In container mode (`TLS_VIA=container:<name>`) the system trust store is the one in the target container's image. Before it measures your server, the probe tests itself against two local reference servers, one hybrid and one X25519-only. If either control comes out wrong, the run is undecided. On the host with OpenSSL 3.5 or later, the tool repeats the hybrid-only handshake with `openssl s_client` and compares the group. That handshake verifies the certificate too (`-verify_return_error` with `-verify_hostname`, or `-verify_ip` for an address), against the same CA file, the `#tofu` anchor or OpenSSL's default trust paths. On macOS `tls_probe` uses the system keychain and OpenSSL uses its own `cert.pem`, so a root added only to the keychain verifies in one and not the other; the run is then undecided (OpenSSL disagrees) and the fix is to give the CA file.
 
 Without Go, download `tls_probe-<os>-<arch>` and `SHA256SUMS` from the GitHub release into one folder, run `shasum -a 256 -c --ignore-missing SHA256SUMS` there, and set `PROBE_BIN_DIR` to it. `gh attestation verify <file> --repo g1mn/pqproof` shows that a binary came from the release workflow.

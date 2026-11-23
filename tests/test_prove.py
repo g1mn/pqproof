@@ -154,7 +154,22 @@ class Inputs(unittest.TestCase):
         with self.assertRaises(prove.UsageError):
             params(TLS_TARGETS="localhost")
         self.assertEqual(params(EXPECT="none").expect, [])
-        self.assertEqual(prove.parse_target("127.0.0.1:8443@api.local"), ("127.0.0.1:8443", "api.local", None))
+        self.assertEqual(prove.parse_target("127.0.0.1:8443@api.local"), ("127.0.0.1:8443", "api.local", None, "system"))
+
+    def test_tls_target_trust(self):
+        # CA 도 '#tofu' 도 없으면 시스템 신뢰 저장소로 검증하고, 서버 이름을 안 주면 주소의 호스트로 검증한다
+        self.assertEqual(prove.parse_target("api.example.com:443"), ("api.example.com:443", "api.example.com", None, "system"))
+        self.assertEqual(prove.parse_target("[::1]:8443"), ("[::1]:8443", "::1", None, "system"))
+        self.assertEqual(prove.parse_target("10.0.0.5:8443#tofu"), ("10.0.0.5:8443", "localhost", None, "tofu"))
+        self.assertEqual(prove.parse_target("10.0.0.5:8443@svc.local#tofu"), ("10.0.0.5:8443", "svc.local", None, "tofu"))
+        with tempfile.TemporaryDirectory() as d:
+            ca = os.path.join(d, "ca.pem")
+            with open(ca, "w", encoding="utf-8") as f:
+                f.write("x")
+            self.assertEqual(prove.parse_target(f"127.0.0.1:8443#{ca}"), ("127.0.0.1:8443", "localhost", ca, "ca-file"))
+        for bad in ("127.0.0.1:8443#TOFU", "127.0.0.1:8443#tofu#/x.pem", "127.0.0.1:8443#relative/ca.pem", "127.0.0.1:8443#"):
+            with self.assertRaises(prove.UsageError, msg=bad):
+                prove.parse_target(bad)
 
 
 class Settings(unittest.TestCase):
