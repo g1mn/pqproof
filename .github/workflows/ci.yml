@@ -100,6 +100,9 @@ jobs:
       - name: Build tls_probe (offline, Go standard library only)
         run: bash build-probe.sh
 
+      - name: go vet (probe)
+        run: go vet -C probe ./...
+
       - name: tls_probe tests and fuzz seeds (offline)
         run: GOPROXY=off GOTOOLCHAIN=local go test -C probe ./...
 
@@ -245,13 +248,15 @@ jobs:
       - name: Lint tools (hash-pinned)
         run: python3 -m pip install --quiet --require-hashes -r .github/requirements/lint.txt
 
-      - name: ruff (F, E9, B; settings in pyproject.toml)
+      - name: ruff (pycodestyle E and W, pyflakes, bugbear; settings in pyproject.toml)
         run: ruff check --no-cache .
 
       - name: shellcheck
         run: |
           shellcheck --version | head -2
-          shellcheck -S warning prove.sh build-probe.sh scan/residue.sh scan/cbom-scan.sh tests/pqverify_targets.sh tests/kpqc_targets.sh
+          shellcheck prove.sh build-probe.sh tests/pqverify_targets.sh tests/kpqc_targets.sh
+          # 두 스캐너는 규칙 묶음 파일이라 고치면 판정 해시가 바뀐다. style·info 정리는 다음 규칙 묶음 변경과 함께 한다(CONTRIBUTING.md, Changing a rule)
+          shellcheck -S warning scan/residue.sh scan/cbom-scan.sh
 
       - name: zizmor (workflows, the action and the example workflows)
         run: zizmor --offline --min-severity medium .github/workflows/ action.yml examples/github-actions/pqproof-sarif.yml examples/github-actions/pqproof-check.yml
