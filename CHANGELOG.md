@@ -10,6 +10,28 @@ Each release has a **Verdict impact (판정 영향)** line. It says whether the 
 
 Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `receipt.json`, so a receipt from years ago still names the rules that judged it. `--verify` keeps reading older evidence formats.
 
+## [0.8.0] - 2026-11-24
+
+Tool 0.8.0, ruleset 8, evidence format 4 (unchanged), `tls_probe` 0.6.0.
+
+**Verdict impact (판정 영향): yes, for TLS targets only.** A target given without a CA used to be trusted on first use; now its certificate is verified against the system trust store, so a server with a self-signed or private-CA certificate measured without `#/path/ca.pem` moves from pass to undecided (`b-tls`, and `c-expect` when `EXPECT` has `tls` or `cert`). A target whose certificate does not verify against its CA file (wrong CA or name) moves from fail to undecided, because the handshake was not measured; a CA-file target that verifies judges as before. An OpenSSL cross-check that used to look like agreement can now disagree, which is undecided (see Fixed). The 41 golden tree cases keep every verdict, check status and count (only the ruleset name in the golden file moved); they have no TLS target. Evidence from every earlier release still verifies byte for byte.
+
+### Security
+
+- TLS certificate verification by default (OpenSSF Best Practices silver, `crypto_certificate_verification`). When PQ-Proof connects to a TLS target, it now verifies the server certificate by default: `tls_probe` uses the system trust store and the server name (the `@servername`, or the host of the address when none is given; a CA-file or `#tofu` target still defaults to `localhost`), and the OpenSSL cross-check uses OpenSSL's default trust paths. Before, a target without a CA was trusted on first use: one unchecked handshake read the chain and the measured handshake trusted its last certificate, so it showed what a server negotiated but not which server answered.
+
+### Changed
+
+- Trust on first use is opt-in and documented as weaker: add `#tofu` to the target (`127.0.0.1:8443@svc.local#tofu`). The evidence records it as `trust: tofu`, as before. `tls.targets[].trust` is `system` for the new default, `ca-file` for `#/path/ca.pem`.
+- A handshake that fails certificate verification (unknown CA, wrong name, expired) is no longer read as a refusal or a classical result. `tls_probe` 0.6.0 starts the error with `certificate verification failed:`, the target's `why` names the trust mode and the error, and `b-tls` is undecided (a measurement that did not happen is never a pass, and under `CLASSIC=deny` it is not a refusal either), unless another target fails outright.
+- The OpenSSL cross-check always passes `-verify_return_error` and checks the name (`-verify_hostname`, or `-verify_ip` for an address), with `-CAfile` for a CA file or the `#tofu` anchor. It used to skip verification without a CA and never checked the name.
+- `tls_probe connect` takes `-ca`, `-tofu` or neither (system trust store) and prints `trust: system` for the last.
+- Self-test: S6c opts in to `#tofu`, and the new S6f checks that a self-signed server without a CA or `#tofu` ends undecided, not passed. The reference controls always pass their own CA.
+
+### Fixed
+
+- The OpenSSL cross-check read a handshake that `s_client -verify_return_error` stopped on a verification error as a success: `s_client` still prints the cipher suite and the group chosen in the ServerHello. A `verify error:` line, `certificate verify failed` or a non-zero `Verify return code` now makes it a verification failure. With a CA file or the `#tofu` anchor the cross-check adds `-partial_chain`, so OpenSSL accepts the same anchors as `tls_probe` (Go trusts any certificate in its root pool, and a `#tofu` anchor is usually a leaf); without it the `#tofu` cross-check had been failing verification all along, hidden by the parsing bug.
+
 ## [0.7.0] - 2026-11-22
 
 Tool 0.7.0, ruleset 7 (unchanged), evidence format 4 (unchanged).
