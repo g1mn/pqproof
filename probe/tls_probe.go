@@ -1,6 +1,6 @@
 // from g1mn/pq-proof 7b7803f (MIT)
 // 수정: connect는 기본으로 시스템 신뢰 저장소로 검증하고 -ca·-tofu(첫 인증서를 믿고 다시 검증)를 고를 수 있다,
-//       cert_sig·cert_key·cert_chain·trust 줄, cert에 -alg=mldsa65, cipher·cert_not_after 줄, 머리 주석 한국어.
+// cert_sig·cert_key·cert_chain·trust 줄, cert에 -alg=mldsa65, cipher·cert_not_after 줄, 머리 주석 한국어.
 //
 // tls_probe: 버전을 고정한 TLS 클라이언트(와 참조 서버). Go 표준 라이브러리만 쓰고 CGO 없이 정적으로 빌드한다
 // (build-probe.sh). 같은 바이너리를 맥·리눅스 컨테이너 어디서나 쓰므로, 실패가 나오면 옛 클라이언트가
