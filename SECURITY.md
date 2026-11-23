@@ -6,9 +6,20 @@ Only the latest MINOR release gets fixes. While PQ-Proof is 0.x, that means the 
 
 ## Reporting a vulnerability
 
-Please report privately through GitHub: open [Report a vulnerability](https://github.com/g1mn/pqproof/security/advisories/new) on this repository (Security tab, then "Report a vulnerability"). Do not open a public issue for it. This is a one-person project, so replies are best effort. I aim to answer within a week.
+Please report privately through GitHub: open [Report a vulnerability](https://github.com/g1mn/pqproof/security/advisories/new) on this repository (Security tab, then "Report a vulnerability"). Do not open a public issue for it. The lead maintainer handles reports ([GOVERNANCE.md](GOVERNANCE.md)). I aim to answer within a week.
 
 Helpful things to include: the PQ-Proof version (`pqproof --version`), the two trees or a small tree that shows the problem, the command and environment variables you used, and the evidence folder the run wrote.
+
+## After a report
+
+1. The report is acknowledged within 7 days.
+2. The problem is reproduced and its severity assessed (CVSS).
+3. A fix ships in the latest MINOR release. A GitHub security advisory is published, and a CVE is requested when one applies.
+4. The fix is listed under "Security" in [CHANGELOG.md](CHANGELOG.md).
+5. The reporter is credited by name in the advisory and the changelog, unless they ask to stay anonymous.
+6. The disclosure date is agreed with the reporter. By default it is no later than 90 days after the report.
+
+The threat model, trust boundaries and the weaknesses the code counters are in [ASSURANCE.md](ASSURANCE.md).
 
 ## What counts
 

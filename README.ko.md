@@ -48,7 +48,7 @@ FAIL_ON_REVIEW=1 pqproof impl judge answers.json   # KpqC 구현 검증
 
 이슈, 풀 리퀘스트, 대응표 정정을 환영합니다. [처음 기여하기 좋은 이슈](https://github.com/g1mn/pqproof/contribute)부터 보세요. 대응표 정정은 PQC 전환 경험만으로 할 수 있고, 어디서든 영어로 써도 됩니다.
 
-로컬 확인 방법은 [CONTRIBUTING.ko.md](https://github.com/g1mn/pqproof/blob/main/CONTRIBUTING.ko.md)와 [행동 강령](https://github.com/g1mn/pqproof/blob/main/CODE_OF_CONDUCT.md)을 보세요.
+로컬 확인 방법은 [CONTRIBUTING.ko.md](https://github.com/g1mn/pqproof/blob/main/CONTRIBUTING.ko.md)와 [행동 강령](https://github.com/g1mn/pqproof/blob/main/CODE_OF_CONDUCT.md)을 보세요. 프로젝트 운영 방식은 [GOVERNANCE.md](https://github.com/g1mn/pqproof/blob/main/GOVERNANCE.md)에, 보안 근거는 [ASSURANCE.md](https://github.com/g1mn/pqproof/blob/main/ASSURANCE.md)에 있습니다.
 
 ## 관련 저장소
 

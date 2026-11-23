@@ -4,7 +4,7 @@
 
 이슈와 풀 리퀘스트를 환영합니다. 보안 문제는 공개 이슈로 올리지 말고 [SECURITY.md](SECURITY.md)에 적힌 경로로 알려 주세요. 여기서는 모두 [행동 강령](CODE_OF_CONDUCT.md)을 따릅니다.
 
-이슈와 풀 리퀘스트에는 3일 안에 첫 답을 드리려고 합니다. 질문과 아이디어는 [Discussions](https://github.com/g1mn/pqproof/discussions)에 남겨도 됩니다.
+이슈와 풀 리퀘스트에는 3일 안에 첫 답을 드리려고 합니다. 질문과 아이디어는 [Discussions](https://github.com/g1mn/pqproof/discussions)에 남겨도 됩니다. 결정 방식과 리뷰하는 사람은 [GOVERNANCE.md](GOVERNANCE.md)와 [MAINTAINERS.md](MAINTAINERS.md)에 있습니다.
 
 ## 첫 기여
 
@@ -89,8 +89,15 @@ ruff check . && shellcheck -S warning prove.sh build-probe.sh scan/residue.sh sc
 3. `main`을 push하고 CI를 기다린 뒤 그 커밋에 `vX.Y.Z` 태그를 답니다. 릴리스 워크플로는 CI를 다시 돌리고, `main`에 없는 태그는 받지 않습니다.
 4. 릴리스 뒤에는 `examples/`의 고정값을 옮깁니다: `examples/github-actions/pqproof-sarif.yml`의 `g1mn/pqproof@<commit>` 줄(커밋 SHA와 주석), GitHub·GitLab·Jenkins 예시의 `pqproof==` 버전.
 
+## 코드 형식
+
+- 파이썬은 `pyproject.toml`의 ruff 규칙이 검사하는 PEP 8을 따르고, Python 3.9 이상을 대상으로 하며, 실행할 때는 표준 라이브러리만 씁니다(`dependencies = []`).
+- 셸 스크립트는 bash 3.2에서 돌고, CI가 돌리는 방식의 ShellCheck를 통과해야 합니다.
+- `probe/`의 Go 코드는 `gofmt`로 맞추고 `go vet`을 통과해야 합니다.
+- CI의 `lint` 작업이 풀 리퀘스트마다 이 검사를 돌리고, 통과해야 병합됩니다.
+
 ## 풀 리퀘스트
 
-판정이 바뀔 수 있는지 설명에 적어 주세요(템플릿이 묻습니다). 커밋은 작게, 시험과 함께 올려 주세요. 커밋 제목 끝에는 지금까지의 기록처럼 `Verdict impact: none`이나 `Verdict impact: yes`를 붙여, `git log`만 봐도 판정이 바뀔 수 있는 커밋이 보이게 합니다. 문서는 사용법이면 `guide/`에, 규칙과 형식이면 `DESIGN.md`에 둡니다.
+판정이 바뀔 수 있는지 설명에 적어 주세요(템플릿이 묻습니다). 커밋은 작게, 시험과 함께 올려 주세요. 원칙: 새 기능과 버그 수정에는 `tests/` 아래 자동 시험을 함께 넣고, 큰 기능을 시험 없이 더하는 풀 리퀘스트는 병합하지 않습니다. 커밋 제목 끝에는 지금까지의 기록처럼 `Verdict impact: none`이나 `Verdict impact: yes`를 붙여, `git log`만 봐도 판정이 바뀔 수 있는 커밋이 보이게 합니다. 문서는 사용법이면 `guide/`에, 규칙과 형식이면 `DESIGN.md`에 둡니다.
 
 같은 리뷰 지적이 두 번 나오면, 기억해 달라는 주석을 다는 대신 무엇을 고칠지 실패 메시지로 알려 주는 시험이나 린트 규칙으로 바꿉니다. 주석은 이유와 표준 근거(FIPS, RFC, KpqC 절)에 씁니다.
