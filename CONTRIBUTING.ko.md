@@ -31,7 +31,9 @@ STRICT=1 bash prove.sh --unit && STRICT=1 bash prove.sh --selftest \
   && python3 -I tests/mutations/run_mutations.py --strict --golden tests/golden/verdicts.json
 cp -R . /tmp/pqproof-scan && (cd /tmp/pqproof-scan && bash scan/cbom-scan.sh --selftest)   # 시험용 키를 만들므로 사본에서 돌림
 python3 -m pip install --require-hashes -r .github/requirements/lint.txt
-ruff check . && shellcheck -S warning prove.sh build-probe.sh scan/residue.sh scan/cbom-scan.sh && zizmor --offline --min-severity medium .github/workflows/ action.yml
+ruff check . && shellcheck prove.sh build-probe.sh tests/pqverify_targets.sh tests/kpqc_targets.sh && shellcheck -S warning scan/residue.sh scan/cbom-scan.sh
+go vet -C probe ./...
+zizmor --offline --min-severity medium .github/workflows/ action.yml
 ```
 
 매주 도는 `python3 -I tests/code_mutants.py --baseline`은 규칙 코드를 조금 바꿨을 때 동작 시험이 그 변화를 여전히 잡는지 봅니다.
