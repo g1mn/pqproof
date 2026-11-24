@@ -14,6 +14,7 @@ PQ-Proof is maintainer-led. This page says who decides, how changes get into `ma
 
 - A change to `main` goes through a pull request. It needs one approval from a maintainer other than the last person who pushed to it, and the required checks (`lint` and `test`) must pass. Repository rules enforce this.
 - The lead maintainer can bypass those rules. The bypass is for release commits (version, changelog and site) and for urgent security fixes. Everything else goes through a pull request like any other change.
+- Maintainers can merge a pull request without an approval, but only through a pull request with its checks visible; they cannot push to `main` directly. In the normal course every pull request gets an approval first. A maintainer merges without one only when the lead maintainer is unavailable.
 - A change that can move a verdict (a rule file, see "Changing a rule" in CONTRIBUTING.md) also needs the lead maintainer's approval and a CHANGELOG entry with its verdict impact.
 - Only admins and maintainers can create release tags (`v*`), and the lead maintainer normally does. The release workflow publishes to PyPI from those tags only, with signed build provenance.
 
@@ -30,7 +31,7 @@ A contributor with a record of reviewed contributions can be invited by the lead
 The project has to be able to go on within a week if any one person is no longer available.
 
 - Maintainers can create and close issues, review pull requests and merge approved ones without the lead maintainer.
-- A maintainer can cut a release. Set the version and the CHANGELOG section in a pull request. The site generator is not needed: edit the `data-build` block and the visible version lines in `docs/index.html` by hand, and `python3 -I tests/version_policy.py --site-only` lists every value that still differs. When CI passes on `main`, tag `vX.Y.Z` on that commit and the release workflow publishes it.
+- A maintainer can cut a release. Set the version and the CHANGELOG section in a pull request, and merge it without an approval if no other maintainer can review it. The site generator is not needed: edit the `data-build` block and the visible version lines in `docs/index.html` by hand, and `python3 -I tests/version_policy.py --site-only` lists every value that still differs. When CI passes on `main`, tag `vX.Y.Z` on that commit and the release workflow publishes it.
 - A maintainer is also a maintainer of the `pqproof` project on PyPI, so releases can still be uploaded if the repository has to move.
 - The lead maintainer has named a maintainer as the successor of the GitHub account that owns this repository. Under GitHub's policy, after the account owner's death is confirmed, the successor can archive the public repositories or transfer them to their own account or an organization.
 
