@@ -31,7 +31,9 @@ STRICT=1 bash prove.sh --unit && STRICT=1 bash prove.sh --selftest \
   && python3 -I tests/mutations/run_mutations.py --strict --golden tests/golden/verdicts.json
 cp -R . /tmp/pqproof-scan && (cd /tmp/pqproof-scan && bash scan/cbom-scan.sh --selftest)   # writes test keys, so use a copy
 python3 -m pip install --require-hashes -r .github/requirements/lint.txt
-ruff check . && shellcheck -S warning prove.sh build-probe.sh scan/residue.sh scan/cbom-scan.sh && zizmor --offline --min-severity medium .github/workflows/ action.yml
+ruff check . && shellcheck prove.sh build-probe.sh tests/pqverify_targets.sh tests/kpqc_targets.sh && shellcheck -S warning scan/residue.sh scan/cbom-scan.sh
+go vet -C probe ./...
+zizmor --offline --min-severity medium .github/workflows/ action.yml
 ```
 
 The weekly `python3 -I tests/code_mutants.py --baseline` checks that the behaviour tests still catch small changes to the rule code.
