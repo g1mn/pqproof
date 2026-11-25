@@ -4,7 +4,7 @@ This page argues that PQ-Proof meets the security requirements below, within the
 
 ## Scope and security requirements
 
-PQ-Proof reads an original and a converted tree (or one tree in check mode), judges the migration by fixed rules, and writes an evidence folder. `pqproof impl judge` compares KAT answers with pinned reference versions. Two optional steps reach outside the inputs. The first is `TLS_TARGETS`, which measures running servers with `tls_probe`. On the host with OpenSSL 3.5 or later it also measures them with `openssl s_client` ([prove.py L538](https://github.com/g1mn/pqproof/blob/1e9aa5b/prove.py#L538), [prove.py L564-L566](https://github.com/g1mn/pqproof/blob/1e9aa5b/prove.py#L564-L566)). The second is `--pq-verify`, which runs pq-verify on a library.
+PQ-Proof reads an original and a converted tree (or one tree in check mode), judges the migration by fixed rules, and writes an evidence folder. `pqproof impl judge` compares KAT answers with pinned reference versions. Two optional steps reach outside the inputs. The first is `TLS_TARGETS`, which measures running servers with `tls_probe`. On the host with OpenSSL 3.5 or later it also measures them with `openssl s_client` ([prove.py L538](https://github.com/g1mn/pqproof/blob/1e9aa5b/prove.py#L538), [prove.py L564-L566](https://github.com/g1mn/pqproof/blob/1e9aa5b/prove.py#L564-L566)). On macOS, checking a target against the system trust store can also make the operating system connect to other addresses for a missing intermediate certificate or revocation data; a CA file avoids it. The second is `--pq-verify`, which runs pq-verify on a library.
 
 The requirements below restate the list of security problems in [SECURITY.md](SECURITY.md#what-counts).
 
