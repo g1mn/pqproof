@@ -1,14 +1,14 @@
 # Roadmap
 
-No dates. This is what comes next and why. Issues labelled `good first issue` are the easiest way in.
+This covers the work planned through the end of 2027 and what is not planned. Items have no fixed dates. Released items stay here for context; [CHANGELOG.md](CHANGELOG.md) has the details. Issues labelled `good first issue` are the easiest way in.
 
-## 0.4.0
+## 0.4.0 (released)
 
 - SLH-DSA (FIPS 205): the 192 and 256 parameter sets count as an expected signature, and SLH-DSA 128 is blocked as below category 3 (ruleset 4).
 - Standards mappings in [`mappings/`](mappings/): NIST IR 8547 and the 2026 Korean PQC pilot migration call, item by item, with the code that does each check.
 - A first-contribution section in CONTRIBUTING.md and this roadmap.
 
-## 0.6.0
+## 0.6.0 (released)
 
 The four gaps in the NIS and NSR draft mappings (posted 2026-11-16) that a migration check can close:
 
@@ -17,7 +17,7 @@ The four gaps in the NIS and NSR draft mappings (posted 2026-11-16) that a migra
 - Allowlist entries can record residual risk, compensating control and replacement plan (draft guidebook G9).
 - The TLS report adds the cipher suite and the certificate expiry (draft guidebook G7).
 
-## 0.7.0
+## 0.7.0 (released)
 
 - The inventory is also written as a CycloneDX 1.6 CBOM (EU PQC roadmap, section 6.2), validated in CI against the official schema.
 - First-run and CI fixes from a new-user review: `pqproof examples`, English reading notes in the evidence, input errors, and CI examples that keep the base tree outside the converted tree.

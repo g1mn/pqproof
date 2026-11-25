@@ -4,7 +4,7 @@ English · [한국어](CONTRIBUTING.ko.md)
 
 Issues and pull requests are welcome. Security problems go through [SECURITY.md](SECURITY.md), not a public issue. Everyone here follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 
-I aim to give a first reply to every issue and pull request within three days. Questions and ideas can go to [Discussions](https://github.com/g1mn/pqproof/discussions).
+I aim to give a first reply to every issue and pull request within three days. Questions and ideas can go to [Discussions](https://github.com/g1mn/pqproof/discussions). How decisions are made and who reviews is in [GOVERNANCE.md](GOVERNANCE.md) and [MAINTAINERS.md](MAINTAINERS.md).
 
 ## First contribution
 
@@ -91,8 +91,15 @@ A field added, removed, renamed or changed in meaning raises `format_version` in
 3. Push `main` and wait for CI, then tag `vX.Y.Z` on that commit. The release workflow runs CI again and refuses a tag that is not on `main`.
 4. After the release, move the pins in `examples/`: the `g1mn/pqproof@<commit>` line in `examples/github-actions/pqproof-sarif.yml` (commit SHA and comment) and the `pqproof==` versions in the GitHub, GitLab and Jenkins examples.
 
+## Coding style
+
+- Python follows PEP 8 as checked by the ruff rules in `pyproject.toml`, targets Python 3.9 and later, and uses only the standard library at run time (`dependencies = []`).
+- Shell scripts run on bash 3.2 and pass ShellCheck as CI runs it.
+- Go code in `probe/` is formatted with `gofmt` and passes `go vet`.
+- The `lint` job in CI runs these checks on every pull request, and a pull request merges only when it passes.
+
 ## Pull requests
 
-Say in the description whether a verdict can move (the template asks). Keep commits small, with tests. End each commit subject with `Verdict impact: none` or `Verdict impact: yes`, as the history does, so `git log` shows which commits can move a verdict. Documentation: usage goes in `guide/`, rules and formats in `DESIGN.md`.
+Say in the description whether a verdict can move (the template asks). Keep commits small, with tests. Policy: new functionality and bug fixes come with tests in the automated suite under `tests/`; a pull request that adds major functionality without tests is not merged. End each commit subject with `Verdict impact: none` or `Verdict impact: yes`, as the history does, so `git log` shows which commits can move a verdict. Documentation: usage goes in `guide/`, rules and formats in `DESIGN.md`.
 
 When the same review comment comes up twice, turn it into a test or a lint rule whose failure message says what to change, instead of a code comment that asks people to remember. Keep comments for reasons and for standard references (FIPS, RFC, KpqC sections).

@@ -48,7 +48,7 @@ Guides: [Quick start](https://github.com/g1mn/pqproof/blob/main/guide/quickstart
 
 Issues, pull requests and mapping corrections are welcome; start from [good first issues](https://github.com/g1mn/pqproof/contribute). PQC migration experience is enough for a mapping correction, and English is fine everywhere.
 
-Read [CONTRIBUTING.md](https://github.com/g1mn/pqproof/blob/main/CONTRIBUTING.md) for local checks and the [Code of Conduct](https://github.com/g1mn/pqproof/blob/main/CODE_OF_CONDUCT.md).
+Read [CONTRIBUTING.md](https://github.com/g1mn/pqproof/blob/main/CONTRIBUTING.md) for local checks and the [Code of Conduct](https://github.com/g1mn/pqproof/blob/main/CODE_OF_CONDUCT.md). How the project is run is in [GOVERNANCE.md](https://github.com/g1mn/pqproof/blob/main/GOVERNANCE.md), and the security reasoning in [ASSURANCE.md](https://github.com/g1mn/pqproof/blob/main/ASSURANCE.md).
 
 ## Related
 
