@@ -18,7 +18,7 @@ Tool 0.8.0, ruleset 8, evidence format 4 (unchanged), `tls_probe` 0.6.0.
 - A target without a CA whose certificate the system trust store does not accept (self-signed or private CA) moves from pass to undecided.
 - The same target moves from fail to undecided when every failing handshake now fails verification, for example a server that accepts the old client under `CLASSIC=deny`, or the certificate key under `EXPECT=cert`. It stays fail when a handshake fails before the certificate is checked: a server that refuses the hybrid-only offer (an X25519-only server) still fails, with both reasons in `why`.
 - A target whose certificate does not verify against its CA file (wrong CA or wrong name) moves from fail to undecided in the same way, and stays fail when the hybrid-only offer is refused.
-- A CA-file target that verifies, and a `#tofu` target, judge as before.
+- A CA-file target that verifies judges as before. So does a `#tofu` target (the old target without a CA) whose certificate holds the server name it is checked against. Without `@servername` that name is `localhost`, so a `#tofu` target whose certificate does not name `localhost` used to fail on the name error. Now that handshake failed verification, and the target moves from fail to undecided in the same way (it stays fail when another handshake fails outright, such as a refused hybrid-only offer). Add `@<a name in the certificate>` to measure it.
 - `b-tls` is undecided, and nothing is measured, when the `tls_probe` binary is not version 0.6.0 (see Changed). Without that check a 0.5.0 binary left on disk would turn a target without a CA into fail with `no cipher negotiated`.
 - An OpenSSL cross-check that used to look like agreement can now disagree, which is undecided (see Fixed).
 
