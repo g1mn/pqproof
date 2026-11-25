@@ -1,12 +1,16 @@
 # Dependabot: 워크플로가 쓰는 액션(커밋 SHA 고정), 파이썬 빌드 의존(pyproject 의 build-system), 릴리스·린트 도구
 # (.github/requirements/*.txt, 해시 고정)를 매주 본다.
 # 액션 PR 은 SHA 와 버전 주석을 같이 바꾼다. 런타임 파이썬 의존은 없다.
+# cooldown: 공급망 사고는 대개 배포 직후 며칠 안에 드러나서, 버전 업데이트는 requirements/*.in 의 --exclude-newer 와 같은 기준으로 늦게 받는다.
+# cooldown 과 exclude-paths 는 버전 업데이트에만 걸린다. 보안 업데이트 PR 은 바로 오고, 제외한 파일도 건드릴 수 있다.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 14
     groups:
       actions:
         patterns: ["*"]
@@ -16,11 +20,22 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 14
     commit-message:
       prefix: "build"
   - package-ecosystem: pip
     directory: "/.github/requirements"  # 릴리스·린트 도구(해시 고정). 갱신 PR 은 해시도 같이 바꾼다
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 14
+    # 손으로 관리하는 잠금은 뺀다. schema.txt 는 여러 파이썬판을 함께 고정한 --universal 잠금이라 Dependabot 이 다시 만들면 깨지고,
+    # pq-verify.txt 는 PQV_TESTED 와 함께 바꾸는 휠 해시 하나뿐이라 pip-compile 잠금으로 다루면 안 된다(각 .in 의 머리 주석)
+    exclude-paths:
+      - "schema.in"
+      - "schema.txt"
+      - "pq-verify.in"
+      - "pq-verify.txt"
     commit-message:
       prefix: "build"

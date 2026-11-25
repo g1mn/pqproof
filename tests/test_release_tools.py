@@ -56,6 +56,14 @@ class Release(unittest.TestCase):
         self.assertIn("-m build --no-isolation", release)
         self.assertIn("--require-hashes -r .github/requirements/sbom.txt", release)
 
+    def test_hand_kept_locks_stay_out_of_dependabot(self):
+        dep = (GH / "dependabot.yml").read_text(encoding="utf-8")
+        for name in ("schema.in", "schema.txt", "pq-verify.in", "pq-verify.txt"):
+            self.assertTrue(f'- "{name}"' in dep, f"dependabot.yml exclude-paths 에 {name} 이 있어야 한다(손으로 관리하는 잠금)")
+        schema = (GH / "requirements" / "schema.txt").read_text(encoding="utf-8")
+        for marker in ("python_full_version < '3.10'", "python_full_version >= '3.10'"):
+            self.assertRegex(schema, rf"(?m)^jsonschema==\S+ ; {re.escape(marker)}", "schema.txt 는 3.9 와 3.10+ 를 함께 고정한 --universal 잠금이어야 한다")
+
     def test_release_reuses_the_whole_ci(self):
         release = (GH / "workflows" / "release.yml").read_text(encoding="utf-8")
         ci = (GH / "workflows" / "ci.yml").read_text(encoding="utf-8")
