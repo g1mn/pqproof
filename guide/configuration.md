@@ -19,7 +19,7 @@ Settings are environment variables, the same for `pqproof` and `bash prove.sh`. 
 | `EXCLUDE` | none | run-data globs such as `data/** *.db *.log`. Code, config and build files are never excluded |
 | `RECON` | `<W>/notes/recon.json` | reads `DATA_DIR` and the app root, to exclude a data folder inside the app |
 | `TLS_TARGETS` | none | addresses of the running fixed service (see below) |
-| `TLS_TARGETS_ORIG` | none | addresses of the original service, recorded as a baseline only |
+| `TLS_TARGETS_ORIG` | none | addresses of the original service, recorded as a baseline and not judged; a tool error while measuring one makes `b-tls` undecided |
 | `TLS_VIA` | `host` | `container:<name>` measures inside a container's network namespace |
 | `PROBE_BIN_DIR` | `bin/`, then the user cache | folder with `tls_probe-<os>-<arch>` |
 | `OPENSSL` | the first OpenSSL 3.5 or later found, else the first OpenSSL | used as given, even below 3.5 |
