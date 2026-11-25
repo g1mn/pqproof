@@ -103,6 +103,11 @@ jobs:
       - name: go vet (probe)
         run: go vet -C probe ./...
 
+      - name: gofmt (probe)
+        run: |
+          out="$(gofmt -l probe)"
+          [ -z "$out" ] || { echo "gofmt 로 맞추지 않은 파일:"; echo "$out"; exit 1; }
+
       - name: tls_probe tests and fuzz seeds (offline)
         run: GOPROXY=off GOTOOLCHAIN=local go test -C probe ./...
 
