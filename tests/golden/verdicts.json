@@ -91,7 +91,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "pass",
    "weakening": {
     "deny": 0,
@@ -187,7 +187,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "fail",
    "weakening": {
     "deny": 0,
@@ -283,7 +283,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "fail",
    "weakening": {
     "deny": 2,
@@ -379,7 +379,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "pass",
    "weakening": {
     "deny": 0,
@@ -475,7 +475,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "fail",
    "weakening": {
     "deny": 2,
@@ -571,7 +571,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "fail",
    "weakening": {
     "deny": 3,
@@ -670,7 +670,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "pass",
    "weakening": {
     "deny": 0,
@@ -769,7 +769,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "fail",
    "weakening": {
     "deny": 0,
@@ -868,7 +868,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "pass",
    "weakening": {
     "deny": 0,
@@ -964,7 +964,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "pass",
    "weakening": {
     "deny": 0,
@@ -1060,7 +1060,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "fail",
    "weakening": {
     "deny": 0,
@@ -1158,7 +1158,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "fail",
    "weakening": {
     "deny": 0,
@@ -1256,7 +1256,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "pass",
    "weakening": {
     "deny": 0,
@@ -1352,7 +1352,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "fail",
    "weakening": {
     "deny": 0,
@@ -1448,7 +1448,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "fail",
    "weakening": {
     "deny": 0,
@@ -1544,7 +1544,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "fail",
    "weakening": {
     "deny": 0,
@@ -1640,7 +1640,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "pass",
    "weakening": {
     "deny": 0,
@@ -1736,7 +1736,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "fail",
    "weakening": {
     "deny": 0,
@@ -1832,7 +1832,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "pass",
    "weakening": {
     "deny": 0,
@@ -1928,7 +1928,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "fail",
    "weakening": {
     "deny": 0,
@@ -2024,7 +2024,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "fail",
    "weakening": {
     "deny": 0,
@@ -2120,7 +2120,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "fail",
    "weakening": {
     "deny": 2,
@@ -2216,7 +2216,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "fail",
    "weakening": {
     "deny": 0,
@@ -2312,7 +2312,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "pass",
    "weakening": {
     "deny": 0,
@@ -2408,7 +2408,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "pass",
    "weakening": {
     "deny": 0,
@@ -2504,7 +2504,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "pass",
    "weakening": {
     "deny": 0,
@@ -2600,7 +2600,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "pass",
    "weakening": {
     "deny": 0,
@@ -2696,7 +2696,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "fail",
    "weakening": {
     "deny": 1,
@@ -2792,7 +2792,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "fail",
    "weakening": {
     "deny": 0,
@@ -2888,7 +2888,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "pass",
    "weakening": {
     "deny": 0,
@@ -2984,7 +2984,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "pass",
    "weakening": {
     "deny": 0,
@@ -3080,7 +3080,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "fail",
    "weakening": {
     "deny": 0,
@@ -3176,7 +3176,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "fail",
    "weakening": {
     "deny": 0,
@@ -3272,7 +3272,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "fail",
    "weakening": {
     "deny": 0,
@@ -3368,7 +3368,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "pass",
    "weakening": {
     "deny": 0,
@@ -3464,7 +3464,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "pass",
    "weakening": {
     "deny": 0,
@@ -3560,7 +3560,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "pass",
    "weakening": {
     "deny": 0,
@@ -3656,7 +3656,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "undecided",
    "weakening": {
     "deny": 0,
@@ -3752,7 +3752,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "fail",
    "weakening": {
     "deny": 0,
@@ -3848,7 +3848,7 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
    "verdict": "pass",
    "weakening": {
     "deny": 0,
@@ -3944,7 +3944,103 @@
      "weak_pqc": 0
     }
    },
-   "ruleset_version": "8",
+   "ruleset_version": "9",
+   "verdict": "fail",
+   "weakening": {
+    "deny": 0,
+    "review": 0
+   }
+  },
+  "m31-kcdsa": {
+   "allow_status": [],
+   "allowlist": {
+    "unreviewed": 0,
+    "unused": 0,
+    "unused_orig_lines": 0,
+    "write_review": 0
+   },
+   "cbom": {
+    "fixed": {
+     "allowed": 0,
+     "blocking": 2,
+     "check": 0,
+     "comment_or_test": 1,
+     "review": 0,
+     "tests": 0
+    },
+    "orig": {
+     "allowed": 0,
+     "blocking": 13,
+     "check": 0,
+     "comment_or_test": 0,
+     "review": 0,
+     "tests": 0
+    }
+   },
+   "checks": {
+    "a-cbom": "fail",
+    "a-input": "pass",
+    "b-tls": "na",
+    "b-weakening": "pass",
+    "c-classic": "fail",
+    "c-expect": "pass",
+    "r-allow": "na",
+    "r-review": "pass"
+   },
+   "exit": 1,
+   "java": {
+    "fixed": {
+     "code": {
+      "G-CLASSIC-SIG": 0,
+      "G-CURVE": 0,
+      "G-DH-DSA": 2,
+      "G-EC": 0,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 0,
+      "G-RSA": 0,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-KPQC-KEM": 0,
+      "E-KPQC-SIG": 0,
+      "E-MLDSA65": 2,
+      "E-MLDSA87": 0,
+      "E-MLKEM1024": 0,
+      "E-MLKEM768": 2,
+      "E-SLHDSA": 0
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    },
+    "orig": {
+     "code": {
+      "G-CLASSIC-SIG": 2,
+      "G-CURVE": 2,
+      "G-DH-DSA": 0,
+      "G-EC": 5,
+      "G-EDDSA": 0,
+      "G-JWT-ALG": 0,
+      "G-OAEP-PKCS1": 3,
+      "G-RSA": 5,
+      "G-X25519": 0
+     },
+     "expect": {
+      "E-KPQC-KEM": 0,
+      "E-KPQC-SIG": 0,
+      "E-MLDSA65": 0,
+      "E-MLDSA87": 0,
+      "E-MLKEM1024": 0,
+      "E-MLKEM768": 0,
+      "E-SLHDSA": 0
+     },
+     "legacy_write": 0,
+     "tests": 0,
+     "weak_pqc": 0
+    }
+   },
+   "ruleset_version": "9",
    "verdict": "fail",
    "weakening": {
     "deny": 0,

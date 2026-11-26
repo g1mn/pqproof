@@ -1425,6 +1425,35 @@
    }
   },
   {
+   "id": "m31-kcdsa",
+   "title": "KCDSA: a migrated tree that still signs with the KISA KCDSA code fails c-classic (ruleset 9)",
+   "title_ko": "KCDSA: KISA KCDSA 코드로 계속 서명하는 전환 트리는 c-classic 실패(규칙 묶음 9)",
+   "kind": "tree",
+   "orig": "classic",
+   "base": "pqc",
+   "edits": [
+    {
+     "op": "add",
+     "file": "native/sign.c",
+     "text_file": "files/kisa_kcdsa.c"
+    }
+   ],
+   "expect": {
+    "exit": 1,
+    "verdict": "fail",
+    "checks": {
+     "a-cbom": "fail",
+     "c-classic": "fail"
+    }
+   },
+   "sarif": {
+    "rules": {
+     "a-cbom": "error",
+     "c-classic": "error"
+    }
+   }
+  },
+  {
    "id": "i01-impl-latest",
    "title": "Implementation check: answers of the latest reference versions (SMAUG-T 1.2.0, HAETAE 1.2.0)",
    "title_ko": "구현 검증: 최신 참조판(SMAUG-T 1.2.0, HAETAE 1.2.0)의 답안은 통과",

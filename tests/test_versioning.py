@@ -257,7 +257,7 @@ class FormatTwo(unittest.TestCase):
 
     def test_wrong_ruleset_claims_fail(self):
         d = self.copy("rs-name")
-        rewrite(d, lambda r: r.update(ruleset_version="9"))
+        rewrite(d, lambda r: r.update(ruleset_version="999"))
         self.assertIn("not in this tool's ruleset history", self.fails(d))
         d = self.copy("rs-mod")
         rewrite(d, lambda r: r.update(ruleset_version=r["ruleset_version"] + "+modified"))

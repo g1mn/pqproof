@@ -716,7 +716,7 @@ scan_embedded() {
 scan_generic() {
   local CORE='rsa|ecdsa|ecdhe?|dsa|ed25519|x25519|secp256r1|secp384r1|secp521r1|secp256k1|prime256v1|[rpe]s(256|384|512)|eddsa|md5|sha-?1|3?des|desede|tripledes|rc4|arc4|arcfour|ecb|sslv3|ml-?kem-?[0-9]*|ml-?dsa-?[0-9]*|slh-?dsa(-(sha2|shake)-?[0-9]+[sf]?)?|x25519mlkem768|sha[0-9]*with(rsa|ecdsa|dsa)[a-z]*' RE
   # TLSv1·1.0·1.1만. 뒤가 '.'·숫자면(TLSv1.2·1.3) 안 맞게 경계를 따로 둔다(시험에서 proxy_ssl_protocols TLSv1.3 등 4행 오탐)
-  RE="(^|[^A-Za-z0-9_])($CORE)([^A-Za-z0-9_]|\$)|(^|[^A-Za-z0-9_])(tlsv1(\\.[01])?)([^.0-9A-Za-z_]|\$)"
+  RE="(^|[^A-Za-z0-9_])($CORE)([^A-Za-z0-9_]|\$)|(^|[^A-Za-z0-9_])(tlsv1(\\.[01])?)([^.0-9A-Za-z_]|\$)|(ec[-_]?)?kc[-_]?dsa"
   G -i $CODE $CFG $NOLOCK -e "$RE" | while IFS= read -r h; do
     local f=${h%%:*} rest=${h#*:} ln txt r tk; ln=${rest%%:*}; txt=${rest#*:}; r=${f#"$ROOT"/}
     seen "$r:$ln" && continue
@@ -879,6 +879,8 @@ selftest() {
   # Go
   ck go/main.go:4 crypto/ecdsa "쇼어로 깨짐" P2; ck go/main.go:6 crypto/md5 "그로버로 약화" P2; ck go/main.go:7 crypto/mlkem "안전" 참고
   ck go/main.go:9 crypto/rsa "쇼어로 깨짐" P1; ck go/main.go:12 x/crypto/ssh "미확인" 확인; ck go/main.go:16 RSA-2048 "쇼어로 깨짐" P1
+  # C: 국내 공개키 서명 KCDSA·EC-KCDSA(KISA 참조 구현 이름, 낱말 경계 밖 '_' 에 붙은 것)
+  ck c/sign.c:2 KCDSA "쇼어로 깨짐" P2; ck c/sign.c:3 EC_KCDSA "쇼어로 깨짐" P2
   ck go/main.go:17 "ECDSA P256" "쇼어로 깨짐" P2; ck go/main.go:21 VersionTLS10 "고전 취약" P2; ck go/main.go:22 CurveP256:X25519 "쇼어로 깨짐" P1
   ck go/go.mod:3 "go 1.21" "쇼어로 깨짐" P1 ""; ck go/go.mod:5 "x/crypto v0.17.0" "간접" P2 "v0.38.0+"
   # 설정·스크립트(일반 패턴·키 생성 명령), 문서는 제외

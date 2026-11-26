@@ -101,7 +101,7 @@ GEN@@G-CLASSIC-SIG@@-@@*@@with(RSA|ECDSA|DSA|PLAIN-ECDSA)|NONEwith|RSASSA|RSA-?P
 GEN@@G-JWT-ALG@@-@@*@@(^|[^A-Za-z0-9])(RS|ES|PS)(256|384|512)([^0-9]|$)@@JWT/JOSE 고전 alg(RS256·ES256·PS256)
 GEN@@G-EDDSA@@-@@*@@Ed25519|Ed448|EdDSA|Curve25519|(^|[^A-Za-z0-9])(ed25519|ed448|eddsa|curve25519|ED25519|ED448)@@EdDSA 서명(소문자 ed25519·ssh-ed25519 포함)
 GEN@@G-X25519@@-@@*@@X25519|X448|XDH|ECDH|KeyAgreement|(^|[^A-Za-z0-9])(x25519|x448|ecdh)@@X25519/ECDH 단독(같은 줄 ML-KEM 이면 하이브리드 허용)@@[Mm][Ll][-_]?[Kk][Ee][Mm]
-GEN@@G-DH-DSA@@-@@*@@[Dd]iffie-?[Hh]ellman|"DH"|"DHE"|"DSA"|'(DH|DHE|DSA|dh|dhe|dsa)'|"(dh|dhe|dsa)"|ssh-dss|ElGamal|ECIES@@DH·DSA·ElGamal(diffie-hellman·ssh-dss·작은따옴표 'dh' 포함)
+GEN@@G-DH-DSA@@-@@*@@[Dd]iffie-?[Hh]ellman|"DH"|"DHE"|"DSA"|'(DH|DHE|DSA|dh|dhe|dsa)'|"(dh|dhe|dsa)"|[Kk][Cc][-_]?[Dd][Ss][Aa]|1\.2\.410\.200004\.1\.(1|8|9|21)([^0-9]|$)|1\.2\.410\.200004\.1\.100\.4\.|1\.0\.14888\.3\.0\.5|ssh-dss|ElGamal|ECIES@@DH·DSA·KCDSA·ElGamal(diffie-hellman·ssh-dss·작은따옴표 'dh', KCDSA·EC-KCDSA 이름과 OID 포함)
 GEN@@G-AES128@@-@@*@@AES-?128|AES_128|[Aa]es-?128|\.init\(128\)@@AES-128(보안레벨 1)
 GEN@@G-WEAK-PQC@@-@@*@@[Mm][Ll][-_]?[Kk][Ee][Mm][-_]?512|[Mm][Ll][-_]?[Dd][Ss][Aa][-_]?44|[Kk][Yy][Bb][Ee][Rr][-_]?512|[Dd][Ii][Ll][Ii][Tt][Hh][Ii][Uu][Mm][-_]?2([^0-9]|$)|[Ss][Ll][Hh][-_]?[Dd][Ss][Aa][-_]?([Ss][Hh][Aa]2|[Ss][Hh][Aa][Kk][Ee])[-_]?128@@보안레벨 3 미만 PQC(대소문자·구분자 무관, SLH-DSA 128 은 규칙 묶음 4)
 LWRITE@@LW-legacy-write@@-@@*@@ENCRYPT_MODE|WRAP_MODE|initSign|KeyPairGenerator|generateKeyPair|Files\.(write|writeString|move|copy)@@Legacy*.java 는 읽기·검증 전용이어야 함
