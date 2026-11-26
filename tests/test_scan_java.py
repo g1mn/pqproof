@@ -88,6 +88,12 @@ class JavaRules(unittest.TestCase):
         self.assertEqual(got, {"SLH-DSA-SHA2-128s": "weak-pqc", "slh_dsa_shake_128f": "weak-pqc", "SLH-DSA-SHA2-192s": "pqc",
                                "SLH-DSA-SHAKE-256f": "pqc", "SLH-DSA": "pqc"})
 
+    def test_kcdsa_is_shor(self):
+        # 규칙 묶음 9: 국내 공개키 서명 KCDSA·EC-KCDSA 는 이산대수라 쇼어로 깨진다. 대칭 SEED 는 공개키 표에 없다
+        got = {n: S._classify(n)[1] for n in ("KCDSA", "EC-KCDSA", "ECKCDSA", "kcdsaWithSHA1")}
+        self.assertEqual(set(got.values()), {"shor"}, got)
+        self.assertIsNone(S._classify("SEED"))
+
     def test_prestandard_names_are_flagged_in_detail(self):
         rows = rows_of({"src/main/java/x/P.java": PQC})
         dil = next(r for r in rows if r.algorithm == "dilithium3")

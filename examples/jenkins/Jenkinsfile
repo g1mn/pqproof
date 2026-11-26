@@ -21,7 +21,7 @@ pipeline {
           T="${WORKSPACE_TMP:-$(mktemp -d)}/pqproof"
           rm -rf "$T" && mkdir -p "$T"
           python3 -m venv "$T/venv"
-          "$T/venv/bin/pip" install --quiet "pqproof==0.7.0"
+          "$T/venv/bin/pip" install --quiet "pqproof==0.8.0"
           # Not git archive: it drops export-ignore paths, and unchanged files would look added.
           GIT_INDEX_FILE="$T/base.idx" git read-tree "$BASE_COMMIT"
           GIT_INDEX_FILE="$T/base.idx" git checkout-index -a --prefix="$T/original/"

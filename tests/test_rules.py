@@ -160,6 +160,23 @@ RESIDUE_CASES = [
     R("c/Dh7.js", "const dh = crypto.getDiffieHellman('modp14'); const a = 'dh';", G_DH_DSA=L),
     R("c/Dh8.py", 'alg = "dsa"', G_DH_DSA=L),
     R("c/Dh9.conf", "HostKeyAlgorithms ssh-dss", G_DH_DSA=L),
+    # 규칙 묶음 9: KCDSA·EC-KCDSA(국내 공개키 서명, 이산대수라 쇼어로 깨짐). 이름은 KISA 참조 구현·Botan·go-cryptobin, OID 는 Botan oids.txt·asn1js
+    R("c/Kc1.c", "KISA_KCDSA_sign(ctx, msg, len, sig);", G_DH_DSA=L),
+    R("c/Kc2.java", 'Signature s = Signature.getInstance("KCDSA");', G_DH_DSA=L),
+    R("c/Kc3.cpp", "Botan::ECKCDSA_PrivateKey key(rng, group);", G_DH_DSA=L),
+    R("c/Kc4.go", 'import "github.com/deatil/go-cryptobin/pubkey/eckcdsa"', G_DH_DSA=L),
+    R("c/Kc5.yml", "sigalg: EC-KCDSA", G_DH_DSA=L, G_EC=L),
+    R("c/Kc6.java", 'String oid = "1.2.410.200004.1.1";', G_DH_DSA=L),
+    R("c/Kc7.java", 'String oid = "1.2.410.200004.1.100.4.5";', G_DH_DSA=L),
+    R("c/Kc8.py", "oid = '1.0.14888.3.0.5'", G_DH_DSA=L),
+    R("c/Kc9.java", 'String a = "1.2.410.200004.1.8";', G_DH_DSA=L),
+    R("c/Kc10.java", 'String a = "1.2.410.200004.1.9";', G_DH_DSA=L),
+    R("c/Kc11.java", 'String a = "1.2.410.200004.1.21";', G_DH_DSA=L),
+    R("c/Kc12.py", "oid = '1.0.14888.3.0.2'", G_DH_DSA=L),
+    R("c/Kc13.java", 'String oid = "1.2.410.200004.1.100.2.1";', G_DH_DSA=L),
+    R("c/KcNo3.py", "oid = '1.0.14888.3.0.50'", G_DH_DSA=None),
+    R("c/KcNo1.java", 'String seed = "1.2.410.200004.1.4";', G_DH_DSA=None),  # SEED OID 는 대칭이라 아님
+    R("c/KcNo2.java", 'String oid = "1.2.410.200004.1.15";', G_DH_DSA=None),
     # G-AES128
     R("c/Aes1.java", 'String a = "AES-128";', G_AES128=L),
     R("c/Aes2.java", 'String a = "AES128";', G_AES128=L),

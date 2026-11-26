@@ -22,9 +22,9 @@ def row(loc, alg, threat="쇼어로 깨짐", use="키교환", note=""):
 class Floor(unittest.TestCase):
     def test_sizes(self):
         below = ("RSA-1024", "rsa1024", "DSA-1024", "DH-1024", "ElGamal-1536", "EC-192 prime192v1", "secp192r1", "P-192",
-                 "sect163k1", "brainpoolP160r1", "RSA-512")
+                 "sect163k1", "brainpoolP160r1", "RSA-512", "KCDSA-1024", "kcdsa1024")
         fine = ("RSA-2048", "rsa:3072", "RSA", "ECDSA-256", "secp224r1", "secp256r1", "P-256", "ffdhe2048", "RSA-OAEP-256",
-                "X25519", "ecdh", "ML-KEM-768")
+                "X25519", "ecdh", "ML-KEM-768", "KCDSA-2048", "KCDSA")
         for a in below:
             with self.subTest(a=a):
                 self.assertTrue(rules.below_floor(a))

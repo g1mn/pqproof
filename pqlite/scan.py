@@ -310,7 +310,7 @@ BC_PROVIDER = re.compile(r"\bSecurity\s*\.\s*(?:addProvider|insertProviderAt)\s*
 NAMED_GROUPS_CALL = re.compile(r"\bsetNamedGroups\s*\(")
 JDK_GROUPS = re.compile(r"jdk\.tls\.namedGroups[\"']?\s*(?:=|:|,)\s*[\"']?([A-Za-z0-9_, -]{1,200})")
 JDK_GROUPS_FILES = re.compile(r"(?:.*\.(?:properties|ya?ml|sh|bash|env|conf|cfg)|java\.security|Dockerfile.*|\.env.*)")
-SHOR_ALG = re.compile(r"(?i)rsa|ecdsa|ecdh|ecies|ecmqv|eddsa|ed25519|ed448|x25519|x448|\bxdh\b|diffie|elgamal|\bsm2\b|"
+SHOR_ALG = re.compile(r"(?i)rsa|ecdsa|ecdh|ecies|ecmqv|eddsa|ed25519|ed448|x25519|x448|\bxdh\b|diffie|elgamal|\bsm2\b|kc[-_]?dsa|"
                       r"with(?:plain-)?(?:dsa|ecdsa|rsa)|^ec$|^dh$|^dsa$|^ecc$|^ecgost|^gost3410|\bdhkem\b")
 # 변이 시험에서 보탬: 대입 추적, BC 경량 API·JCA 키 스펙·키 형·곡선 표·JWT/JOSE 상수·OID 상수.
 J_ASSIGN = re.compile(r"(?<![\w.$])([A-Za-z_]\w*)\s*=(?!=)")  # bare(문자열 비운 판)에서 찾는다: 선언·다시 대입
