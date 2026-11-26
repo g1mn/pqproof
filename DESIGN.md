@@ -15,7 +15,7 @@ bash prove.sh <original folder|zip> <fixed folder|zip>
 ```
 
 1. **Prepare.** Unpack zip inputs, hash both trees, load the allowlist and the data exclusions.
-2. **(a) CBOM.** Run `scan/cbom-scan.sh` and `pqlite/scan.py` on both trees and merge their rows by `path:line`.
+2. **(a) CBOM.** Run `scan/cbom-scan.sh` and `pqlite/scan.py` on both trees and merge their rows by `path:line`. Since ruleset 10 `pkname()` in `cbom-scan.sh` names the SLH-DSA parameter set from its OID (2.16.840.1.101.3.4.3.20 to .31: SHA2 and SHAKE, 128/192/256, s and f). It matters only where OpenSSL prints the raw OID instead of the name: OpenSSL before 3.5 and LibreSSL do that in `x509 -text`, and neither can read an SLH-DSA key with `pkey -text`, so `pkname` is the only place the algorithm gets named. A row read that way used to be plain `SLH-DSA` and counted as safe (category 3 or above); an SLH-DSA-128s row now reads `SLH-DSA-SHA2-128s` and blocks as below category 3, the same way an ML-DSA-44 row does.
 3. **(c) Classical-line count.** Run `scan/residue.sh` on both trees and read its per-rule counts and line lists. Then resolve the allowlist against the original as well and count, per entry, the classical lines it covers there (see Allow rules).
 4. **(b) TLS weakening.** Compare every changed file before and after with `pqlite/verify.py`.
 5. **(b) TLS probe.** Only with `TLS_TARGETS`: check the probe against reference servers, then measure each target.

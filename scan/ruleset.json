@@ -1,6 +1,6 @@
 {
- "about": "Ruleset versions: a name for each hash of the rule files (pqlite/version.py RULESET_FILES). A run records ruleset_version and ruleset_sha256 in receipt.json. Each version lists sha256, since (the first tool version that shipped it), verdict_impact (yes when the same trees can get a different verdict, check status or count than under the previous ruleset; no when only comments, wording or code layout changed) and files (path and sha256 of each rule file). The file list can differ between versions: ruleset 1 hashed six files, ruleset 2 hashes eleven: it adds scan/skip-dirs, scan/profiles.json, pqlite/rules.py, pqlite/skipdirs.py and pqlite/tlsprobe.py. Ruleset 3 hashes fourteen: it adds pqlite/impl.py, scan/kat-kpqc.json and scan/kat (the reference KAT excerpts, one digest over the *.json files of the folder, pqlite/version.py path_sha256). Ruleset 4 hashes the same fourteen and counts SLH-DSA 192 and 256 (FIPS 205) as an expected signature (E-SLHDSA) and blocks SLH-DSA 128 as below category 3. --verify recomputes a receipt's ruleset_sha256 from the files of the ruleset it names. Changing a rule file needs a new name here, a new current, and a CHANGELOG entry with its verdict impact. A ruleset with verdict_impact yes first ships in a MINOR release (MAJOR from 1.0), never a PATCH release (tests/version_policy.py). pqlite/version.py --ruleset-json prints sha256 and files for the rule files on disk. Ruleset 5 hashes the same fourteen files with the same rules as ruleset 4; only comments changed. From ruleset 5 a record also keeps comment_free (the hash of the rule files without comments) and aliases: a later edit that changes only comments is recorded as an alias of the same name (pqlite/version.py --alias), so comments no longer rename a ruleset. --verify accepts the recorded hash or an alias. Ruleset 6 hashes the same fourteen files: one awk mask (MASKFN, the same text in scan/cbom-scan.sh and scan/residue.sh) hides the same values as prove.py REDACT, residue.sh masks its excerpts too, and both add ssh-keygen -N. Verdict impact yes only for a file over MAX_FILE_MIB, where prove falls back to the residue.sh excerpt and a masked secret value could hold a rule word. Ruleset 7 hashes the same fourteen files: a classical row whose stated size is below 112-bit security (RSA, DSA, DH or ElGamal under 2048 bits, a curve under 224 bits) is never allowed (NIS draft cryptographic security guideline, November 2026); PQ/PQ hybrid lines are marked; allowlist entries read residual_risk, compensating_control and replacement_plan; tls_probe 0.5.0 reports the cipher suite and the certificate expiry. Verdict impact yes only for such a weak classical key that an allow rule, a hybrid or an allowlist entry used to take out of the blocking count. Ruleset 8 hashes the same fourteen files: a TLS target without a CA is verified against the system trust store and its host name (tls_probe 0.6.0), trust on first use needs an explicit #tofu, and a handshake that fails certificate verification counts as not measured, never as a hybrid result or a refusal; each handshake is judged on its own, so a failure measured before the certificate is checked still fails. A tls_probe binary that is not version 0.6.0, or a connect that ends with a usage error, leaves b-tls undecided. Verdict impact yes only for TLS targets: one given without a CA whose certificate the system trust store does not accept (a self-signed or private CA) moves from pass to undecided, and from fail to undecided when every failing handshake now fails verification (for example the old client accepted under CLASSIC=deny); one whose certificate does not verify against its CA file moves from fail to undecided in the same way. Either stays fail when the hybrid-only offer is refused (an X25519-only server). Ruleset 9 hashes the same fourteen files: G-DH-DSA (one of the nine public-key families) also counts KCDSA and EC-KCDSA, the Korean discrete-log signatures (TTAK.KO-12.0001, TTAK.KO-12.0015), by name in any spelling (KCDSA, EC-KCDSA, ECKCDSA, KISA_KCDSA_sign, kcdsaWithSHA1) and by OID (1.2.410.200004.1.1, .8, .9, .21, 1.2.410.200004.1.100.2.1, 1.2.410.200004.1.100.4.x, 1.0.14888.3.0.2, 1.0.14888.3.0.5). By name only (not by OID), the inventory scanner, the Java name classifier and the CBOM export list them as signatures that Shor's algorithm breaks, and the 112-bit key floor covers a stated KCDSA size. Verdict impact yes only for a tree with such a line: c-classic can move from pass to fail, and a-cbom too when the line names the algorithm; a line with only the OID moves c-classic alone; an upper-case EC-KCDSA or EC_KCDSA line, already counted in G-EC, now also counts in G-DH-DSA.",
- "current": "9",
+ "about": "Ruleset versions: a name for each hash of the rule files (pqlite/version.py RULESET_FILES). A run records ruleset_version and ruleset_sha256 in receipt.json. Each version lists sha256, since (the first tool version that shipped it), verdict_impact (yes when the same trees can get a different verdict, check status or count than under the previous ruleset; no when only comments, wording or code layout changed) and files (path and sha256 of each rule file). The file list can differ between versions: ruleset 1 hashed six files, ruleset 2 hashes eleven: it adds scan/skip-dirs, scan/profiles.json, pqlite/rules.py, pqlite/skipdirs.py and pqlite/tlsprobe.py. Ruleset 3 hashes fourteen: it adds pqlite/impl.py, scan/kat-kpqc.json and scan/kat (the reference KAT excerpts, one digest over the *.json files of the folder, pqlite/version.py path_sha256). Ruleset 4 hashes the same fourteen and counts SLH-DSA 192 and 256 (FIPS 205) as an expected signature (E-SLHDSA) and blocks SLH-DSA 128 as below category 3. --verify recomputes a receipt's ruleset_sha256 from the files of the ruleset it names. Changing a rule file needs a new name here, a new current, and a CHANGELOG entry with its verdict impact. A ruleset with verdict_impact yes first ships in a MINOR release (MAJOR from 1.0), never a PATCH release (tests/version_policy.py). pqlite/version.py --ruleset-json prints sha256 and files for the rule files on disk. Ruleset 5 hashes the same fourteen files with the same rules as ruleset 4; only comments changed. From ruleset 5 a record also keeps comment_free (the hash of the rule files without comments) and aliases: a later edit that changes only comments is recorded as an alias of the same name (pqlite/version.py --alias), so comments no longer rename a ruleset. --verify accepts the recorded hash or an alias. Ruleset 6 hashes the same fourteen files: one awk mask (MASKFN, the same text in scan/cbom-scan.sh and scan/residue.sh) hides the same values as prove.py REDACT, residue.sh masks its excerpts too, and both add ssh-keygen -N. Verdict impact yes only for a file over MAX_FILE_MIB, where prove falls back to the residue.sh excerpt and a masked secret value could hold a rule word. Ruleset 7 hashes the same fourteen files: a classical row whose stated size is below 112-bit security (RSA, DSA, DH or ElGamal under 2048 bits, a curve under 224 bits) is never allowed (NIS draft cryptographic security guideline, November 2026); PQ/PQ hybrid lines are marked; allowlist entries read residual_risk, compensating_control and replacement_plan; tls_probe 0.5.0 reports the cipher suite and the certificate expiry. Verdict impact yes only for such a weak classical key that an allow rule, a hybrid or an allowlist entry used to take out of the blocking count. Ruleset 8 hashes the same fourteen files: a TLS target without a CA is verified against the system trust store and its host name (tls_probe 0.6.0), trust on first use needs an explicit #tofu, and a handshake that fails certificate verification counts as not measured, never as a hybrid result or a refusal; each handshake is judged on its own, so a failure measured before the certificate is checked still fails. A tls_probe binary that is not version 0.6.0, or a connect that ends with a usage error, leaves b-tls undecided. Verdict impact yes only for TLS targets: one given without a CA whose certificate the system trust store does not accept (a self-signed or private CA) moves from pass to undecided, and from fail to undecided when every failing handshake now fails verification (for example the old client accepted under CLASSIC=deny); one whose certificate does not verify against its CA file moves from fail to undecided in the same way. Either stays fail when the hybrid-only offer is refused (an X25519-only server). Ruleset 9 hashes the same fourteen files: G-DH-DSA (one of the nine public-key families) also counts KCDSA and EC-KCDSA, the Korean discrete-log signatures (TTAK.KO-12.0001, TTAK.KO-12.0015), by name in any spelling (KCDSA, EC-KCDSA, ECKCDSA, KISA_KCDSA_sign, kcdsaWithSHA1) and by OID (1.2.410.200004.1.1, .8, .9, .21, 1.2.410.200004.1.100.2.1, 1.2.410.200004.1.100.4.x, 1.0.14888.3.0.2, 1.0.14888.3.0.5). By name only (not by OID), the inventory scanner, the Java name classifier and the CBOM export list them as signatures that Shor's algorithm breaks, and the 112-bit key floor covers a stated KCDSA size. Verdict impact yes only for a tree with such a line: c-classic can move from pass to fail, and a-cbom too when the line names the algorithm; a line with only the OID moves c-classic alone; an upper-case EC-KCDSA or EC_KCDSA line, already counted in G-EC, now also counts in G-DH-DSA. Ruleset 10 hashes the same fourteen files: cbom-scan.sh pkname() maps each SLH-DSA OID (2.16.840.1.101.3.4.3.20 to .31) to its parameter set name instead of plain SLH-DSA, so a 128-bit SLH-DSA key or certificate read from its OID (OpenSSL before 3.5, LibreSSL) becomes SLH-DSA-SHA2-128s and is judged below category 3. Verdict impact yes for exactly those trees, whose row moves from SLH-DSA / 참고 to 보안레벨 3 미만 / P2 and whose check goes from undecided to fail.",
+ "current": "10",
  "versions": {
   "1": {
    "sha256": "b0bff18e90b4f981b7b5df07236e5d132d7c0aa3458bc1a79810ca5e10f49645",
@@ -834,6 +834,130 @@
     ]
    },
    "aliases": []
+  },
+  "10": {
+   "sha256": "d50aaf760d320b992b4760ea4bd971b9003532be368b8b61b27aeb62aba5b6fa",
+   "files": [
+    {
+     "path": "pqlite/allowlist.py",
+     "sha256": "2125dd8d71f762ab1a0d67efd306799235e1862d653934355291c09001718e8b"
+    },
+    {
+     "path": "pqlite/impl.py",
+     "sha256": "274ba53d95c161d8adbf136a53c6fe31e5e746c254b3c2b1cf25df83a389457a"
+    },
+    {
+     "path": "pqlite/rules.py",
+     "sha256": "e83bbba89966a9c1a8145e0072eba82c36e3d483982eeddd883ffeebcac5221e"
+    },
+    {
+     "path": "pqlite/scan.py",
+     "sha256": "f28ca17dff0a074df2b1c08ca8ee7ed39c0a18359b51a0d516b40397b67f232b"
+    },
+    {
+     "path": "pqlite/skipdirs.py",
+     "sha256": "99928889442aa1808fef94ed18dd063a169bc626c75d198bd7602cef338e3c25"
+    },
+    {
+     "path": "pqlite/tlsprobe.py",
+     "sha256": "34ee6d1a70980c0d6bb0e6bb79a184033d081e002e1ebdeb757191e9ceda8d56"
+    },
+    {
+     "path": "pqlite/verify.py",
+     "sha256": "8829cc3849554cb51e7cd1059b70e7066308f3766e116551b25ce43d59192c00"
+    },
+    {
+     "path": "scan/cbom-scan.sh",
+     "sha256": "27ad50f911c5ac646bf3fdd4681ec4abd678704f5539a9d0ee07955a5c7ca0e1"
+    },
+    {
+     "path": "scan/kat",
+     "sha256": "182a5384a6acf8f789f2e068d834d1d968d37aff4ae8e0275dbdd96aaef741e9"
+    },
+    {
+     "path": "scan/kat-kpqc.json",
+     "sha256": "628d6e88552908d9a2eaf7c827a698f84278cd320531f1c8f7324f8947bcd9f5"
+    },
+    {
+     "path": "scan/profiles.json",
+     "sha256": "3a5fa9f1d8d8ebdafa53b1dc136e561a580eb5df4b86e9ec4d4ec5651788fdab"
+    },
+    {
+     "path": "scan/residue.sh",
+     "sha256": "491cb470d28bc07da03ce8c00d61fecec7ca5a250095f1b61952d11b4b758bfe"
+    },
+    {
+     "path": "scan/skip-dirs",
+     "sha256": "685fda3e7ac9ead22c216540301847dfc31b043918e920148ec74a08515ae1f7"
+    },
+    {
+     "path": "scan/test-paths.ere",
+     "sha256": "1c57d266eb7365ec1766652c6d43277ce0e59fb9924aa02b6bf3a3a5faf89bfa"
+    }
+   ],
+   "comment_free": {
+    "sha256": "d5ca66d52d3172f7b66750ea5e5cec04cc3f787e188892f45376565419c74501",
+    "files": [
+     {
+      "path": "pqlite/allowlist.py",
+      "sha256": "5cdb2b0acb7ab6fda82b0212dd1878b3c197250be3325f96e1750938fa61541f"
+     },
+     {
+      "path": "pqlite/impl.py",
+      "sha256": "ab99557c1dd97ccf33bf3924cc7f9b196636425722a6a5aad3695d95540b9555"
+     },
+     {
+      "path": "pqlite/rules.py",
+      "sha256": "31e89b888b8720d4565764e42f768b31935196bb897d97e71caa191e18256a23"
+     },
+     {
+      "path": "pqlite/scan.py",
+      "sha256": "cc9736bfcc6312a04691bada5acf8fdc4fa86481c74128ccb853b67da4cbb8ba"
+     },
+     {
+      "path": "pqlite/skipdirs.py",
+      "sha256": "42fa6257ae96b0b16637a89312d9bcf26b46ae50f3dfe682de2cbdf9e1a6dd6b"
+     },
+     {
+      "path": "pqlite/tlsprobe.py",
+      "sha256": "a86b39a22e8498b53ca859fec5664fae3d54eb5f0478d25a1a7e9d7e13fcf8a9"
+     },
+     {
+      "path": "pqlite/verify.py",
+      "sha256": "c4bf380b070e91102ce9369b1b5a6ae9152db3721101623cd29290ad35116d22"
+     },
+     {
+      "path": "scan/cbom-scan.sh",
+      "sha256": "b5ed9de4dbad12425a931cbe2dbad35cdbb24a69a181cd09322c28236a2edb5c"
+     },
+     {
+      "path": "scan/kat",
+      "sha256": "182a5384a6acf8f789f2e068d834d1d968d37aff4ae8e0275dbdd96aaef741e9"
+     },
+     {
+      "path": "scan/kat-kpqc.json",
+      "sha256": "628d6e88552908d9a2eaf7c827a698f84278cd320531f1c8f7324f8947bcd9f5"
+     },
+     {
+      "path": "scan/profiles.json",
+      "sha256": "3a5fa9f1d8d8ebdafa53b1dc136e561a580eb5df4b86e9ec4d4ec5651788fdab"
+     },
+     {
+      "path": "scan/residue.sh",
+      "sha256": "825a6c5f9b93a7063567eef9e7aaef888d49918ed3a4dcbbfe0866dfe5f9464d"
+     },
+     {
+      "path": "scan/skip-dirs",
+      "sha256": "aa87a3c8d124abcd2cc7ebbbb6d5d4f69c8a7d5015851ef9ce45a892e827d4a5"
+     },
+     {
+      "path": "scan/test-paths.ere",
+      "sha256": "77aa57bcc8932a372c5c541c6d9ee0d93b15a4b2dc1bf0210c44ccb02595a103"
+     }
+    ]
+   },
+   "since": "0.10.0",
+   "verdict_impact": "yes"
   }
  }
 }
