@@ -549,7 +549,12 @@ pkname() { case "$1" in
   rsaEncryption|RSA|rsassaPss) echo RSA;; id-ecPublicKey) echo EC;; dsaEncryption|DSA) echo DSA;; dhKeyAgreement|X9.42\ DH) echo DH;;
   2.16.840.1.101.3.4.3.17) echo ML-DSA-44;; 2.16.840.1.101.3.4.3.18) echo ML-DSA-65;; 2.16.840.1.101.3.4.3.19) echo ML-DSA-87;;
   2.16.840.1.101.3.4.4.1) echo ML-KEM-512;; 2.16.840.1.101.3.4.4.2) echo ML-KEM-768;; 2.16.840.1.101.3.4.4.3) echo ML-KEM-1024;;
-  2.16.840.1.101.3.4.3.2[0-9]|2.16.840.1.101.3.4.3.3[01]) echo SLH-DSA;;
+  2.16.840.1.101.3.4.3.20) echo SLH-DSA-SHA2-128s;; 2.16.840.1.101.3.4.3.21) echo SLH-DSA-SHA2-128f;;
+  2.16.840.1.101.3.4.3.22) echo SLH-DSA-SHA2-192s;; 2.16.840.1.101.3.4.3.23) echo SLH-DSA-SHA2-192f;;
+  2.16.840.1.101.3.4.3.24) echo SLH-DSA-SHA2-256s;; 2.16.840.1.101.3.4.3.25) echo SLH-DSA-SHA2-256f;;
+  2.16.840.1.101.3.4.3.26) echo SLH-DSA-SHAKE-128s;; 2.16.840.1.101.3.4.3.27) echo SLH-DSA-SHAKE-128f;;
+  2.16.840.1.101.3.4.3.28) echo SLH-DSA-SHAKE-192s;; 2.16.840.1.101.3.4.3.29) echo SLH-DSA-SHAKE-192f;;
+  2.16.840.1.101.3.4.3.30) echo SLH-DSA-SHAKE-256s;; 2.16.840.1.101.3.4.3.31) echo SLH-DSA-SHAKE-256f;;
   1.3.101.112|Ed25519|ED25519) echo ED25519;; 1.3.101.113|Ed448|ED448) echo ED448;; 1.3.101.110|X25519) echo X25519;; 1.3.101.111|X448) echo X448;;
   *) echo "$1";; esac; }
 keytext_alg() { # openssl -text 출력 → "RSA-2048" / "EC-256 prime256v1" / "ML-DSA-65"
@@ -897,6 +902,14 @@ selftest() {
   if [ -n "$SK" ]; then ck gen/id_rsa:1 RSA-2048 "쇼어로 깨짐" P2; ck gen/id_ed25519.pub ED25519 "쇼어로 깨짐" P2; else skip 2; fi
   if [ -n "$KT" ] && [ -f "$g/legacy.jks" ]; then ck "gen/legacy.jks#" EC "쇼어로 깨짐" P2; else skip; fi   # '#legacy'(별칭) 또는 옛 keytool이면 '#rfc:N'
   if [ -f "$g/mldsa65.crt" ]; then ck gen/mldsa65.crt:1 ML-DSA-65 "안전" 참고; ck gen/mlkem768.key:1 ML-KEM-768 "안전" 참고; else skip 2; fi
+  # FIPS 205 파라미터 집합(규칙 묶음 10): 128s 는 보안레벨 3 미만, 192s 는 안전.
+  # 셀프테스트가 스캔하는 곳(scan/fixtures/)에 커밋한 인증서를 그대로 단언한다. OpenSSL 판에 조건을
+  # 달지 않는다. 3.5 미만과 LibreSSL 은 x509 -text 에 원시 OID 를 찍어 이 행이 OID 경로로만 통과한다.
+  ck gen-128s.crt:1 SLH-DSA-SHA2-128s "보안레벨 3 미만" P2; ck gen-192s.crt:1 SLH-DSA-SHA2-192s "안전" 참고
+  ck_o() { if [ "$(pkname "$1")" = "$2" ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "  FAIL: pkname $1 = '$(pkname "$1")', want '$2'"; fi; }
+  ck_o 2.16.840.1.101.3.4.3.20 SLH-DSA-SHA2-128s; ck_o 2.16.840.1.101.3.4.3.22 SLH-DSA-SHA2-192s
+  ck_o 2.16.840.1.101.3.4.3.31 SLH-DSA-SHAKE-256f; ck_o 2.16.840.1.101.3.4.3.18 ML-DSA-65
+  ck_o 2.16.840.1.101.3.4.3.32 2.16.840.1.101.3.4.3.32   # 모르는 OID 는 그대로
   # 엔드포인트
   ck 127.0.0.1:$P1 X25519 "쇼어로 깨짐" P1; ck 127.0.0.1:$P1 RSA-2048 "쇼어로 깨짐" P2 "서버 인증서"
   if [ -n "$s2" ]; then ck 127.0.0.1:$P2 X25519MLKEM768 "안전" 참고 "강등 차단"; ck 127.0.0.1:$P2 ML-DSA-65 "안전" 참고; else skip 2; fi

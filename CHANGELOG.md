@@ -10,6 +10,17 @@ Each release has a **Verdict impact (판정 영향)** line. It says whether the 
 
 Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `receipt.json`, so a receipt from years ago still names the rules that judged it. `--verify` keeps reading older evidence formats.
 
+## [Unreleased]
+
+Tool unreleased, ruleset 10 (new), evidence format 4 (unchanged).
+
+**Verdict impact (판정 영향): yes, for SLH-DSA keys and certificates read from their OID.** `pkname()` maps each SLH-DSA OID (2.16.840.1.101.3.4.3.20 to .31) to its parameter set name instead of plain `SLH-DSA`. Before, OpenSSL 3.5 and later already printed the name in `x509 -text` and `pkey -text`, but OpenSSL before 3.5 and LibreSSL print the raw OID (`cert_row`, `scan/cbom-scan.sh:599-600`), so `pkname` is reached and the row was plain `SLH-DSA`. With LibreSSL 3.3.6 an SLH-DSA-SHA2-128s certificate moves from `SLH-DSA / 안전(PQC) / 참고` to `SLH-DSA-SHA2-128s / 보안레벨 3 미만(PQC) / P2`, because a 128s parameter set is below category 3. `prove.sh --check` on that tree moves from undecided to fail. The 42 golden tree cases keep every verdict, check status and count: none reaches `pkname` with an SLH-DSA OID (0 of 42 moved).
+
+### Changed
+
+- `scan/cbom-scan.sh`: twelve SLH-DSA OIDs map to their parameter sets, the way the ML-DSA and ML-KEM OIDs already did. A 192 or 256 parameter set is safe at category 3; a 128 set is below it.
+- `scan/fixtures/gen-128s.crt`, `gen-192s.crt`: two SLH-DSA certificates (public certificates only, no keys) committed under `scan/fixtures/`, where the selftest already scans, so both rows are checked on every OpenSSL, not just 3.5 and later, and the old `skip 2` below OpenSSL 3.5 is gone. Nothing is generated into `gen/` for them, so a `gen/` left behind by an earlier run cannot make the rows fail.
+
 ## [0.9.0] - 2026-11-27
 
 Tool 0.9.0, ruleset 9, evidence format 4 (unchanged), `tls_probe` 0.6.0 (unchanged).
