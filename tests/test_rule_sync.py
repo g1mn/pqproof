@@ -68,7 +68,10 @@ class ResidueAndProve(unittest.TestCase):
         res = {r["id"]: r["re"] for r in rulesrc.residue_rules() if r["kind"] == "EXPECT"}
         samples = ["ML-KEM-768", "mlkem768", "ML_KEM_1024", "ml-dsa-65", "MLDSA87", "SMAUG-T3", "NTRU+576", "ntruplus", "HAETAE3",
                    "AIMer128f", "disclaimer", "ML-KEM-512", "MLDSA44", "SLH-DSA-SHA2-192s", "slh_dsa_shake_256f",
-                   "SLHDSA-SHA2-256s", "SLH-DSA-SHA2-128s", "SPHINCS+-SHA2-192s-simple", "SLH-DSA"]
+                   "SLHDSA-SHA2-256s", "SLH-DSA-SHA2-128s", "SPHINCS+-SHA2-192s-simple", "SLH-DSA",
+                   # slhdsa.SHA2_192s: python-cryptography writes the name with a '.' separator, which neither
+                   # rule matches; it is here so the gap stays visible. SLHDSA_SHA2_192s (underscore) matches.
+                   "SLHDSA_SHA2_192s", "slhdsa.SHA2_192s"]
         self.assertEqual(set(res), set(rules.EXPECT_RE), sync("EXPECT rules", "scan/residue.sh and pqlite/rules.py EXPECT_RE"))
         for rid in res:
             for s in samples:
