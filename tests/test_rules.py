@@ -169,6 +169,12 @@ RESIDUE_CASES = [
     R("c/Kc6.java", 'String oid = "1.2.410.200004.1.1";', G_DH_DSA=L),
     R("c/Kc7.java", 'String oid = "1.2.410.200004.1.100.4.5";', G_DH_DSA=L),
     R("c/Kc8.py", "oid = '1.0.14888.3.0.5'", G_DH_DSA=L),
+    R("c/Kc9.java", 'String a = "1.2.410.200004.1.8";', G_DH_DSA=L),
+    R("c/Kc10.java", 'String a = "1.2.410.200004.1.9";', G_DH_DSA=L),
+    R("c/Kc11.java", 'String a = "1.2.410.200004.1.21";', G_DH_DSA=L),
+    R("c/Kc12.py", "oid = '1.0.14888.3.0.2'", G_DH_DSA=L),
+    R("c/Kc13.java", 'String oid = "1.2.410.200004.1.100.2.1";', G_DH_DSA=L),
+    R("c/KcNo3.py", "oid = '1.0.14888.3.0.50'", G_DH_DSA=None),
     R("c/KcNo1.java", 'String seed = "1.2.410.200004.1.4";', G_DH_DSA=None),  # SEED OID 는 대칭이라 아님
     R("c/KcNo2.java", 'String oid = "1.2.410.200004.1.15";', G_DH_DSA=None),
     # G-AES128

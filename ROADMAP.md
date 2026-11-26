@@ -29,7 +29,7 @@ The four gaps in the NIS and NSR draft mappings (posted 2026-11-16) that a migra
 
 ## 0.9.0
 
-- KCDSA and EC-KCDSA, the Korean discrete-log signatures, are caught by name and OID in the residue count (`G-DH-DSA`, ruleset 9), the inventory, the Java name classifier and the CBOM export. They were missed before because the generic `dsa` pattern needs a word boundary.
+- KCDSA and EC-KCDSA, the Korean discrete-log signatures, are caught by name and OID in the residue count (`G-DH-DSA`, ruleset 9) and by name in the inventory, the Java name classifier and the CBOM export. They were missed before: `G-DH-DSA` counted DSA only as a quoted literal, and the inventory's `dsa` pattern needs a word boundary.
 
 ## When the KISA PQC migration guide is published
 

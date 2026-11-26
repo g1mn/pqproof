@@ -14,15 +14,16 @@ Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `rec
 
 Tool 0.9.0, ruleset 9, evidence format 4 (unchanged), `tls_probe` 0.6.0 (unchanged).
 
-**Verdict impact (판정 영향): yes, for trees with KCDSA or EC-KCDSA.** KCDSA and EC-KCDSA, the Korean signature standards (TTAK.KO-12.0001 and TTAK.KO-12.0015, discrete-log based, so Shor's algorithm breaks them), were not caught: the generic `dsa` pattern needs a word boundary, and in `KCDSA` the letter before `DSA` is `C`. Ruleset 9 adds them to `G-DH-DSA`:
-- A code line that names KCDSA or EC-KCDSA in any spelling (`KCDSA`, `EC-KCDSA`, `ECKCDSA`, `KISA_KCDSA_sign`, `kcdsaWithSHA1`, `go-cryptobin/pubkey/eckcdsa`) or by OID (`1.2.410.200004.1.1`, `.8`, `.9`, `.21`, `1.2.410.200004.1.100.4.x`, `1.0.14888.3.0.5`) now counts in `c-classic`, so a fixed tree that keeps one moves from pass to fail. Allow it with a reason in the allowlist when it stays on purpose. The SEED OID (`1.2.410.200004.1.4`) and other symmetric OIDs under `1.2.410.200004.1` do not count.
-- A line that says `EC-KCDSA` was already counted in `G-EC` (the `EC-` prefix); it now counts in `G-DH-DSA` too, like `ECIES`.
+**Verdict impact (판정 영향): yes, for trees with KCDSA or EC-KCDSA.** KCDSA and EC-KCDSA, the Korean signature standards (TTAK.KO-12.0001 and TTAK.KO-12.0015, discrete-log based, so Shor's algorithm breaks them), were not caught: `G-DH-DSA` counted DSA only as a quoted literal (`"DSA"`, `'dsa'`), and the inventory's `dsa` pattern needs a word boundary, which `KCDSA` does not have. Ruleset 9 adds them to `G-DH-DSA`:
+- A code line that names KCDSA or EC-KCDSA in any spelling (`KCDSA`, `EC-KCDSA`, `ECKCDSA`, `KISA_KCDSA_sign`, `kcdsaWithSHA1`, `go-cryptobin/pubkey/eckcdsa`) or by OID (`1.2.410.200004.1.1`, `.8`, `.9`, `.21`, `1.2.410.200004.1.100.2.1`, `1.2.410.200004.1.100.4.x`, `1.0.14888.3.0.2`, `1.0.14888.3.0.5`) now counts in `c-classic`, so a fixed tree that keeps one moves from pass to fail. A line that names the algorithm also becomes a blocking inventory row, so `a-cbom` moves from pass to fail too; a line with only the OID moves `c-classic` alone. Allow it with a reason in the allowlist when it stays on purpose. The SEED OID (`1.2.410.200004.1.4`) and other symmetric OIDs under `1.2.410.200004.1` do not count.
+- A line that says `EC-KCDSA` or `EC_KCDSA` in upper case was already counted in `G-EC` (the `EC` prefix); it now counts in `G-DH-DSA` too, like `ECIES`, so its code count goes from 1 to 2.
+- A stated KCDSA key size under 2048 bits (`KCDSA-1024`) falls under the 112-bit key floor like DSA.
 
 The 41 golden tree cases keep every verdict, check status and count; none has KCDSA. A new mutation and golden case, `m31-kcdsa`, adds the KISA KCDSA reference call to a migrated tree and fails `a-cbom` and `c-classic` (57 mutations, 42 golden tree cases). Evidence from every earlier release still verifies byte for byte.
 
 ### Added
 
-- Inventory and CBOM: `cbom-scan.sh` lists KCDSA and EC-KCDSA as signatures broken by Shor's algorithm (P2, replace with ML-DSA-65), also when the name is glued to `_` or a capital letter as in the KISA reference code. The Java name classifier marks them `shor`, and the CycloneDX export gives them the `signature` primitive even when the use is unknown.
+- Inventory and CBOM (by name; OIDs are counted only by `G-DH-DSA`): `cbom-scan.sh` lists KCDSA and EC-KCDSA as signatures broken by Shor's algorithm (P2, replace with ML-DSA-65), also when the name is glued to `_` or a capital letter as in the KISA reference code. The Java name classifier marks them `shor`, and the CycloneDX export gives them the `signature` primitive even when the use is unknown.
 
 ## [0.8.0] - 2026-11-26
 

@@ -94,7 +94,7 @@ class Mapping(unittest.TestCase):
         ec = comp(self.doc, "EC-secp256r1", "algorithm")
         self.assertEqual((alg_props(ec)["curve"], len(ec["evidence"]["occurrences"])), ("secp256r1", 2))
         self.assertEqual(sum(1 for p in ec["properties"] if p["name"] == "pqproof:alg_raw"), 2)
-        for name in ("KCDSA", "EC-KCDSA", "ECKCDSA"):  # 규칙 묶음 9: 용도 칸이 비어도 서명으로 분류
+        for name in ("KCDSA", "EC-KCDSA", "ECKCDSA", "SHA256withKCDSA", "HAS160withKCDSA"):  # 규칙 묶음 9: 용도 칸이 비어도 서명으로 분류
             self.assertEqual(cdx.classify(name, "")[1], {"primitive": "signature"}, name)
 
     def test_unknown_and_lists_stay_raw(self):

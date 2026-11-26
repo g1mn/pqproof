@@ -233,11 +233,11 @@ CBOM_FLAGS = ("주석", "테스트·예제")
 # cbom-scan.sh verdict() 가 NIST 보안레벨 3 미만 PQC(ML-KEM-512·ML-DSA-44·Kyber512·Dilithium2)에 다는 위협(교차 리뷰 X07). 허용하지 않는다
 CBOM_WEAK_PQC = "보안레벨 3 미만(PQC)"
 # 112비트 하한(국정원 암호 안전성 기준 초안 S1, 규칙 묶음 7): 2036년 전까지 한시 허용하는 기존 공개키 암호는 보안 강도 112비트 이상이다.
-# 키 길이가 적힌 고전 행 가운데 그보다 약한 것(RSA·DSA·DH·ElGamal 2048비트 미만, 224비트 미만 곡선)은 허용 규칙·허용 목록·하이브리드
+# 키 길이가 적힌 고전 행 가운데 그보다 약한 것(RSA·DSA·KCDSA·DH·ElGamal 2048비트 미만, 224비트 미만 곡선)은 허용 규칙·허용 목록·하이브리드
 # 결합으로 빼지 않고 막는다. 길이가 안 적힌 행은 모른다고 보고 그대로 둔다.
 # ponytail: 이름과 숫자를 맞춘다. 길이를 변수로 넘기는 코드는 못 본다(cbom-scan.sh refine 이 이웃 3줄에서 찾은 숫자만 붙는다)
 FLOOR_REASON = "112비트 미만 고전 키(2036년 전 한시 허용 대상 아님)"
-FLOOR_FF = re.compile(r"(?i)(?<![a-z])(?:rsa|dsa|dhe?|diffie[-_ ]?hellman|elgamal)[-_ :]?([0-9]{3,5})(?![0-9])")
+FLOOR_FF = re.compile(r"(?i)(?<![a-z])(?:rsa|(?:ec[-_]?)?kc[-_]?dsa|dsa|dhe?|diffie[-_ ]?hellman|elgamal)[-_ :]?([0-9]{3,5})(?![0-9])")
 FLOOR_EC = re.compile(r"(?i)(?<![a-z0-9])(?:secp1[0-9]{2}[rk][12]|sect1[0-9]{2}[rk][12]|prime192v[1-3]|p-?192|nistp192|"
                       r"brainpoolp1(?:60|92)[rt]1|ec-1[0-9]{2})(?![0-9])")
 # PQ/PQ 하이브리드(국정원 기준 초안 S2, 판정 영향 없음): 같은 줄 코드에 같은 종류(KEM끼리, 서명끼리)의 양자내성 계열이 둘 이상이면

@@ -82,7 +82,7 @@ A runtime base image whose OpenSSL is too old to offer `X25519MLKEM768` blocks o
 | `G-JWT-ALG` | RS256/384/512, ES*, PS* |
 | `G-EDDSA` | Ed25519, Ed448, EdDSA, Curve25519, and the lower-case forms as their own word (`'ed25519'`, `ssh-ed25519`, `ed25519_dalek`) |
 | `G-X25519` | X25519, X448, XDH, ECDH, KeyAgreement, lower-case `x25519`, `x448`, `ecdh` (same line with ML-KEM in any case counts as hybrid, as in `pqlite/rules.py`) |
-| `G-DH-DSA` | DiffieHellman, diffie-hellman, `"DH"`, `'dh'`, `"DSA"`, `ssh-dss`, ElGamal, ECIES, KCDSA and EC-KCDSA (any spelling such as `ECKCDSA`, `KISA_KCDSA_sign`, `kcdsaWithSHA1`, and their OIDs) |
+| `G-DH-DSA` | DiffieHellman, diffie-hellman, `"DH"`, `'dh'`, `"DSA"`, `ssh-dss`, ElGamal, ECIES, KCDSA and EC-KCDSA (any spelling such as `ECKCDSA`, `KISA_KCDSA_sign`, `kcdsaWithSHA1`, and their OIDs; an OID written with commas or spaces, as in a Go `asn1.ObjectIdentifier{...}`, is not caught, the same limit as `G-CURVE`) |
 | `G-WEAK-PQC` | ML-KEM-512, ML-DSA-44, Kyber512, Dilithium2 and SLH-DSA 128 (ruleset 4), in any case and with `-`, `_` or nothing between the parts (`ml-kem-512`, `mldsa44`) |
 | `LW-legacy-write` | encryption, signing, key generation or file writes inside `Legacy*.java` |
 | `E-MLKEM768`, `E-MLKEM1024`, `E-MLDSA65`, `E-MLDSA87` | ML-KEM-768, ML-KEM-1024, ML-DSA-65 and ML-DSA-87 in code outside test paths, in any case and separator |

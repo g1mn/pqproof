@@ -44,7 +44,7 @@ RX = [  # (정규식, 함수(match) -> (name, algorithmProperties, oid)). alg �
     (re.compile(r"(?:aes\S*(?:gcm|ccm)\S*|chacha20[-_]?poly1305)", _F), lambda m: (m[0], {"primitive": "ae"}, None)),
     (re.compile(r"aes\S*", _F), lambda m: (m[0], {"primitive": "block-cipher"}, None)),
     (re.compile(r"(?:sha[-_]?(?:1|224|256|384|512)|sha3[-_]?\S*|md5)", _F), lambda m: (m[0], {"primitive": "hash"}, None)),
-    (re.compile(r"(?:\S*with(?:ec)?dsa|ecdsa\S*|ed25519\S*|ed448\S*|(?:ec[-_]?)?kc[-_]?dsa\S*|dsa\S*)", _F), lambda m: (m[0], {"primitive": "signature"}, None)),
+    (re.compile(r"(?:\S*with(?:ec[-_]?)?(?:kc[-_]?)?dsa|ecdsa\S*|ed25519\S*|ed448\S*|(?:ec[-_]?)?kc[-_]?dsa\S*|dsa\S*)", _F), lambda m: (m[0], {"primitive": "signature"}, None)),
     (re.compile(r"(?:x25519|x448|ecdh\S*|dhe?\S*|ffdhe\S*)", _F), lambda m: (m[0], {"primitive": "key-agree"}, None)),
 ]
 USE_PRIMITIVE = {"서명": "signature", "signature": "signature", "key-encapsulation": "kem", "키교환": "key-agree", "key-exchange": "key-agree"}
