@@ -10,7 +10,7 @@ Each release has a **Verdict impact (판정 영향)** line. It says whether the 
 
 Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `receipt.json`, so a receipt from years ago still names the rules that judged it. `--verify` keeps reading older evidence formats.
 
-## [0.9.0] - 2026-11-26
+## [0.9.0] - 2026-11-27
 
 Tool 0.9.0, ruleset 9, evidence format 4 (unchanged), `tls_probe` 0.6.0 (unchanged).
 
