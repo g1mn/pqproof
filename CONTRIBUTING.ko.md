@@ -33,6 +33,7 @@ cp -R . /tmp/pqproof-scan && (cd /tmp/pqproof-scan && bash scan/cbom-scan.sh --s
 python3 -m pip install --require-hashes -r .github/requirements/lint.txt
 ruff check . && shellcheck prove.sh build-probe.sh tests/pqverify_targets.sh tests/kpqc_targets.sh && shellcheck -S warning scan/residue.sh scan/cbom-scan.sh
 go vet -C probe ./...
+gofmt -l probe              # 아무것도 나오지 않아야 합니다
 zizmor --offline --min-severity medium .github/workflows/ action.yml
 ```
 

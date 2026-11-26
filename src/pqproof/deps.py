@@ -66,6 +66,17 @@ def find_openssl(env):
     return best if best else (None, None, "")
 
 
+# pqlite/tlsprobe.py PROBE_VERSION 과 같아야 한다(tests/test_pqproof_pkg.py). 이 패키지는 pqlite 를 들여오지 않는다
+PROBE_VERSION = "0.6.0"
+
+
+def probe_version(path):
+    """바이너리가 'tls_probe version' 에 찍는 판, 못 읽으면 None."""
+    _, out = _run([path, "version"])
+    m = re.match(r"tls_probe (\S+)", out)
+    return m[1] if m else None
+
+
 def probe_binary(bin_dir):
     system = platform.system().lower()
     arch = platform.machine().lower()
@@ -160,8 +171,15 @@ def check(env=None, inputs=(), bin_dir=None, need_tls=None, need_pqverify=None):
     if need_tls is None:
         need_tls = bool((env.get("TLS_TARGETS") or "").strip() or (env.get("TLS_TARGETS_ORIG") or "").strip())
     probe = probe_binary(bin_dir) if bin_dir else None
-    if probe:
-        rep.info.append(f"tls_probe: {probe}")
+    got = probe_version(probe) if probe else None
+    if probe and got != PROBE_VERSION:
+        # 캐시·PROBE_BIN_DIR 의 바이너리는 도구를 올려도 남는다. 0.5.0 은 CA 없는 대상(시스템 신뢰 저장소)을 사용법 오류로 끝낸다
+        msg = (f"tls_probe at {probe} is version {got or 'unknown'}, but this PQ-Proof needs {PROBE_VERSION}. Rebuild it with "
+               "`pqproof build-probe` (from a clone: bash build-probe.sh), or replace the binaries in PROBE_BIN_DIR with the "
+               "release assets of this version.")
+        (rep.errors if need_tls else rep.warnings).append(msg)
+    elif probe:
+        rep.info.append(f"tls_probe: {probe} ({got})")
     elif need_tls:
         rep.errors.append(f"TLS_TARGETS is set but no tls_probe binary for this machine in {bin_dir}. Either run `pqproof build-probe` "
                           "(needs Go 1.27 or later, no network), or download tls_probe-<os>-<arch> and SHA256SUMS from the GitHub release, "

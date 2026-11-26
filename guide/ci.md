@@ -83,4 +83,4 @@ FAIL_ON_REVIEW=1 pqproof impl judge answers.json
 
 ## Offline runners
 
-A runner without internet needs the wheel (from an internal package mirror, or `pip download pqproof` elsewhere), bash, OpenSSL and, for TLS targets, the `tls_probe` binary for its platform with `SHA256SUMS` from the release. PQ-Proof itself makes no network calls.
+A runner without internet needs the wheel (from an internal package mirror, or `pip download pqproof` elsewhere), bash, OpenSSL and, for TLS targets, the `tls_probe` binary for its platform with `SHA256SUMS` from the release. PQ-Proof itself connects only to the servers in `TLS_TARGETS` and `TLS_TARGETS_ORIG` (and, before measuring them, its own two reference servers on 127.0.0.1). On macOS, checking one against the system trust store can also reach other addresses for certificate data, so give the CA file (`#/abs/path/ca.pem`).

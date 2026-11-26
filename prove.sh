@@ -17,8 +17,10 @@
 # 환경 변수(모두 선택):
 #   OUT=<출력 폴더>        기본: 원본이 <W>/orig 이고 <W>/evidence 가 있으면 <W>/evidence/proof-YYYYMMDD-HHMMSS, 아니면
 #                          ./proof-out-YYYYMMDD-HHMMSS(같은 이름이 있으면 -2, -3). OUT 으로 준 폴더가 이미 있으면 멈춘다
-#   TLS_TARGETS="127.0.0.1:8443@localhost#/abs/ca.pem 127.0.0.1:9443"   띄운 고친 판의 TLS 주소(CA 없으면 -tofu)
-#   TLS_TARGETS_ORIG=...   원본 스택 주소(기준선, 판정에는 안 씀)
+#   TLS_TARGETS="127.0.0.1:8443@localhost#/abs/ca.pem api.example:443 127.0.0.1:9443#tofu"   띄운 고친 판의 TLS 주소.
+#                          인증서는 늘 검증한다: #/CA.pem 이면 그 CA, 없으면 시스템 신뢰 저장소와 호스트 이름. 처음 본 인증서를
+#                          믿는 방식은 더 약해서 #tofu 를 붙일 때만 쓴다(guide/configuration.md#tls-targets)
+#   TLS_TARGETS_ORIG=...   원본 스택 주소(기준선. 판정에 쓰지 않지만 재다가 도구 오류가 나면 b-tls 미판정)
 #   TLS_VIA=host | container:<컨테이너 이름>   container면 그 컨테이너 네트워크 이름공간에서 잰다(공개 안 된 내부 포트용)
 #   CLASSIC=allow | deny   옛 클라이언트(X25519,P-256) 기대값. 기본 allow, PQC 단독(옛 클라이언트 거부)을 요구하면 deny
 #   EXPECT=kem,sig         고친 판에 있어야 할 것(kem ML-KEM-768, sig ML-DSA-65, tls 하이브리드 TLS, cert ML-DSA-65 TLS 인증서, none)

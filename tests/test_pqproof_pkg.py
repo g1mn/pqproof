@@ -9,6 +9,7 @@ import io
 import json
 import os
 import pathlib
+import platform
 import shutil
 import subprocess
 import sys
@@ -178,6 +179,27 @@ class DepsTest(unittest.TestCase):
         finally:
             os.rmdir(empty)
         self.assertTrue(any("tls_probe" in e and "SHA256SUMS" in e for e in rep.errors), rep.errors)
+
+    def test_stale_probe_version(self):
+        # 업그레이드 뒤 캐시·PROBE_BIN_DIR 에 남은 옛 탐침: doctor 는 경고, TLS_TARGETS 실행은 시작 전에 멈춘다
+        sys.path.insert(0, str(PROOF))
+        from pqlite import tlsprobe
+        self.assertEqual(deps.PROBE_VERSION, tlsprobe.PROBE_VERSION,
+                         "src/pqproof/deps.py PROBE_VERSION must match pqlite/tlsprobe.py PROBE_VERSION")
+        with tempfile.TemporaryDirectory() as d:
+            arch = {"x86_64": "amd64", "aarch64": "arm64"}.get(platform.machine().lower(), platform.machine().lower())
+            fake = pathlib.Path(d, f"tls_probe-{platform.system().lower()}-{arch}")
+            for ver, stale in (("0.5.0", True), (deps.PROBE_VERSION, False)):
+                fake.write_text(f"#!/bin/sh\necho 'tls_probe {ver} (go1.25.0)'\n", encoding="utf-8")
+                fake.chmod(0o755)
+                doctor = deps.check(env={}, bin_dir=d, need_tls=False)
+                run = deps.check(env={"TLS_TARGETS": "127.0.0.1:8443"}, bin_dir=d)
+                if stale:
+                    self.assertTrue(any("0.5.0" in w and "build-probe" in w for w in doctor.warnings), doctor.warnings)
+                    self.assertTrue(any("0.5.0" in e and deps.PROBE_VERSION in e for e in run.errors), run.errors)
+                else:
+                    self.assertFalse([m for m in doctor.warnings + run.errors if "tls_probe" in m])
+                    self.assertTrue(any(ver in i for i in run.info), run.info)
 
     def test_keystore_without_keytool(self):
         d = tempfile.mkdtemp(prefix="pqproof-ks-")

@@ -22,6 +22,11 @@ The four gaps in the NIS and NSR draft mappings (posted 2026-11-16) that a migra
 - The inventory is also written as a CycloneDX 1.6 CBOM (EU PQC roadmap, section 6.2), validated in CI against the official schema.
 - First-run and CI fixes from a new-user review: `pqproof examples`, English reading notes in the evidence, input errors, and CI examples that keep the base tree outside the converted tree.
 
+## 0.8.0
+
+- TLS targets are verified by default (OpenSSF Best Practices silver, `crypto_certificate_verification`): a target without a CA is checked against the system trust store and its host name, and trust on first use needs an explicit `#tofu`. A certificate that does not verify leaves `b-tls` undecided instead of passing.
+- The tool checks that the `tls_probe` binary on disk is the version it needs (0.6.0) before a TLS run, and `pqproof doctor` warns about an old one left in the cache or `PROBE_BIN_DIR`.
+
 ## When the KISA PQC migration guide is published
 
 KISA's plan to publish a PQC migration guide in 2026 was [reported in January 2026](https://byline.network/2026/01/28-578/). It is not out yet, so nothing here assumes what it will say. The draft PQC migration guidebook for national and public institutions from NIS and NSR (posted 2026-11-16) is already mapped, and that table follows its final version. When it is published:

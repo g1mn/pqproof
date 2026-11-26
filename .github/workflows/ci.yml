@@ -103,6 +103,11 @@ jobs:
       - name: go vet (probe)
         run: go vet -C probe ./...
 
+      - name: gofmt (probe)
+        run: |
+          out="$(gofmt -l probe)"
+          [ -z "$out" ] || { echo "gofmt 로 맞추지 않은 파일:"; echo "$out"; exit 1; }
+
       - name: tls_probe tests and fuzz seeds (offline)
         run: GOPROXY=off GOTOOLCHAIN=local go test -C probe ./...
 
@@ -149,6 +154,18 @@ jobs:
               assert agrees is True, "macOS must run the OpenSSL 3.5 cross-check in S6a"
           else:
               assert agrees is True or (agrees is None and note.startswith("교차 확인 불가")), t
+          EOF
+          # S6f: CA·#tofu 없는 대상은 system 신뢰로 재고, macOS 의 OpenSSL 교차 확인도 같은 시험 CA 를 기본 경로에서 못 찾아 검증 실패여야 한다
+          python3 - "$RUNNER_TEMP/selftest/s6f/receipt.json" "$RUNNER_OS" <<'EOF'
+          import json, sys
+          t = json.load(open(sys.argv[1], encoding="utf-8"))["tls"]["targets"][0]
+          o = t["openssl"]
+          print(f"S6f trust={t['trust']} openssl={o and o.get('error')} {t.get('openssl_note', '')}")
+          assert t["trust"] == "system", t
+          if sys.argv[2] == "macOS":
+              assert o is not None and not o["ok"] and o["error"].startswith("certificate verification failed: "), t
+          else:
+              assert o is None or (not o["ok"] and o["error"].startswith("certificate verification failed: ")), t
           EOF
 
       - name: Mutation suite and golden verdicts (every planted defect caught, no verdict moved)

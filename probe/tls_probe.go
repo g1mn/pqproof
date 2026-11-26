@@ -1,6 +1,6 @@
 // from g1mn/pq-proof 7b7803f (MIT)
-// 수정: connect에 -tofu(CA 파일 없을 때 첫 인증서를 믿고 다시 검증), cert_sig·cert_key·cert_chain·trust 줄,
-//       cert에 -alg=mldsa65, 0.5.0에서 cipher·cert_not_after 줄, 머리 주석 한국어.
+// 수정: connect는 기본으로 시스템 신뢰 저장소로 검증하고 -ca·-tofu(첫 인증서를 믿고 다시 검증)를 고를 수 있다,
+// cert_sig·cert_key·cert_chain·trust 줄, cert에 -alg=mldsa65, cipher·cert_not_after 줄, 머리 주석 한국어.
 //
 // tls_probe: 버전을 고정한 TLS 클라이언트(와 참조 서버). Go 표준 라이브러리만 쓰고 CGO 없이 정적으로 빌드한다
 // (build-probe.sh). 같은 바이너리를 맥·리눅스 컨테이너 어디서나 쓰므로, 실패가 나오면 옛 클라이언트가
@@ -9,13 +9,17 @@
 //	tls_probe version
 //	tls_probe cert [-alg=ecdsa|mldsa65] -hosts=localhost,127.0.0.1 DIR    DIR/ca.pem, cert.pem, key.pem (0644)
 //	tls_probe serve -addr=127.0.0.1:4433 -groups=X25519MLKEM768,X25519 -cert=PATH -key=PATH
-//	tls_probe connect -groups=X25519MLKEM768 (-ca=PATH | -tofu=PATH) -servername=NAME [-wait=10s] HOST:PORT
+//	tls_probe connect -groups=X25519MLKEM768 [-ca=PATH | -tofu=PATH] -servername=NAME [-wait=10s] HOST:PORT
 //	tls_probe listeners -ports=8443,9443 [-wait=10s]
 //
 // connect는 "key: value" 줄(probe, target, offered, trust, result, protocol, group, cipher, cert_sig, cert_key,
 // cert_chain, cert_not_after(RFC 3339 UTC), error)을 찍고, 핸드셰이크가 되면 0, 안 되면 1, 사용법 오류면 2로 끝난다.
 //
-// -tofu=PATH: CA 파일을 구할 수 없을 때(서비스가 실행 중에 자기 CA를 만드는 경우) 쓴다. 먼저 인증서 사슬만 읽는
+// 신뢰: -ca도 -tofu도 없으면 시스템 신뢰 저장소(RootCAs nil)와 -servername으로 서버 인증서를 검증한다("trust: system").
+// -ca=PATH는 그 CA만 믿는다("trust: ca-file"). 인증서 검증이 실패하면 error 줄이 "certificate verification failed: "로
+// 시작한다(그때 협상 그룹은 재지 못한 것이고, 읽는 쪽은 이것을 거부나 고전 협상으로 읽으면 안 된다).
+//
+// -tofu=PATH: 더 약한 신뢰라 명시적으로 고를 때만 쓴다. CA 파일을 구할 수 없을 때(서비스가 실행 중에 자기 CA를 만드는 경우) 쓴다. 먼저 인증서 사슬만 읽는
 // 접속을 한 번 하고(이 접속은 판정에 쓰지 않는다), 사슬의 마지막 인증서를 PATH에 PEM으로 쓴 뒤, 그 인증서를 신뢰
 // 앵커로 삼아 제대로 검증하는 두 번째 접속으로 판정한다. "trust: tofu ca_spki_sha256=..." 줄이 남는다.
 // 사슬 읽기 접속은 제시 그룹에 고전 그룹을 더해 보낸다(하이브리드 전용 서버에 고전을 제시하는 판정에서도 사슬은 받아야 하므로).
@@ -51,7 +55,10 @@ import (
 	"time"
 )
 
-const version = "0.5.0"
+const version = "0.6.0"
+
+// 읽는 쪽(pqlite/tlsprobe.py)이 이 앞머리로 '검증 실패라 협상을 재지 못함'을 거부·실패와 가른다
+const verifyFailed = "certificate verification failed: "
 
 var groupNames = map[string]tls.CurveID{
 	"X25519MLKEM768":     tls.X25519MLKEM768,
@@ -284,11 +291,11 @@ func connect(args []string) int {
 	fs := flag.NewFlagSet("connect", flag.ContinueOnError)
 	groups := fs.String("groups", "X25519MLKEM768", "groups to offer, in order")
 	caFile := fs.String("ca", "", "CA certificate (PEM) the server certificate must chain to")
-	tofu := fs.String("tofu", "", "CA 파일이 없을 때: 사슬의 마지막 인증서를 이 경로에 쓰고 그것으로 검증")
+	tofu := fs.String("tofu", "", "명시적 TOFU(더 약함): 사슬의 마지막 인증서를 이 경로에 쓰고 그것으로 검증")
 	serverName := fs.String("servername", "localhost", "server name to send and verify")
 	wait := fs.Duration("wait", 10*time.Second, "keep retrying a refused connection this long")
-	if fs.Parse(args) != nil || fs.NArg() != 1 || (*caFile == "") == (*tofu == "") {
-		fmt.Fprintln(os.Stderr, "usage: tls_probe connect -groups=G1,G2 (-ca=PATH | -tofu=PATH) [-servername=NAME] [-wait=10s] HOST:PORT")
+	if fs.Parse(args) != nil || fs.NArg() != 1 || (*caFile != "" && *tofu != "") {
+		fmt.Fprintln(os.Stderr, "usage: tls_probe connect -groups=G1,G2 [-ca=PATH | -tofu=PATH] [-servername=NAME] [-wait=10s] HOST:PORT")
 		return 2
 	}
 	target := fs.Arg(0)
@@ -301,7 +308,8 @@ func connect(args []string) int {
 	if err != nil {
 		return fail(err)
 	}
-	if *tofu != "" {
+	switch {
+	case *tofu != "":
 		anchor, err := tofuFetch(target, *serverName, *tofu, ids, *wait)
 		if err != nil {
 			return fail(err)
@@ -310,16 +318,21 @@ func connect(args []string) int {
 		fmt.Printf("trust: tofu ca_spki_sha256=%s self_signed=%v\n", hex.EncodeToString(spki[:]),
 			anchor.CheckSignatureFrom(anchor) == nil)
 		*caFile = *tofu
-	} else {
+	case *caFile != "":
 		fmt.Println("trust: ca-file")
+	default:
+		fmt.Println("trust: system")
 	}
-	caPEM, err := os.ReadFile(*caFile)
-	if err != nil {
-		return fail(err)
-	}
-	roots := x509.NewCertPool()
-	if !roots.AppendCertsFromPEM(caPEM) {
-		return fail(errors.New("no certificate in " + *caFile))
+	var roots *x509.CertPool // nil: Go가 시스템 신뢰 저장소를 쓴다
+	if *caFile != "" {
+		caPEM, err := os.ReadFile(*caFile)
+		if err != nil {
+			return fail(err)
+		}
+		roots = x509.NewCertPool()
+		if !roots.AppendCertsFromPEM(caPEM) {
+			return fail(errors.New("no certificate in " + *caFile))
+		}
 	}
 	conf := &tls.Config{RootCAs: roots, ServerName: *serverName, CurvePreferences: ids}
 	raw, err := dial(target, *wait)
@@ -330,6 +343,10 @@ func connect(args []string) int {
 	raw.SetDeadline(time.Now().Add(10 * time.Second))
 	conn := tls.Client(raw, conf)
 	if err := conn.Handshake(); err != nil {
+		var verr *tls.CertificateVerificationError
+		if errors.As(err, &verr) {
+			return fail(fmt.Errorf("%s%w", verifyFailed, verr.Err))
+		}
 		return fail(err)
 	}
 	st := conn.ConnectionState()
