@@ -27,6 +27,10 @@ The four gaps in the NIS and NSR draft mappings (posted 2026-11-16) that a migra
 - TLS targets are verified by default (OpenSSF Best Practices silver, `crypto_certificate_verification`): a target without a CA is checked against the system trust store and its host name, and trust on first use needs an explicit `#tofu`. A certificate that does not verify leaves `b-tls` undecided instead of passing.
 - The tool checks that the `tls_probe` binary on disk is the version it needs (0.6.0) before a TLS run, and `pqproof doctor` warns about an old one left in the cache or `PROBE_BIN_DIR`.
 
+## 0.9.0
+
+- KCDSA and EC-KCDSA, the Korean discrete-log signatures, are caught by name and OID in the residue count (`G-DH-DSA`, ruleset 9), the inventory, the Java name classifier and the CBOM export. They were missed before because the generic `dsa` pattern needs a word boundary.
+
 ## When the KISA PQC migration guide is published
 
 KISA's plan to publish a PQC migration guide in 2026 was [reported in January 2026](https://byline.network/2026/01/28-578/). It is not out yet, so nothing here assumes what it will say. The draft PQC migration guidebook for national and public institutions from NIS and NSR (posted 2026-11-16) is already mapped, and that table follows its final version. When it is published:

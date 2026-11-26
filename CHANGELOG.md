@@ -10,6 +10,20 @@ Each release has a **Verdict impact (판정 영향)** line. It says whether the 
 
 Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `receipt.json`, so a receipt from years ago still names the rules that judged it. `--verify` keeps reading older evidence formats.
 
+## [0.9.0] - 2026-11-26
+
+Tool 0.9.0, ruleset 9, evidence format 4 (unchanged), `tls_probe` 0.6.0 (unchanged).
+
+**Verdict impact (판정 영향): yes, for trees with KCDSA or EC-KCDSA.** KCDSA and EC-KCDSA, the Korean signature standards (TTAK.KO-12.0001 and TTAK.KO-12.0015, discrete-log based, so Shor's algorithm breaks them), were not caught: the generic `dsa` pattern needs a word boundary, and in `KCDSA` the letter before `DSA` is `C`. Ruleset 9 adds them to `G-DH-DSA`:
+- A code line that names KCDSA or EC-KCDSA in any spelling (`KCDSA`, `EC-KCDSA`, `ECKCDSA`, `KISA_KCDSA_sign`, `kcdsaWithSHA1`, `go-cryptobin/pubkey/eckcdsa`) or by OID (`1.2.410.200004.1.1`, `.8`, `.9`, `.21`, `1.2.410.200004.1.100.4.x`, `1.0.14888.3.0.5`) now counts in `c-classic`, so a fixed tree that keeps one moves from pass to fail. Allow it with a reason in the allowlist when it stays on purpose. The SEED OID (`1.2.410.200004.1.4`) and other symmetric OIDs under `1.2.410.200004.1` do not count.
+- A line that says `EC-KCDSA` was already counted in `G-EC` (the `EC-` prefix); it now counts in `G-DH-DSA` too, like `ECIES`.
+
+The 41 golden tree cases keep every verdict, check status and count; none has KCDSA. A new mutation and golden case, `m31-kcdsa`, adds the KISA KCDSA reference call to a migrated tree and fails `a-cbom` and `c-classic` (57 mutations, 42 golden tree cases). Evidence from every earlier release still verifies byte for byte.
+
+### Added
+
+- Inventory and CBOM: `cbom-scan.sh` lists KCDSA and EC-KCDSA as signatures broken by Shor's algorithm (P2, replace with ML-DSA-65), also when the name is glued to `_` or a capital letter as in the KISA reference code. The Java name classifier marks them `shor`, and the CycloneDX export gives them the `signature` primitive even when the use is unknown.
+
 ## [0.8.0] - 2026-11-26
 
 Tool 0.8.0, ruleset 8, evidence format 4 (unchanged), `tls_probe` 0.6.0.
