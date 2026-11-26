@@ -21,6 +21,11 @@
   전환 전 코드와 후 코드를 같은 규칙으로 판정하며, 판정에 AI 모델을 쓰지 않습니다. KpqC 구현도 실행하지 않고 고정한 참조판 KAT와 대조합니다.
 </p>
 
+
+<p align="center">
+  <a href="https://g1mn.github.io/pqproof/?lang=ko#sec-flow"><img src="https://raw.githubusercontent.com/g1mn/pqproof/main/assets/how-it-works.ko.gif" alt="PQ-Proof 동작 흐름: 전환 전과 후의 트리를 같은 규칙으로 검사해 판정과 누구나 다시 계산할 수 있는 증적 해시를 남긴다" width="100%"></a>
+</p>
+
 ---
 
 ### [자세한 내용은 모두 사이트에 있습니다: g1mn.github.io/pqproof](https://g1mn.github.io/pqproof/?lang=ko)
