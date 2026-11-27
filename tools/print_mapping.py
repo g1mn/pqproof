@@ -28,9 +28,11 @@ def to_markdown(doc):
 
 def main(argv):
     if len(argv) != 2:
-        print("usage: print_mapping.py <mappings/file.json>", file=sys.stderr)
+        sys.stderr.reconfigure(encoding="utf-8")
+        print("사용법: print_mapping.py <mappings/file.json>", file=sys.stderr)
         return 2
     doc = json.loads(pathlib.Path(argv[1]).read_text(encoding="utf-8"))
+    sys.stdout.reconfigure(encoding="utf-8")
     sys.stdout.write(to_markdown(doc))
     return 0
 

@@ -4,6 +4,7 @@
 """
 import json
 import pathlib
+import runpy
 import subprocess
 import sys
 import unittest
@@ -40,7 +41,7 @@ class Mappings(unittest.TestCase):
                     self.check_item(it)
 
     def test_print_mapping_table(self):
-        # tools/print_mapping.py prints one row per item under a Markdown header.
+        # tools/print_mapping.py는 Markdown 머리글 아래에 항목마다 한 줄을 출력한다.
         p = MAPS[0]
         proc = subprocess.run(
             [sys.executable, "-I", str(PROOF / "tools" / "print_mapping.py"), str(p)],
@@ -49,10 +50,48 @@ class Mappings(unittest.TestCase):
         self.assertEqual(proc.returncode, 0, proc.stderr)
         lines = proc.stdout.splitlines()
         self.assertEqual(lines[0], "| id | reference | status | note | remaining |")
+        self.assertEqual(lines[1], "| --- | --- | --- | --- | --- |")
         items = json.loads(p.read_text(encoding="utf-8"))["items"]
         self.assertEqual(len(lines), 2 + len(items))
         for it, line in zip(items, lines[2:]):
             self.assertTrue(line.startswith(f"| {it['id']} |"), line)
+        self.assertEqual(
+            lines[2],
+            "| R1 | section 4.1, page 6 | partial | "
+            "c-classic counts classical public-key lines left without a recorded reason and "
+            "a-cbom blocks classical CBOM rows, while a hybrid TLS group passes b-tls. | "
+            "Risk classes and dates are not encoded. |",
+        )
+
+    def test_to_markdown_escapes_pipes_and_flattens_note_newlines(self):
+        to_markdown = runpy.run_path(
+            str(PROOF / "tools" / "print_mapping.py")
+        )["to_markdown"]
+        doc = {
+            "items": [
+                {
+                    "id": "R1",
+                    "ref": {"section": "2.1"},
+                    "status": "partial",
+                    "note_en": "first | second\nthird",
+                    "remaining_en": ["one", "two"],
+                }
+            ]
+        }
+        self.assertEqual(
+            to_markdown(doc),
+            "| id | reference | status | note | remaining |\n"
+            "| --- | --- | --- | --- | --- |\n"
+            "| R1 | section 2.1 | partial | first \\| second third | one; two |\n",
+        )
+
+    def test_print_mapping_usage_is_korean(self):
+        proc = subprocess.run(
+            [sys.executable, "-I", str(PROOF / "tools" / "print_mapping.py")],
+            capture_output=True, encoding="utf-8",
+        )
+        self.assertEqual(proc.returncode, 2)
+        self.assertEqual(proc.stderr, "사용법: print_mapping.py <mappings/file.json>\n")
 
     def check_item(self, it):
         with self.subTest(item=it["id"]):
