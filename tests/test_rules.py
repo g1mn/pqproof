@@ -268,7 +268,7 @@ EXPECT_TREE = {
     "e/Sig.java": 'String a = "ML-DSA-65";\nString b = "MLDSA65";\nString c = "ml_dsa_65";\nString d = "ML_DSA_65";\n',
     "e/Kem5.js": "const a = crypto.generateKeyPairSync('ml-kem-1024');\n",
     "e/Sig5.go": 'const name = "ML-DSA-87"\n',
-    "e/SigSlh.py": 'a = "SLH-DSA-SHA2-192s"\nb = "slh_dsa_shake_256f"\nc = "SLHDSA-SHA2-256s"\nd = "SLH-DSA-SHA2-128s"\ne = "SPHINCS+-SHA2-192s-simple"\n',
+    "e/SigSlh.py": 'a = "SLH-DSA-SHA2-192s"\nb = "slh_dsa_shake_256f"\nc = "SLHDSA-SHA2-256s"\nd = "SLH-DSA-SHA2-128s"\ne = "SPHINCS+-SHA2-192s-simple"\nf = "SLHDSA_SHA2_192s"\ng = "slh-dsa-shake-128f"\n',
     "e/KpqcKem.py": 'kem = kpqc.KEM("SMAUG-T3")\nkem2 = kpqc.KEM("NTRU+576")\nkem3 = "ntruplus"\n',
     "e/KpqcSig.py": 'sig = kpqc.Signature("HAETAE3")\nsig2 = kpqc.Signature("AIMer128f")\nnote = "disclaimer"\n',
     "e/Cm.java": "// ML-KEM-768 ML-DSA-65\n",
@@ -391,7 +391,7 @@ class ResidueRules(unittest.TestCase):
             prove.prepare_input(g, os.path.join(self.tmp, "x21-out"), "fixed")
 
     def test_expect_counts_code_lines_outside_test_paths(self):
-        self.assertEqual(self.expect["expect"], {"E-MLKEM768": 4, "E-MLKEM1024": 1, "E-MLDSA65": 4, "E-MLDSA87": 1, "E-SLHDSA": 3,
+        self.assertEqual(self.expect["expect"], {"E-MLKEM768": 4, "E-MLKEM1024": 1, "E-MLDSA65": 4, "E-MLDSA87": 1, "E-SLHDSA": 4,
                                                  "E-KPQC-KEM": 3, "E-KPQC-SIG": 2})
 
     def test_every_rule_and_alternative_has_rows(self):
