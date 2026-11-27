@@ -22,6 +22,28 @@ class Mappings(unittest.TestCase):
         for p in MAPS:
             self.assertIn(p.name, readme, "mappings/README.md lists every mapping")
 
+        rows = {}
+        for line in readme.splitlines():
+            if not line.startswith("|"):
+                continue
+            cells = [c.strip() for c in line.strip("|").split("|")]
+            if len(cells) < 2:
+                continue
+            fname = cells[0].strip("`")
+            if fname.endswith(".json"):
+                rows[fname] = cells[-1]
+
+        self.assertEqual(set(rows), {p.name for p in MAPS})
+        for p in MAPS:
+            with self.subTest(mapping=p.name):
+                d = json.loads(p.read_text(encoding="utf-8"))
+                actual = len(d["items"])
+                self.assertEqual(
+                    int(rows[p.name]),
+                    actual,
+                    f"mappings/README.md: set the Items cell of the {p.name} row to {actual}",
+                )
+
     def test_each_mapping(self):
         for p in MAPS:
             with self.subTest(mapping=p.name):
@@ -96,6 +118,7 @@ class Mappings(unittest.TestCase):
     def check_item(self, it):
         with self.subTest(item=it["id"]):
             self.assertEqual(set(it), ITEM_KEYS)
+            self.assertLessEqual(set(it["ref"]), {"section", "table", "page", "note"})
             self.assertIn(it["status"], STATUSES)
             self.assertTrue(it["ref"] and it["about_en"] and it["about_ko"] and it["note_en"] and it["note_ko"])
             self.assertEqual(len(it["remaining_en"]), len(it["remaining_ko"]))
