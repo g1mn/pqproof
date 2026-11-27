@@ -4,6 +4,8 @@
 """
 import json
 import pathlib
+import subprocess
+import sys
 import unittest
 
 PROOF = pathlib.Path(__file__).resolve().parent.parent
@@ -36,6 +38,21 @@ class Mappings(unittest.TestCase):
                 self.assertEqual(len(ids), len(set(ids)))
                 for it in d["items"]:
                     self.check_item(it)
+
+    def test_print_mapping_table(self):
+        # tools/print_mapping.py prints one row per item under a Markdown header.
+        p = MAPS[0]
+        proc = subprocess.run(
+            [sys.executable, "-I", str(PROOF / "tools" / "print_mapping.py"), str(p)],
+            capture_output=True, encoding="utf-8",
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        lines = proc.stdout.splitlines()
+        self.assertEqual(lines[0], "| id | reference | status | note | remaining |")
+        items = json.loads(p.read_text(encoding="utf-8"))["items"]
+        self.assertEqual(len(lines), 2 + len(items))
+        for it, line in zip(items, lines[2:]):
+            self.assertTrue(line.startswith(f"| {it['id']} |"), line)
 
     def check_item(self, it):
         with self.subTest(item=it["id"]):
