@@ -21,6 +21,11 @@
   The same rules judge the code before and after, with no AI model in the verdict. It also matches KpqC implementations against pinned reference KATs without running them.
 </p>
 
+
+<p align="center">
+  <a href="https://g1mn.github.io/pqproof/?lang=en#sec-flow"><img src="https://raw.githubusercontent.com/g1mn/pqproof/main/assets/how-it-works.en.gif" alt="How PQ-Proof works: the trees before and after go through the same fixed rules to one verdict and an evidence hash anyone can recompute" width="100%"></a>
+</p>
+
 ---
 
 ### [Everything is on the site: g1mn.github.io/pqproof](https://g1mn.github.io/pqproof/?lang=en)
