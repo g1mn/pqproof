@@ -31,6 +31,10 @@ The four gaps in the NIS and NSR draft mappings (posted 2026-11-16) that a migra
 
 - KCDSA and EC-KCDSA, the Korean discrete-log signatures, are caught by name and OID in the residue count (`G-DH-DSA`, ruleset 9) and by name in the inventory, the Java name classifier and the CBOM export. They were missed before: `G-DH-DSA` counted DSA only as a quoted literal, and the inventory's `dsa` pattern needs a word boundary.
 
+## 0.10.0
+
+- On macOS a TLS target without a CA file is verified by Go's own verifier against Apple's system roots (`tls_probe` 0.7.0, ruleset 10), the same way as on Linux: the operating system no longer fills in a missing intermediate or trusts keychain roots, so the same target gets the same answer on every Mac.
+
 ## When the KISA PQC migration guide is published
 
 KISA's plan to publish a PQC migration guide in 2026 was [reported in January 2026](https://byline.network/2026/01/28-578/). It is not out yet, so nothing here assumes what it will say. The draft PQC migration guidebook for national and public institutions from NIS and NSR (posted 2026-11-16) is already mapped, and that table follows its final version. When it is published:
