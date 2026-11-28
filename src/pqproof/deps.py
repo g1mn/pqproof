@@ -67,7 +67,7 @@ def find_openssl(env):
 
 
 # pqlite/tlsprobe.py PROBE_VERSION 과 같아야 한다(tests/test_pqproof_pkg.py). 이 패키지는 pqlite 를 들여오지 않는다
-PROBE_VERSION = "0.6.0"
+PROBE_VERSION = "0.7.0"
 
 
 def probe_version(path):

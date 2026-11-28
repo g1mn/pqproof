@@ -26,6 +26,6 @@ if command -v shasum >/dev/null; then SUM="shasum -a 256"; else SUM="sha256sum";
 {
   echo "go: $(go version)"
   echo "flags: GOPROXY=off CGO_ENABLED=0 GOTOOLCHAIN=local GOFLAGS=$gofl -trimpath -buildvcs=false -ldflags=$ldf"
-  ( cd "$HERE/probe" && $SUM go.mod tls_probe.go | sed 's/^/source: /' )
+  ( cd "$HERE/probe" && for f in go.mod *.go; do case $f in *_test.go) ;; *) $SUM "$f";; esac; done | sed 's/^/source: /' )
 } > "$OUT/BUILDINFO"
 cat "$OUT/SHA256SUMS"
