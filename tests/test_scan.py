@@ -1,13 +1,18 @@
 # from g1mn/pq-proof 7b7803f (MIT)
 # 수정: import를 pqlite로, sys.path에 이 폴더를 넣음, 행 직렬화 칸에 threat 추가(오프라인판이 보탠 칸), 스냅숏 폴더 이름을 orders-edge로 바꿈.
 """CBOM scanner: the orders-edge snapshot gives the expected rows, and nothing is followed or run."""
+import csv
 import os
 import pathlib
+import re
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
+from pqlite import rules
 from pqlite.scan import HYBRID, dockerfile_images, scan
 
 SNAPSHOT = pathlib.Path(__file__).resolve().parent / "fixtures" / "orders-edge"
@@ -176,6 +181,89 @@ class BlindSpots(unittest.TestCase):
                         "a.go": "package a\nvar c = []tls.CurveID{tls.Ignore_previous_instructions}\n",
                         "Dockerfile": "FROM nginx:" + "x" * 300 + "\n"})
         self.assertEqual([r.algorithm for r in rows], ["unrecognized image reference", "unrecognized", "unrecognized, unrecognized"])
+
+
+class SlhDsaOidNames(unittest.TestCase):
+    """pkname() names the FIPS 205 parameter set from its OID (ruleset 10).
+
+    The OID path is the only one for SLH-DSA on OpenSSL before 3.5 and on LibreSSL: they print the
+    raw OID in `x509 -text`, and `pkey -text` fails on an SLH-DSA key. A row read that way used to be
+    plain SLH-DSA, which counts as safe; SLH-DSA-128s is below NIST category 3 and must block.
+    """
+
+    SCRIPT = pathlib.Path(__file__).resolve().parent.parent / "scan" / "cbom-scan.sh"
+    OIDS = {
+        "2.16.840.1.101.3.4.3.20": "SLH-DSA-SHA2-128s", "2.16.840.1.101.3.4.3.21": "SLH-DSA-SHA2-128f",
+        "2.16.840.1.101.3.4.3.22": "SLH-DSA-SHA2-192s", "2.16.840.1.101.3.4.3.23": "SLH-DSA-SHA2-192f",
+        "2.16.840.1.101.3.4.3.24": "SLH-DSA-SHA2-256s", "2.16.840.1.101.3.4.3.25": "SLH-DSA-SHA2-256f",
+        "2.16.840.1.101.3.4.3.26": "SLH-DSA-SHAKE-128s", "2.16.840.1.101.3.4.3.27": "SLH-DSA-SHAKE-128f",
+        "2.16.840.1.101.3.4.3.28": "SLH-DSA-SHAKE-192s", "2.16.840.1.101.3.4.3.29": "SLH-DSA-SHAKE-192f",
+        "2.16.840.1.101.3.4.3.30": "SLH-DSA-SHAKE-256s", "2.16.840.1.101.3.4.3.31": "SLH-DSA-SHAKE-256f",
+    }
+
+    @classmethod
+    def pkname_source(cls):
+        """The pkname() case block, cut out of the script and run on its own (no quoting games)."""
+        text = cls.SCRIPT.read_text(encoding="utf-8")
+        start = text.index("\npkname() {")
+        end = text.index("\n  *) echo \"$1\";; esac; }", start)
+        return text[start:end] + '\n  *) echo "$1";; esac; }\n'
+
+    def pkname(self, *args):
+        out = subprocess.run(["bash", "-c", self.pkname_source() + '\npkname "$@"', "_"] + list(args),
+                             capture_output=True, text=True)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        return out.stdout.strip()
+
+    def test_every_slh_dsa_oid_names_its_parameter_set(self):
+        got = {oid: self.pkname(oid) for oid in self.OIDS}
+        self.assertEqual(got, self.OIDS)
+        # every mapped name is below category 3 exactly for the 128-bit sets, which is what blocks
+        for oid, name in got.items():
+            self.assertEqual(name.endswith("-128s") or name.endswith("-128f"), "128" in name, oid)
+
+    def test_other_oids_still_name_their_algorithm(self):
+        self.assertEqual(self.pkname("2.16.840.1.101.3.4.3.18"), "ML-DSA-65")
+        self.assertEqual(self.pkname("2.16.840.1.101.3.4.4.2"), "ML-KEM-768")
+        self.assertEqual(self.pkname("1.3.101.112"), "ED25519")
+
+    def test_an_unknown_oid_is_left_alone(self):
+        self.assertEqual(self.pkname("2.16.840.1.101.3.4.3.32"), "2.16.840.1.101.3.4.3.32")
+
+    FIXTURES = pathlib.Path(__file__).resolve().parent.parent / "scan" / "fixtures"
+
+    def scan(self, *names):
+        """Run the real scanner over copies of the committed certificates; return the rows it wrote."""
+        rows = {}
+        with tempfile.TemporaryDirectory() as d:
+            for n in names:
+                shutil.copy(self.FIXTURES / n, os.path.join(d, n))
+            out = subprocess.run([os.environ.get("BASH", "bash"), str(self.SCRIPT), d],
+                                 capture_output=True, text=True,
+                                 env={**os.environ, "SKIP_DIRS": str(self.FIXTURES.parent / "skip-dirs"),
+                                      "TEST_PATHS": str(self.FIXTURES.parent / "test-paths.ere")})
+            self.assertEqual(out.returncode, 0, out.stderr[-2000:])
+            found = sorted((self.FIXTURES.parent / "evidence").glob("cbom-*.csv"), key=os.path.getmtime)
+            self.assertTrue(found, "the scanner wrote no CSV")
+            for row in csv.DictReader(found[-1].read_text(encoding="utf-8-sig").splitlines()):
+                if row["위치"].endswith(".crt:1"):
+                    rows[row["위치"]] = {"alg": row["알고리즘·키 길이"], "threat": row["양자 위협"], "pr": row["우선순위"]}
+        return rows
+
+    def test_committed_certificates_carry_their_threat_on_every_openssl(self):
+        """The whole path, not just the map: committed cert -> name -> threat, with no version condition.
+
+        Below OpenSSL 3.5 and on LibreSSL, `x509 -text` prints the raw OID, so this row is only right
+        through pkname(); the point of the fixtures is that the check runs there too instead of skipping.
+        """
+        rows = self.scan("gen-128s.crt", "gen-192s.crt")
+        self.assertEqual(rows.get("gen-128s.crt:1", {}).get("alg"),
+                         "SLH-DSA-SHA2-128s / 서명 SLH-DSA-SHA2-128s", rows)
+        self.assertEqual(rows["gen-128s.crt:1"]["threat"], "보안레벨 3 미만(PQC)")
+        self.assertEqual(rows["gen-128s.crt:1"]["pr"], "P2")
+        self.assertEqual(rows["gen-192s.crt:1"]["alg"], "SLH-DSA-SHA2-192s / 서명 SLH-DSA-SHA2-192s")
+        self.assertEqual(rows["gen-192s.crt:1"]["threat"], "안전(PQC)")
+        self.assertEqual(rows["gen-192s.crt:1"]["pr"], "참고")
 
 
 if __name__ == "__main__":
