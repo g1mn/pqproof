@@ -12,7 +12,7 @@
 - 하이브리드: "Negotiated TLS1.3 group: X25519MLKEM768"
 - 고전: "Negotiated TLS1.3 group" 줄 없이 "Peer Temp Key: X25519, 253 bits"
 - 실패: 경고(alert)와 "Cipher is (NONE)". 그때의 "Negotiated TLS1.3 group NID: 0"은 그룹이 아니다.
-신뢰: CA를 주지 않으면 시스템 신뢰 저장소로 검증한다(trust=system). CA 파일(ca-file)이나 명시적 TOFU(tofu, 더 약함)를 고를 수 있다.
+신뢰: CA를 주지 않으면 시스템 루트로 검증한다(trust=system, 0.7.0부터 맥도 Go 검증기와 Apple 기본 루트). CA 파일(ca-file)이나 명시적 TOFU(tofu, 더 약함)를 고를 수 있다.
 인증서 검증이 실패한 핸드셰이크는 협상을 재지 못한 것이라 거부·고전 협상으로 읽지 않는다(verify_failed).
 """
 from __future__ import annotations  # 맥 기본 python3 3.9에서 str | None 주석이 돌게
@@ -28,7 +28,7 @@ import time
 from dataclasses import asdict, dataclass
 
 PROBE_NAME = "tls_probe"
-PROBE_VERSION = "0.6.0"
+PROBE_VERSION = "0.7.0"
 HERE = pathlib.Path(__file__).resolve().parent.parent
 PROBE_SRC = HERE / "probe"
 BIN_DIR = pathlib.Path(os.environ.get("PROBE_BIN_DIR") or HERE / "bin")  # build-probe.sh 와 같은 PROBE_BIN_DIR
@@ -220,7 +220,7 @@ def binary_version(binary, timeout=10):
 def version_problem(got):
     """탐침 판이 PROBE_VERSION 이 아니면 그 까닭(아니면 None). 0.5.0 탐침은 -ca·-tofu 없는 connect(시스템 신뢰 저장소)를
     사용법 오류로 끝내고, 그 출력을 협상 실패로 읽으면 미판정이어야 할 것이 실패가 된다. PROBE_BIN_DIR·캐시의 바이너리는
-    도구를 올려도 그대로 남는다."""
+    도구를 올려도 그대로 남는다. 0.6.0 탐침은 맥에서 검증을 OS에 맡겨 기계마다 결과가 달랐다."""
     if got == PROBE_VERSION:
         return None
     return (f"tls_probe 바이너리 판이 {got or '알 수 없음'}인데 이 도구는 {PROBE_VERSION} 이 필요하다. 다시 빌드하거나"

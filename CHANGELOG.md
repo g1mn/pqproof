@@ -10,6 +10,16 @@ Each release has a **Verdict impact (판정 영향)** line. It says whether the 
 
 Every run records `tool_version`, `ruleset_version` and `ruleset_sha256` in `receipt.json`, so a receipt from years ago still names the rules that judged it. `--verify` keeps reading older evidence formats.
 
+## [Unreleased]
+
+Tool unreleased, ruleset 10 (new), evidence format 4 (unchanged), `tls_probe` 0.7.0 (new).
+
+**Verdict impact (판정 영향): yes, for TLS targets measured on macOS without a CA file.** Before, `tls_probe` handed the macOS check of a target without a CA file to the operating system (`SecTrustEvaluateWithError`, which Go uses when no root pool is given). That verifier fills in an intermediate certificate the server left out, from its cache or the network, and trusts roots in the login and admin keychains, so the same target could pass on one Mac, fail on another and fail on Linux. `tls_probe` 0.7.0 reads Apple's system roots (`/System/Library/Keychains/SystemRootCertificates.keychain`) and verifies with Go's own verifier, the same way it already did on Linux: only the chain the server sends, no intermediate filled in, no connection to the addresses in the certificate. On macOS a target whose server leaves out its intermediate, or whose CA is only in a keychain, moves from pass to undecided; give the CA file (`#/abs/path/ca.pem`). Targets with a CA file or `#tofu`, Linux and container mode do not change. When the probe cannot read Apple's roots it exits 3 and `b-tls` is undecided, never a refusal.
+
+### Changed
+
+- `tls_probe` 0.7.0: on macOS the system roots are Apple's system root keychain, verified with Go's `crypto/x509` (`probe/roots_darwin.go`). PQ-Proof needs 0.7.0; an older binary stops the run before it measures anything, as before.
+
 ## [0.9.0] - 2026-11-27
 
 Tool 0.9.0, ruleset 9, evidence format 4 (unchanged), `tls_probe` 0.6.0 (unchanged).

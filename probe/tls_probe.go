@@ -13,9 +13,12 @@
 //	tls_probe listeners -ports=8443,9443 [-wait=10s]
 //
 // connect는 "key: value" 줄(probe, target, offered, trust, result, protocol, group, cipher, cert_sig, cert_key,
-// cert_chain, cert_not_after(RFC 3339 UTC), error)을 찍고, 핸드셰이크가 되면 0, 안 되면 1, 사용법 오류면 2로 끝난다.
+// cert_chain, cert_not_after(RFC 3339 UTC), error)을 찍고, 핸드셰이크가 되면 0, 안 되면 1, 사용법 오류면 2, 시스템 루트를
+// 읽지 못하면 3으로 끝난다.
 //
-// 신뢰: -ca도 -tofu도 없으면 시스템 신뢰 저장소(RootCAs nil)와 -servername으로 서버 인증서를 검증한다("trust: system").
+// 신뢰: -ca도 -tofu도 없으면 시스템 루트와 -servername으로 서버 인증서를 검증한다("trust: system"). 검증은 어느 OS에서나
+// Go 자체 검증기가 한다: 리눅스는 디스크의 루트, 맥은 Apple 기본 루트만 읽는다(roots_darwin.go). 서버가 보낸 사슬로만
+// 검증하고 빠진 중간 인증서를 채우지 않으며, 인증서에 적힌 주소(AIA·OCSP·CRL)로 접속하지 않는다.
 // -ca=PATH는 그 CA만 믿는다("trust: ca-file"). 인증서 검증이 실패하면 error 줄이 "certificate verification failed: "로
 // 시작한다(그때 협상 그룹은 재지 못한 것이고, 읽는 쪽은 이것을 거부나 고전 협상으로 읽으면 안 된다).
 //
@@ -55,7 +58,7 @@ import (
 	"time"
 )
 
-const version = "0.6.0"
+const version = "0.7.0"
 
 // 읽는 쪽(pqlite/tlsprobe.py)이 이 앞머리로 '검증 실패라 협상을 재지 못함'을 거부·실패와 가른다
 const verifyFailed = "certificate verification failed: "
@@ -323,16 +326,13 @@ func connect(args []string) int {
 	default:
 		fmt.Println("trust: system")
 	}
-	var roots *x509.CertPool // nil: Go가 시스템 신뢰 저장소를 쓴다
-	if *caFile != "" {
-		caPEM, err := os.ReadFile(*caFile)
-		if err != nil {
-			return fail(err)
-		}
-		roots = x509.NewCertPool()
-		if !roots.AppendCertsFromPEM(caPEM) {
-			return fail(errors.New("no certificate in " + *caFile))
-		}
+	roots, err := trustRoots(*caFile)
+	if errors.Is(err, errSystemRoots) {
+		fmt.Fprintln(os.Stderr, err) // 재지 못한 것이지 서버의 거부가 아니다: 읽는 쪽은 0·1 밖의 코드를 미판정으로 둔다
+		return 3
+	}
+	if err != nil {
+		return fail(err)
 	}
 	conf := &tls.Config{RootCAs: roots, ServerName: *serverName, CurvePreferences: ids}
 	raw, err := dial(target, *wait)
@@ -358,6 +358,29 @@ func connect(args []string) int {
 			len(st.PeerCertificates), leaf.NotAfter.UTC().Format(time.RFC3339))
 	}
 	return 0
+}
+
+var errSystemRoots = errors.New("system roots")
+
+// trustRoots는 connect가 RootCAs로 쓰는 풀이다. CA 파일이 있으면 그 CA만, 없으면 systemRoots(맥은 Apple 기본 루트,
+// 리눅스는 nil이라 Go가 디스크의 루트를 읽는다).
+func trustRoots(caFile string) (*x509.CertPool, error) {
+	if caFile == "" {
+		roots, err := systemRoots()
+		if err != nil {
+			return nil, fmt.Errorf("%w: %v", errSystemRoots, err)
+		}
+		return roots, nil
+	}
+	caPEM, err := os.ReadFile(caFile)
+	if err != nil {
+		return nil, err
+	}
+	roots := x509.NewCertPool()
+	if !roots.AppendCertsFromPEM(caPEM) {
+		return nil, errors.New("no certificate in " + caFile)
+	}
+	return roots, nil
 }
 
 func groupName(id tls.CurveID) string {

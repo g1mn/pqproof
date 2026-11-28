@@ -16,6 +16,7 @@ EXTERNAL = (
     ("bash", "required", ">=3.2", "runs prove.sh, cbom-scan.sh and residue.sh (grep, awk, sed, find and the other POSIX tools too)"),
     ("openssl", "required", ">=3.5 recommended", "reads certificates and keys; 3.5 or later also runs the TLS cross-check"),
     ("keytool", "optional", "any JDK", "reads .jks and .p12 keystores; without it they are listed as not checked"),
+    ("security", "optional", "macOS /usr/bin/security", "tls_probe on macOS reads Apple's system roots with it for a TLS target without a CA file"),
 )
 
 

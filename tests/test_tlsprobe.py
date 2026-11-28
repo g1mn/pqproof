@@ -266,6 +266,21 @@ class ProbeVersion(unittest.TestCase):
         self.assertIn("exit=2", problem)
         self.assertEqual(rules.tls_status(t, problem, ([], []), {"via": "host"})[0], "undecided")
 
+    def test_unreadable_system_roots_is_a_tool_error_not_a_refusal(self):
+        # 0.7.0 on macOS reads Apple's system roots before it connects; when that fails it exits 3 without a handshake
+        no_roots = self.fake(f"""#!/bin/sh
+case "$1" in
+  version) echo "tls_probe {T.PROBE_VERSION} (go1.27.4)";;
+  *) printf 'probe: tls_probe {T.PROBE_VERSION} (go1.27.4)\ntarget: 127.0.0.1:1\noffered: X25519MLKEM768\ntrust: system\n'
+     echo "system roots: exit status 1" >&2; exit 3;;
+esac
+""", "tls_probe-noroots")
+        with mock.patch.object(T, "host_binary", return_value=no_roots), \
+                mock.patch.object(T, "references", return_value=(None, None, {})):
+            controls, problem, t, b = prove.tls_runs(self.params(), os.path.join(self.tmp.name, "tls"), [], ["127.0.0.1:1"], [], [])
+        self.assertIn("exit=3", problem)
+        self.assertEqual(rules.tls_status(t, problem, ([], []), {"via": "host"})[0], "undecided")
+
 
 class Args(unittest.TestCase):
     def test_connect_trust_flags(self):

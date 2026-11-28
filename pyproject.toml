@@ -1,6 +1,6 @@
 # PQ-Proof 파이썬 패키지. 판정 코드(prove.sh·prove.py·pqlite/·scan/)는 저장소 루트에 그대로 두고, 휠을 만들 때
 # pqproof/_tool/ 아래로 옮겨 담는다(force-include). 그래서 `bash prove.sh` 와 `pqproof` 가 같은 파일을 돈다.
-# 런타임 파이썬 의존은 없다. 바깥 의존은 bash·openssl(필수), keytool·tls_probe(선택)이고 pqproof 가 실행 때 점검한다.
+# 런타임 파이썬 의존은 없다. 바깥 의존은 bash·openssl(필수), keytool·tls_probe(선택, 맥의 tls_probe 는 /usr/bin/security 로 Apple 루트를 읽는다)이고 pqproof 가 실행 때 점검한다.
 # 배포는 .github/workflows/release.yml(태그 v*)에서 PyPI Trusted Publishing 으로 한다. 토큰을 저장하지 않는다.
 # 버전은 src/pqproof/__init__.py 의 __version__ 한 곳에서만 정한다(dynamic). prove.sh --version 도 같은 곳을 읽는다.
 

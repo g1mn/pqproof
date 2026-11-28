@@ -35,10 +35,10 @@ class Release(unittest.TestCase):
         names = {c["name"]: c for c in out["components"]}
         self.assertEqual(names["tls_probe-linux-amd64"]["hashes"][0]["content"], "ab" * 32)
         self.assertIn({"name": "pqproof:go", "value": "go version go1.27.4 linux/amd64"}, names["tls_probe-linux-amd64"]["properties"])
-        self.assertEqual((names["bash"]["scope"], names["openssl"]["scope"], names["keytool"]["scope"]),
-                         ("required", "required", "optional"))
+        self.assertEqual((names["bash"]["scope"], names["openssl"]["scope"], names["keytool"]["scope"], names["security"]["scope"]),
+                         ("required", "required", "optional", "optional"))
         dep = next(x for x in out["dependencies"] if x["ref"] == "pqproof==9.9.9")
-        self.assertEqual(len(dep["dependsOn"]), 5)
+        self.assertEqual(len(dep["dependsOn"]), 6)
         json.dumps(out)
 
     def test_build_and_lint_tools_are_hash_pinned(self):
